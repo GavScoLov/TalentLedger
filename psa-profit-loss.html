@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - PSA Profit & Loss</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-trendline@1.0.0/dist/chartjs-plugin-trendline.min.js"></script>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        .report-layout {
+            display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto 1fr; gap: 16px;
+        }
+        .report-tabs { grid-row: 1; grid-column: 1 / 3; }
+        .report-table-section { grid-row: 2; grid-column: 1; display: flex; flex-direction: column; gap: 16px; }
+        .report-chart-section { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; }
+        .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 400px); }
+        .total-bar {
+            background-color: var(--primary); color: #fff; padding: 8px 12px;
+            border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px;
+        }
+        .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
+
+        /* Radio filter group */
+        .radio-filter-group {
+            display: flex; gap: 2px; align-items: center;
+        }
+        .radio-filter-group input[type="radio"] {
+            position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;
+        }
+        .radio-filter-group label {
+            display: flex; align-items: center; justify-content: center;
+            padding: 6px 16px; border-radius: 6px; background-color: var(--bg-default);
+            color: var(--text-primary); font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: background-color 0.2s, color 0.2s;
+            border: 1px solid var(--border-color);
+        }
+        .radio-filter-group label:hover { background-color: var(--border-color); }
+        .radio-filter-group input[type="radio"]:checked + label {
+            background-color: var(--primary); color: #fff; border-color: var(--primary);
+        }
+        .radio-filter-group input[type="radio"]:checked + label:hover {
+            background-color: var(--primary-dark);
+        }
+
+        /* Graph filter bar */
+        .graph-filter-bar {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .graph-filter-bar select { max-width: 140px; }
+        .graph-filter-title {
+            flex: 1; text-align: center; font-size: 16px; font-weight: 700;
+            color: var(--text-primary);
+        }
+        .graph-total-bar {
+            display: flex; justify-content: center; padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .total-revenue-display {
+            background-color: rgba(124, 58, 237, 0.1); color: var(--primary);
+            padding: 8px 32px; border-radius: 6px; font-size: 18px; font-weight: 700;
+        }
+        .graph-display {
+            flex: 1; display: flex; justify-content: center; align-items: center;
+            padding: 12px; min-height: 300px;
+        }
+        .graph-display canvas { max-width: 100%; max-height: 500px; }
+        .no-data-message { text-align: center; color: var(--text-secondary); font-size: 1.1em; }
+
+        /* Print button */
+        .btn-icon {
+            background: none; border: 1px solid var(--border-color); border-radius: 6px;
+            padding: 6px 10px; cursor: pointer; display: flex; align-items: center;
+            transition: background-color 0.2s;
+        }
+        .btn-icon:hover { background-color: var(--bg-default); }
+        .btn-icon img { height: 20px; width: 20px; }
+
+        /* Overhead tabs */
+        .overhead-card { overflow: hidden; }
+        .tab-buttons { display: flex; border-bottom: 1px solid var(--border-color); }
+        .tab-button {
+            background-color: var(--bg-default); border: none; outline: none;
+            cursor: pointer; padding: 10px 16px; transition: 0.2s;
+            font-size: 14px; font-weight: 600; color: var(--text-secondary);
+            border-radius: 0;
+        }
+        .tab-button:hover { background-color: var(--border-color); }
+        .tab-button.active {
+            background-color: var(--primary); color: #fff;
+        }
+        .tab-content { display: none; padding: 12px; }
+        .tab-content.active { display: block; }
+
+        /* Overhead form */
+        .overhead-form-header {
+            color: var(--text-primary); font-size: 18px; font-weight: 700;
+            padding: 8px 0; text-align: center;
+        }
+        .overhead-form { display: flex; flex-direction: column; gap: 10px; color: var(--text-primary); }
+        .overhead-form .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .overhead-form .form-group label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+        .overhead-form input[type="text"],
+        .overhead-form input[type="date"],
+        .overhead-form input[type="number"],
+        .overhead-form select {
+            padding: 8px 12px; border: 1px solid var(--border-color); background-color: var(--bg-default);
+            border-radius: 8px; font-size: 14px; width: 100%; box-sizing: border-box;
+            font-family: 'Inter', sans-serif; transition: border-color 0.2s;
+        }
+        .overhead-form input:focus, .overhead-form select:focus {
+            outline: none; border-color: var(--primary);
+        }
+        .overhead-form .submit-button {
+            background-color: var(--primary); color: #fff; padding: 10px 16px;
+            border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .overhead-form .submit-button:hover { background-color: var(--primary-dark); }
+        .overhead-message { padding: 10px; border-radius: 4px; font-weight: 600; text-align: center; }
+        .overhead-message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .overhead-message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        /* Amount cell alignment */
+        .amount-cell { text-align: right; font-weight: 600; }
+
+        @media (max-width: 900px) {
+            .report-layout { grid-template-columns: 1fr; }
+            .report-chart-section { grid-column: 1; }
+        }
+
+        /* Print styles */
+        @media print {
+            body { background-color: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; padding: 0; }
+            .sidebar, .topbar, .report-tabs, .filter-bar, .graph-filter-bar, .tab-buttons, .overhead-form { display: none !important; }
+            .main-content { margin: 0 !important; padding: 0 !important; }
+            .report-layout { display: block !important; }
+            .report-table-section, .report-chart-section { width: 100% !important; }
+            .card { box-shadow: none !important; border: none !important; }
+            .data-table th, .data-table td { border: 1px solid #000 !important; color: #000 !important; }
+            .data-table th { background-color: #ddd !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">PSA Profit & Loss</h1>
+            </div>
+            <div class="report-layout">
+                <div class="report-tabs">
+                    <div class="card" style="padding:8px;">
+                        <div class="tab-nav" style="margin:0;border:0;">
+                            <a href="./profit-loss.html" class="tab-nav-item">P&L</a>
+                            <a href="./psa-profit-loss.html" class="tab-nav-item active">PSA P&L</a>
+                            <div style="flex:1;display:flex;gap:6px;justify-content:flex-end;align-items:center;">
+                                <input class="form-input" type="date" id="start_date_internal" style="max-width:150px;">
+                                <input class="form-input" type="date" id="end_date_internal" style="max-width:150px;">
+                                <input class="form-input" type="text" id="company_search_internal" placeholder="Search company..." style="max-width:180px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-table-section">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                        <div class="filter-bar">
+                            <select class="form-select" id="table_filter_branch_select">
+                                <option value="all">All Branches</option>
+                                <option value="MO-STL">MO-STL</option>
+                                <option value="GA-ATL">GA-ATL</option>
+                                <option value="Austell & Kennesaw">Austell & Kennesaw</option>
+                                <option value="Adairsville">Adairsville</option>
+                                <option value="Austell">Austell</option>
+                                <option value="Bridgeton">Bridgeton</option>
+                                <option value="Cartersville">Cartersville</option>
+                                <option value="Fairview">Fairview</option>
+                                <option value="Kennesaw">Kennesaw</option>
+                                <option value="Mehlville">Mehlville</option>
+                                <option value="Rome">Rome</option>
+                                <option value="St Charles">St Charles</option>
+                            </select>
+                            <div class="radio-filter-group">
+                                <input type="radio" id="plg_radio_filter_all" name="plg_radio_filter" value="All" checked>
+                                <label for="plg_radio_filter_all">All</label>
+                                <input type="radio" id="plg_radio_filter_dhp" name="plg_radio_filter" value="DHP">
+                                <label for="plg_radio_filter_dhp">DHP</label>
+                                <input type="radio" id="plg_radio_filter_gsp" name="plg_radio_filter" value="GSP">
+                                <label for="plg_radio_filter_gsp">GSP</label>
+                            </div>
+                            <button class="btn btn-primary" type="button" id="table_filter_search_button" style="padding:6px 16px;">Apply</button>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="data-table" id="branch_table">
+                                <thead>
+                                    <tr>
+                                        <th>Branch</th>
+                                        <th class="amount-cell">DHP Profit</th>
+                                        <th class="amount-cell">GSP Profit</th>
+                                        <th class="amount-cell">Overhead</th>
+                                        <th class="amount-cell">Overall Profit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="branch_table_body"></tbody>
+                            </table>
+                        </div>
+                        <div class="total-bar" id="total-revenue">Total Revenue: $0.00</div>
+                    </div>
+                    <div class="card overhead-card" style="padding:0;overflow:hidden;">
+                        <div class="tab-buttons">
+                            <button class="tab-button" onclick="openTab(event, 'CurrentOverhead')">Current Overhead</button>
+                            <button class="tab-button" onclick="openTab(event, 'AddOverhead')">Add Overhead</button>
+                        </div>
+                        <div id="CurrentOverhead" class="tab-content">
+                            <div class="table-scroll" style="max-height:200px;">
+                                <table class="data-table" id="overhead_table">
+                                    <thead>
+                                        <tr>
+                                            <th>Branch</th>
+                                            <th>Week Ending</th>
+                                            <th class="amount-cell">Rent</th>
+                                            <th class="amount-cell">Producer</th>
+                                            <th class="amount-cell">SS/SM</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <p id="no_overhead_data_message" class="no-data-message" style="display:none;">No overhead data available.</p>
+                        </div>
+                        <div id="AddOverhead" class="tab-content">
+                            <div class="overhead-form-header">Add Overhead Entry</div>
+                            <div id="overhead_message"></div>
+                            <form class="overhead-form" id="overhead_form">
+                                <div class="form-group">
+                                    <label for="overhead_branch">Branch:</label>
+                                    <select id="overhead_branch" name="overhead_branch" required>
+                                        <option value="">Select Branch</option>
+                                        <option value="Adairsville">Adairsville</option>
+                                        <option value="Austell">Austell</option>
+                                        <option value="Bridgeton">Bridgeton</option>
+                                        <option value="Cartersville">Cartersville</option>
+                                        <option value="Fairview">Fairview</option>
+                                        <option value="Kennesaw">Kennesaw</option>
+                                        <option value="Mehlville">Mehlville</option>
+                                        <option value="Rome">Rome</option>
+                                        <option value="St Charles">St Charles</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="overhead_week_ending">Week Ending:</label>
+                                    <input type="date" id="overhead_week_ending" name="overhead_week_ending" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="overhead_rent">Rent ($):</label>
+                                    <input type="number" id="overhead_rent" name="overhead_rent" step="0.01" placeholder="0.00" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="overhead_producer">Producer ($):</label>
+                                    <input type="number" id="overhead_producer" name="overhead_producer" step="0.01" placeholder="0.00" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="overhead_ss_sm">SS/SM ($):</label>
+                                    <input type="number" id="overhead_ss_sm" name="overhead_ss_sm" step="0.01" placeholder="0.00" required>
+                                </div>
+                                <button type="submit" class="submit-button">Submit Overhead</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-chart-section">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                        <div class="graph-filter-bar">
+                            <select class="form-select" id="graph_filter_interval_select" style="max-width:120px;">
+                                <option value="weekly" selected>Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                            <div class="graph-filter-title">PLG - Profit & Loss Graph (Sequenced)</div>
+                            <select class="form-select" id="graph_filter_type_select" style="max-width:100px;">
+                                <option value="bar" selected>Bar</option>
+                                <option value="line">Line</option>
+                                <option value="pie">Pie</option>
+                            </select>
+                            <select class="form-select" id="graph_filter_plg_sub_select" style="max-width:140px;">
+                                <option value="Sequenced" selected>Sequenced</option>
+                                <option value="Cumulative">Cumulative</option>
+                                <option value="Worst 4">Worst 4</option>
+                                <option value="Best 4">Best 4</option>
+                            </select>
+                            <button class="btn-icon" id="print_page_button" title="Print">
+                                <img src="https://cdn-icons-png.flaticon.com/512/93/93649.png" alt="Print">
+                            </button>
+                        </div>
+                        <div class="graph-total-bar">
+                            <div class="total-revenue-display" id="graph-total-display">Total: 0.00</div>
+                        </div>
+                        <div class="graph-display">
+                            <!-- Chart will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+        await checkAuth();
+        await checkPageAccess('profit-loss');
+        renderNavbar();
+        await renderSidebar();
+        initInactivityTimer();
+    </script>
+    <script>
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#6B7280';
+
+        // Register Chart.js Datalabels plugin
+        if (typeof ChartDataLabels !== 'undefined') {
+            Chart.register(ChartDataLabels);
+        } else {
+            console.warn("Chart.js Datalabels plugin not loaded or defined.");
+        }
+
+        // Register Chart.js Trendline plugin
+        if (typeof ChartTrendline !== 'undefined') {
+            Chart.register(ChartTrendline);
+        } else {
+            console.warn("Chart.js Trendline plugin not loaded or defined.");
+        }
+
+        // TODO: No Supabase table defined yet for PSA profit & loss data.
+        // This data source (PSA Staffing API) hasn't been defined in the Supabase schema.
+        // Once a psa_profit_loss or branch_financials table is created, replace this sample data with:
+        // const { data: sampleBranchData, error } = await supabase.from('psa_profit_loss').select('*');
+        // Sample data for initial rendering
+        const sampleBranchData = [
+            { branch: 'Austell', DHP_Profit: 12500, GSP_Profit: 8200, Overhead: 3500, Overall_Profit: 17200 },
+            { branch: 'Rome', DHP_Profit: 9800, GSP_Profit: 6400, Overhead: 2800, Overall_Profit: 13400 },
+            { branch: 'Kennesaw', DHP_Profit: 11200, GSP_Profit: 7600, Overhead: 3200, Overall_Profit: 15600 },
+            { branch: 'Cartersville', DHP_Profit: 6500, GSP_Profit: 4100, Overhead: 2100, Overall_Profit: 8500 },
+            { branch: 'Adairsville', DHP_Profit: 7200, GSP_Profit: 4800, Overhead: 2400, Overall_Profit: 9600 },
+            { branch: 'Mehlville', DHP_Profit: 8900, GSP_Profit: 5500, Overhead: 2600, Overall_Profit: 11800 },
+            { branch: 'St Charles', DHP_Profit: 7800, GSP_Profit: 5200, Overhead: 2500, Overall_Profit: 10500 },
+            { branch: 'Bridgeton', DHP_Profit: 6200, GSP_Profit: 3900, Overhead: 2000, Overall_Profit: 8100 },
+            { branch: 'Fairview', DHP_Profit: 5500, GSP_Profit: 3600, Overhead: 1900, Overall_Profit: 7200 },
+        ];
+
+        const initialGraphLabels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'];
+        const initialGraphData = [4200, -1500, 6800, 3200, -800]; // Sequenced profit data
+        const initialCumulativeGraphData = [4200, 2700, 9500, 12700, 11900]; // Cumulative profit data
+        const initialWorst4BranchData = [
+            { label: 'Fairview', data: [7200], backgroundColor: 'rgba(255, 99, 132, 0.7)', borderColor: 'rgb(255, 99, 132)', borderWidth: 1 },
+            { label: 'Bridgeton', data: [8100], backgroundColor: 'rgba(255, 159, 64, 0.7)', borderColor: 'rgb(255, 159, 64)', borderWidth: 1 },
+            { label: 'Cartersville', data: [8500], backgroundColor: 'rgba(255, 205, 86, 0.7)', borderColor: 'rgb(255, 205, 86)', borderWidth: 1 },
+            { label: 'Adairsville', data: [9600], backgroundColor: 'rgba(201, 203, 207, 0.7)', borderColor: 'rgb(201, 203, 207)', borderWidth: 1 },
+        ];
+        const initialBest4BranchData = [
+            { label: 'Austell', data: [17200], backgroundColor: 'rgba(75, 192, 192, 0.7)', borderColor: 'rgb(75, 192, 192)', borderWidth: 1 },
+            { label: 'Kennesaw', data: [15600], backgroundColor: 'rgba(54, 162, 235, 0.7)', borderColor: 'rgb(54, 162, 235)', borderWidth: 1 },
+            { label: 'Rome', data: [13400], backgroundColor: 'rgba(153, 102, 255, 0.7)', borderColor: 'rgb(153, 102, 255)', borderWidth: 1 },
+            { label: 'Mehlville', data: [11800], backgroundColor: 'rgba(124, 58, 237, 0.7)', borderColor: 'rgb(124, 58, 237)', borderWidth: 1 },
+        ];
+
+        const initialGraphColors = ['rgba(75, 192, 192, 0.7)', 'rgba(255, 99, 132, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(255, 99, 132, 0.7)'];
+        const initialCumulativeGraphColors = ['rgba(75, 192, 192, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(75, 192, 192, 0.7)'];
+        const initialGraphFonts = ['#1F2937', '#1F2937', '#1F2937', '#1F2937', '#1F2937'];
+        const initialCumulativeGraphFonts = ['#1F2937', '#1F2937', '#1F2937', '#1F2937', '#1F2937'];
+
+        const initialPieChartColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#7BC8A4'];
+        const initialGraphType = "bar";
+        const initialInterval = "weekly";
+        const initialPLGRadioFilter = "All";
+        const initialPLGSubGraph = "Sequenced";
+
+        // Branch groups for client-side filtering
+        const branchGroups = {
+            'MO-STL': ['Mehlville', 'St.', 'Bridgeton', 'Fairview'],
+            'GA-ATL': ['Adairsville', 'Austell', 'Cartersville', 'Rome', 'Kennesaw'],
+            'Austell & Kennesaw': ['Austell', 'Kennesaw'],
+        };
+
+        // Sample overhead data
+        const initialCurrentOverheadData = [
+            { branch: 'Austell', week_ending: '2025-03-07', rent: '1200.00', producer: '1500.00', ss_sm: '800.00' },
+            { branch: 'Rome', week_ending: '2025-03-07', rent: '900.00', producer: '1200.00', ss_sm: '700.00' },
+            { branch: 'Kennesaw', week_ending: '2025-03-07', rent: '1100.00', producer: '1400.00', ss_sm: '700.00' },
+            { branch: 'Mehlville', week_ending: '2025-03-07', rent: '850.00', producer: '1100.00', ss_sm: '650.00' },
+        ];
+
+        // Set default dates
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        document.getElementById('start_date_internal').value = lastMonth.toISOString().split('T')[0];
+        document.getElementById('end_date_internal').value = today.toISOString().split('T')[0];
+
+        // Compute graph total from sample data
+        let graphTotal = sampleBranchData.reduce((sum, row) => sum + row.Overall_Profit, 0);
+
+        // Render the branch table
+        function renderBranchTable() {
+            const tbody = document.getElementById('branch_table_body');
+            tbody.innerHTML = '';
+            let total = 0;
+            const sorted = [...sampleBranchData].sort((a, b) => b.Overall_Profit - a.Overall_Profit);
+            sorted.forEach(row => {
+                total += row.Overall_Profit;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.branch}</td>
+                    <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.DHP_Profit)}</td>
+                    <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.GSP_Profit)}</td>
+                    <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.Overhead)}</td>
+                    <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.Overall_Profit)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('total-revenue').textContent = `Total Revenue: $${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('graph-total-display').textContent = `Total: ${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+
+        let myChart = null;
+
+        function updateGraphTitle(graphType, interval, startDate, endDate, branchFilter, companySearch, plgSubGraph) {
+            const titleDiv = document.querySelector('.graph-filter-title');
+            let branchText = branchFilter !== 'all' ? ` - ${branchFilter}` : '';
+            let companySearchText = companySearch ? ` - ${companySearch}` : '';
+            titleDiv.textContent = `PLG - Profit & Loss Graph (${plgSubGraph})${branchText}${companySearchText}`;
+        }
+
+        function renderChart(labels, sequencedData, cumulativeData, worst4BranchData, best4BranchData, type, interval, startDate, endDate, branchFilter, companySearch, plgSubGraph, colors_for_sequenced_segments, fonts_for_sequenced_segments, colors_for_cumulative_segments, fonts_for_cumulative_segments) {
+            const graphDisplayDiv = document.querySelector('.graph-display');
+
+            // Clear previous chart or message
+            if (myChart) {
+                myChart.destroy();
+                myChart = null;
+            }
+            graphDisplayDiv.innerHTML = '';
+
+            let dataToUse = [];
+            let datasetsToRender = [];
+            let currentColors = [];
+            let currentFonts = [];
+            let currentLabels = labels;
+
+            // Enable/disable interval selector based on sub-graph selection
+            const intervalSelect = document.getElementById('graph_filter_interval_select');
+            if (plgSubGraph === 'Worst 4' || plgSubGraph === 'Best 4') {
+                intervalSelect.disabled = true;
+                currentLabels = ['Total Profit'];
+            } else {
+                intervalSelect.disabled = false;
+            }
+
+            if (type === 'pie') {
+                dataToUse = sequencedData;
+                currentColors = initialPieChartColors;
+                currentFonts = initialGraphFonts;
+
+                if (!currentLabels || currentLabels.length === 0 || !dataToUse || dataToUse.length === 0) {
+                    graphDisplayDiv.innerHTML = '<p class="no-data-message">No graph data available for the selected filters and interval.</p>';
+                    return;
+                }
+
+                datasetsToRender = [{
+                    data: dataToUse,
+                    backgroundColor: currentColors,
+                    hoverOffset: 10
+                }];
+            } else {
+                if (plgSubGraph === 'Sequenced') {
+                    dataToUse = sequencedData;
+                    currentColors = colors_for_sequenced_segments;
+                    currentFonts = fonts_for_sequenced_segments;
+                    datasetsToRender = [{
+                        label: `Sequenced Profit`,
+                        data: dataToUse,
+                        backgroundColor: type === 'bar' ? currentColors : 'rgba(0,0,0,0)',
+                        borderColor: currentColors,
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: currentColors,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        spanGaps: true
+                    }];
+                    if (type === 'line' || type === 'bar') {
+                        datasetsToRender[0].trendlineLinear = {
+                            style: function(trendline) {
+                                if (trendline.slope > 0) {
+                                    return 'rgba(50, 205, 50, 1)';
+                                } else if (trendline.slope < 0) {
+                                    return 'rgba(210, 43, 43, 1)';
+                                } else {
+                                    return 'rgba(102, 102, 102, 0.6)';
+                                }
+                            },
+                            lineStyle: "dotted",
+                            width: 2
+                        };
+                    }
+                } else if (plgSubGraph === 'Cumulative') {
+                    dataToUse = cumulativeData;
+                    currentColors = colors_for_cumulative_segments;
+                    currentFonts = fonts_for_cumulative_segments;
+                    datasetsToRender = [{
+                        label: `Cumulative Profit`,
+                        data: dataToUse,
+                        backgroundColor: type === 'bar' ? currentColors : 'rgba(0,0,0,0)',
+                        borderColor: currentColors,
+                        borderWidth: 3,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: currentColors,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        spanGaps: true
+                    }];
+                    if (type === 'line' || type === 'bar') {
+                        datasetsToRender[0].trendlineLinear = {
+                            style: function(trendline) {
+                                if (trendline.slope > 0) {
+                                    return 'rgba(50, 205, 50, 1)';
+                                } else if (trendline.slope < 0) {
+                                    return 'rgba(210, 43, 43, 1)';
+                                } else {
+                                    return 'rgba(102, 102, 102, 0.6)';
+                                }
+                            },
+                            lineStyle: "dotted",
+                            width: 2
+                        };
+                    }
+                } else if (plgSubGraph === 'Worst 4') {
+                    datasetsToRender = worst4BranchData;
+                    currentFonts = ['#1F2937', '#1F2937', '#1F2937', '#1F2937'];
+                    if (!worst4BranchData || worst4BranchData.length === 0) {
+                        graphDisplayDiv.innerHTML = '<p class="no-data-message">No graph data available for the selected filters and interval.</p>';
+                        return;
+                    }
+                } else if (plgSubGraph === 'Best 4') {
+                    datasetsToRender = best4BranchData;
+                    currentFonts = ['#1F2937', '#1F2937', '#1F2937', '#1F2937'];
+                    if (!best4BranchData || best4BranchData.length === 0) {
+                        graphDisplayDiv.innerHTML = '<p class="no-data-message">No graph data available for the selected filters and interval.</p>';
+                        return;
+                    }
+                }
+
+                if (!currentLabels || currentLabels.length === 0 || datasetsToRender.length === 0 || (datasetsToRender.length === 1 && datasetsToRender[0].data.length === 0)) {
+                    graphDisplayDiv.innerHTML = '<p class="no-data-message">No graph data available for the selected filters and interval.</p>';
+                    return;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            graphDisplayDiv.appendChild(canvas);
+            const ctx = canvas.getContext('2d');
+
+            updateGraphTitle(type, interval, startDate, endDate, branchFilter, companySearch, plgSubGraph);
+            const chartTitle = '';
+
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#6B7280' }
+                    },
+                    title: {
+                        display: false,
+                        text: chartTitle,
+                        font: { size: 16 },
+                        color: '#1F2937'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== undefined) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                } else if (context.parsed !== undefined) {
+                                    label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed);
+                                }
+                                return label;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        color: function(context) {
+                            if (plgSubGraph === 'Cumulative') {
+                                return fonts_for_cumulative_segments[context.dataIndex];
+                            }
+                            return '#1F2937';
+                        },
+                        display: function(context) {
+                            return context.dataset.data[context.dataIndex] !== null;
+                        },
+                        formatter: function(value, context) {
+                            return new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            }).format(value);
+                        },
+                        font: { weight: 'bold' },
+                        align: function(context) {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value < 0 ? 'end' : 'start';
+                        },
+                        anchor: function(context) {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value < 0 ? 'end' : 'start';
+                        },
+                        offset: 5,
+                        padding: 5,
+                        rotation: 270,
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: false,
+                        ticks: { color: '#6B7280' },
+                        grid: { color: '#E8E8E8' }
+                    },
+                    y: {
+                        stacked: false,
+                        beginAtZero: false,
+                        afterDataLimits: (axis) => {
+                            const data = axis.chart.data.datasets[0].data;
+                            let minValue = Math.min(...data);
+                            let maxValue = Math.max(...data);
+
+                            axis.min = Math.min(minValue, 0);
+                            axis.max = Math.max(maxValue, 0);
+
+                            const dataRange = axis.max - axis.min;
+                            const buffer = dataRange * 0.1;
+
+                            axis.min -= buffer;
+                            axis.max += buffer;
+
+                            let additionalIncreaseAmount = 0;
+                            if (plgSubGraph === 'Sequenced') {
+                                additionalIncreaseAmount = 2000;
+                            } else if (plgSubGraph === 'Cumulative' || plgSubGraph === 'Worst 4' || plgSubGraph === 'Best 4') {
+                                additionalIncreaseAmount = 10000;
+                            }
+                            axis.max = Math.max(axis.max, maxValue + additionalIncreaseAmount);
+                            axis.min = Math.min(axis.min, minValue - additionalIncreaseAmount);
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value);
+                            },
+                            color: '#6B7280'
+                        },
+                        grid: {
+                            color: '#E8E8E8',
+                            zeroLineColor: 'rgba(0, 0, 0, 0.5)',
+                            zeroLineWidth: 2
+                        }
+                    }
+                }
+            };
+
+            if (type === 'pie') {
+                myChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: currentLabels,
+                        datasets: datasetsToRender
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 20, padding: 10, font: { size: 12 }, color: '#6B7280' } },
+                            title: {
+                                display: false,
+                                text: chartTitle,
+                                font: { size: 16 },
+                                color: '#1F2937'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) { label += ': '; }
+                                        if (context.parsed !== null) {
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                display: true, color: '#1F2937', textAlign: 'center', font: { weight: 'bold', size: 14 },
+                                formatter: (value, context) => {
+                                    const labelText = context.chart.data.labels[context.dataIndex];
+                                    const percentageMatch = labelText.match(/\(([^)]+)\)/);
+                                    if (percentageMatch) {
+                                        return percentageMatch[1];
+                                    }
+                                    return new Intl.NumberFormat('en-US', { notation: 'compact', compactDisplay: 'short' }).format(value);
+                                },
+                                anchor: 'end', align: 'end', offset: 3, padding: 4
+                            }
+                        }
+                    }
+                });
+            } else {
+                myChart = new Chart(ctx, {
+                    type: type,
+                    data: {
+                        labels: currentLabels,
+                        datasets: datasetsToRender
+                    },
+                    options: commonOptions
+                });
+            }
+        }
+
+        /**
+         * Triggers the browser's print dialog for the entire page,
+         * with CSS media queries handling the print-specific layout.
+         */
+        function printPage() {
+            window.print();
+        }
+
+        // Function to handle tab switching
+        function openTab(evt, tabName) {
+            let i, tabcontent, tabbuttons;
+
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+
+            tabbuttons = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tabbuttons.length; i++) {
+                tabbuttons[i].className = tabbuttons[i].className.replace(" active", "");
+            }
+
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+
+            if (tabName === 'CurrentOverhead') {
+                renderOverheadTable(initialCurrentOverheadData);
+            }
+        }
+
+        // Function to render the overhead table
+        function renderOverheadTable(data) {
+            const tableBody = document.querySelector('#overhead_table tbody');
+            const noDataMessage = document.getElementById('no_overhead_data_message');
+            tableBody.innerHTML = '';
+
+            if (data && data.length > 0) {
+                noDataMessage.style.display = 'none';
+                data.forEach(row => {
+                    const date = new Date(row.week_ending);
+                    const month = date.getMonth() + 1;
+                    const day = date.getDate();
+                    const year = date.getFullYear();
+                    const formattedDate = `${month}/${day}/${year}`;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.branch}</td>
+                        <td>${formattedDate}</td>
+                        <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(row.rent))}</td>
+                        <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(row.producer))}</td>
+                        <td class="amount-cell">${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(row.ss_sm))}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } else {
+                noDataMessage.style.display = 'block';
+            }
+        }
+
+        function applyFilters() {
+            // TODO: No Supabase table defined yet for PSA P&L data. Replace once table is created.
+            const startDate = document.getElementById('start_date_internal').value;
+            const endDate = document.getElementById('end_date_internal').value;
+            const companySearch = document.getElementById('company_search_internal').value;
+            const interval = document.getElementById('graph_filter_interval_select').value;
+            const graphType = document.getElementById('graph_filter_type_select').value;
+            const plgSubGraph = document.getElementById('graph_filter_plg_sub_select').value;
+            const branchFilter = document.getElementById('table_filter_branch_select').value;
+            const radioGroup = document.querySelector('input[name="plg_radio_filter"]:checked');
+            const plgRadioFilter = radioGroup ? radioGroup.value : 'All';
+
+            console.log('Applying filters:', { startDate, endDate, companySearch, interval, graphType, plgSubGraph, branchFilter, plgRadioFilter });
+
+            // Re-render chart with current settings
+            renderChart(
+                initialGraphLabels,
+                initialGraphData,
+                initialCumulativeGraphData,
+                initialWorst4BranchData,
+                initialBest4BranchData,
+                graphType,
+                interval,
+                startDate,
+                endDate,
+                branchFilter,
+                companySearch,
+                plgSubGraph,
+                initialGraphColors,
+                initialGraphFonts,
+                initialCumulativeGraphColors,
+                initialCumulativeGraphFonts
+            );
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Render initial data
+            renderBranchTable();
+
+            const startDate = document.getElementById('start_date_internal').value;
+            const endDate = document.getElementById('end_date_internal').value;
+
+            renderChart(
+                initialGraphLabels,
+                initialGraphData,
+                initialCumulativeGraphData,
+                initialWorst4BranchData,
+                initialBest4BranchData,
+                initialGraphType,
+                initialInterval,
+                startDate,
+                endDate,
+                'all',
+                '',
+                initialPLGSubGraph,
+                initialGraphColors,
+                initialGraphFonts,
+                initialCumulativeGraphColors,
+                initialCumulativeGraphFonts
+            );
+
+            // Event listeners for filters
+            document.getElementById('table_filter_search_button').addEventListener('click', applyFilters);
+            document.getElementById('graph_filter_interval_select').addEventListener('change', applyFilters);
+            document.getElementById('graph_filter_type_select').addEventListener('change', applyFilters);
+            document.getElementById('graph_filter_plg_sub_select').addEventListener('change', applyFilters);
+            document.getElementById('table_filter_branch_select').addEventListener('change', applyFilters);
+            document.querySelectorAll('input[name="plg_radio_filter"]').forEach(radio => {
+                radio.addEventListener('change', applyFilters);
+            });
+            document.getElementById('start_date_internal').addEventListener('change', applyFilters);
+            document.getElementById('end_date_internal').addEventListener('change', applyFilters);
+            document.getElementById('company_search_internal').addEventListener('change', applyFilters);
+
+            document.getElementById('print_page_button').addEventListener('click', printPage);
+
+            // Table sorting
+            const tables = document.querySelectorAll('.data-table');
+            tables.forEach(table => {
+                const headers = table.querySelectorAll('th');
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return;
+
+                headers.forEach((header, index) => {
+                    header.addEventListener('click', () => {
+                        const isAsc = header.classList.contains('sort-asc');
+                        const direction = isAsc ? 'desc' : 'asc';
+
+                        headers.forEach(h => {
+                            h.classList.remove('sort-asc', 'sort-desc');
+                        });
+
+                        header.classList.add(`sort-${direction}`);
+
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        rows.sort((rowA, rowB) => {
+                            const cellA = rowA.children[index].textContent.trim();
+                            const cellB = rowB.children[index].textContent.trim();
+                            let comparison = 0;
+
+                            if (header.classList.contains('amount-cell')) {
+                                const numA = parseFloat(cellA.replace(/[^0-9.-]+/g, ""));
+                                const numB = parseFloat(cellB.replace(/[^0-9.-]+/g, ""));
+                                comparison = numA - numB;
+                            } else {
+                                comparison = cellA.localeCompare(cellB);
+                            }
+
+                            return direction === 'asc' ? comparison : -comparison;
+                        });
+
+                        rows.forEach(row => tbody.appendChild(row));
+                    });
+                });
+            });
+
+            // Auto-sort branch table by Overall Profit descending
+            const branchTable = document.getElementById('branch_table');
+            if (branchTable) {
+                const headers = branchTable.querySelectorAll('th');
+                let overallProfitHeader = null;
+                headers.forEach(header => {
+                    if (header.textContent.trim() === 'Overall Profit') {
+                        overallProfitHeader = header;
+                    }
+                });
+
+                if (overallProfitHeader) {
+                    overallProfitHeader.click();
+                    overallProfitHeader.click();
+                }
+            }
+
+            // Open first tab by default
+            document.querySelector('.tab-button').click();
+
+            // Overhead form submission
+            document.getElementById('overhead_form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const messageDiv = document.getElementById('overhead_message');
+                const formData = {
+                    branch: document.getElementById('overhead_branch').value,
+                    week_ending: document.getElementById('overhead_week_ending').value,
+                    rent: document.getElementById('overhead_rent').value,
+                    producer: document.getElementById('overhead_producer').value,
+                    ss_sm: document.getElementById('overhead_ss_sm').value,
+                };
+                // TODO: No Supabase table defined yet for overhead data.
+                // Once an 'overhead' table is created with columns: id, branch, week_ending, rent,
+                // producer, ss_sm, created_at, replace with:
+                // const { error } = await supabase.from('overhead').insert(formData);
+                // if (error) { console.error('Error submitting overhead:', error); return; }
+                console.log('Overhead form submitted:', formData);
+                messageDiv.innerHTML = '<div class="overhead-message success">Overhead entry submitted (will be connected once an overhead table is created in Supabase).</div>';
+                this.reset();
+            });
+        });
+    </script>
+</body>
+</html>

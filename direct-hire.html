@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - Direct Hire</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        .report-layout {
+            display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto 1fr; gap: 16px;
+        }
+        .report-tabs { grid-row: 1; grid-column: 1 / 3; }
+        .report-table-section { grid-row: 2; grid-column: 1; display: flex; flex-direction: column; }
+        .report-chart-section { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; }
+        .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 340px); }
+        .total-bar {
+            background-color: var(--primary); color: #fff; padding: 8px 12px;
+            border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px;
+        }
+        .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
+        @media (max-width: 900px) {
+            .report-layout { grid-template-columns: 1fr; }
+            .report-chart-section { grid-column: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Direct Hire Placements</h1>
+            </div>
+            <div class="report-layout">
+                <div class="report-tabs">
+                    <div class="card" style="padding:8px;">
+                        <div class="tab-nav" style="margin:0;border:0;">
+                            <a href="./profit-loss.html" class="tab-nav-item">P&L</a>
+                            <a href="./descending-revenue.html" class="tab-nav-item">Desc. Revenue</a>
+                            <a href="./direct-hire.html" class="tab-nav-item active">Direct Hire</a>
+                            <a href="./general-staffing.html" class="tab-nav-item">Gen. Staffing</a>
+                            <div style="flex:1;display:flex;gap:6px;justify-content:flex-end;align-items:center;">
+                                <input class="form-input" type="date" id="start_date" style="max-width:150px;">
+                                <input class="form-input" type="date" id="end_date" style="max-width:150px;">
+                                <input class="form-input" type="text" id="company_search" placeholder="Search company..." style="max-width:180px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="report-table-section">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                        <div class="filter-bar">
+                            <select class="form-select" id="table_branch_filter">
+                                <option value="all" selected>All Branches</option>
+                                <option value="Austell">Austell</option>
+                                <option value="Rome">Rome</option>
+                                <option value="Kennesaw">Kennesaw</option>
+                            </select>
+                            <button class="btn btn-primary" type="button" onclick="applyFilters()" style="padding:6px 16px;">Apply</button>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="data-table" id="dhp-table">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Branch</th>
+                                        <th style="text-align:right">DHP Billing</th>
+                                        <th style="text-align:right">DHP Hours</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dhp-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="total-bar" id="total-dhp">Total DHP Billing: $0.00</div>
+                    </div>
+                </div>
+                <div class="report-chart-section">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                        <div class="filter-bar">
+                            <select class="form-select" id="graph_branch_filter">
+                                <option value="all" selected>All Branches</option>
+                                <option value="Austell">Austell</option>
+                                <option value="Rome">Rome</option>
+                                <option value="Kennesaw">Kennesaw</option>
+                            </select>
+                            <select class="form-select" id="graph_type">
+                                <option value="bar" selected>Bar</option>
+                                <option value="line">Line</option>
+                            </select>
+                            <button class="btn btn-primary" type="button" onclick="applyGraphFilters()" style="padding:6px 16px;">Apply</button>
+                        </div>
+                        <div class="chart-wrap">
+                            <canvas id="dhpChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+
+        await checkAuth();
+        await checkPageAccess('commission');
+        renderNavbar();
+        await renderSidebar();
+        initInactivityTimer();
+    </script>
+    <script>
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#6B7280';
+
+        const sampleDHP = [
+            { company: 'Acme Corp', branch: 'Austell', billing: 25000, hours: 160 },
+            { company: 'Beta Industries', branch: 'Rome', billing: 18000, hours: 120 },
+            { company: 'Gamma LLC', branch: 'Kennesaw', billing: 15000, hours: 100 },
+            { company: 'Delta Services', branch: 'Austell', billing: 12000, hours: 80 },
+        ];
+        const today = new Date();
+        document.getElementById('start_date').value = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split('T')[0];
+        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+
+        function renderTable() {
+            const tbody = document.getElementById('dhp-table-body'); tbody.innerHTML = ''; let total = 0;
+            sampleDHP.sort((a, b) => b.billing - a.billing).forEach(row => {
+                total += row.billing;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${row.company}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">$${row.billing.toLocaleString()}</td><td style="text-align:right;font-weight:600">${row.hours}</td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('total-dhp').textContent = `Total DHP Billing: $${total.toLocaleString()}`;
+        }
+        let dhpChart = null;
+        function renderChart() {
+            const ctx = document.getElementById('dhpChart').getContext('2d');
+            if (dhpChart) dhpChart.destroy();
+            const sorted = [...sampleDHP].sort((a, b) => b.billing - a.billing);
+            dhpChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: sorted.map(c => c.company), datasets: [{ label: 'DHP Billing ($)', data: sorted.map(c => c.billing), backgroundColor: 'rgba(124, 58, 237, 0.7)' }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } } }
+            });
+        }
+        function applyFilters() {
+            alert('DHP filters will be connected once a data source table is created in Supabase.');
+        }
+        function applyGraphFilters() {
+            alert('DHP graph filters will be connected once a data source table is created in Supabase.');
+        }
+        renderTable(); renderChart();
+    </script>
+</body>
+</html>

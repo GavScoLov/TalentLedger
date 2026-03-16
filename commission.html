@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - Commission Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        .commission-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
+        .commission-filters {
+            grid-row: 1; grid-column: 1;
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+        }
+        .commission-filters .form-select,
+        .commission-filters .form-input { min-width: 150px; flex: 1; }
+        .commission-table-wrap {
+            grid-row: 2; grid-column: 1;
+            overflow-y: auto; max-height: calc(100vh - 260px);
+        }
+        .commission-form-panel {
+            grid-row: 1 / 3; grid-column: 2;
+            display: flex; flex-direction: column;
+        }
+        .producer-form-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 12px; margin-bottom: 16px;
+        }
+        .producer-form-grid .form-group:first-child { grid-column: 1 / -1; }
+        #branches_container {
+            flex-grow: 1; overflow-y: auto; max-height: 400px;
+            padding-right: 8px; margin-bottom: 16px;
+            border-top: 1px solid var(--border-color); padding-top: 16px;
+        }
+        .branch-item {
+            background-color: var(--bg-default); padding: 10px; border-radius: 8px;
+            border: 1px solid var(--border-color); margin-bottom: 10px;
+        }
+        .branch-item .branch-header {
+            display: grid; grid-template-columns: auto 1fr 100px 100px auto;
+            align-items: center; gap: 10px;
+        }
+        .branch-item .branch-header label { font-weight: 600; color: var(--text-primary); cursor: pointer; }
+        .branch-item .branch-header input[type="number"] {
+            width: 70px; padding: 5px; border: 1px solid var(--border-color);
+            border-radius: 8px; text-align: center; font-size: 13px;
+        }
+        .custom-checkbox-button {
+            display: inline-block; cursor: pointer; width: 20px; height: 20px;
+            border: 2px solid var(--primary); border-radius: 4px; position: relative;
+            background-color: #fff; transition: all 0.2s; flex-shrink: 0;
+        }
+        .custom-checkbox-button.checked { background-color: var(--primary); border-color: var(--primary); }
+        .custom-checkbox-button.checked::after {
+            content: ''; position: absolute; top: 3px; left: 6px; width: 4px; height: 10px;
+            border: solid white; border-width: 0 3px 3px 0; transform: rotate(45deg);
+        }
+        .hidden-checkbox { display: none; }
+        .print-header, .total-header { display: none; }
+        .form-message { padding: 10px; margin-bottom: 15px; border-radius: 8px; text-align: center; font-weight: 600; }
+        .form-message.success { background-color: #d4edda; color: #155724; }
+        .form-message.error { background-color: #f8d7da; color: #721c24; }
+        @media print {
+            body { background-color: #fff !important; }
+            .sidebar, .topbar, .commission-filters, .commission-form-panel { display: none !important; }
+            .commission-layout { grid-template-columns: 1fr !important; }
+            .commission-table-wrap { max-height: none !important; overflow: visible !important; }
+            .print-header { display: block !important; font-size: 24px; text-align: center; padding: 8px; color: #000; }
+            .main-content { margin-left: 0 !important; padding: 0 !important; }
+        }
+        @media (max-width: 900px) {
+            .commission-layout { grid-template-columns: 1fr; }
+            .commission-form-panel { grid-row: auto; grid-column: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Commission Report</h1>
+                <p class="page-subtitle">Track producer commissions by branch</p>
+            </div>
+            <div class="commission-layout">
+                <form id="filterForm">
+                    <div class="commission-filters">
+                        <select class="form-select" id="group_by" name="group_by">
+                            <option value="Producer" selected>Group By: Producer</option>
+                            <option value="Branch">Group By: Branch</option>
+                            <option value="Company">Group By: Company</option>
+                        </select>
+                        <input class="form-input" type="date" id="start_date" name="start_date">
+                        <input class="form-input" type="date" id="end_date" name="end_date">
+                        <button type="submit" class="btn btn-primary" id="apply_filters_button">Apply</button>
+                        <button type="button" class="btn btn-outlined" onclick="window.print()">Print</button>
+                    </div>
+                </form>
+                <div class="commission-table-wrap">
+                    <div class="print-header" id="print-header">Commission Report</div>
+                    <div class="card" style="padding:0;overflow:hidden;">
+                        <table class="data-table" id="commission_table">
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-sort-type="text">Branch</th>
+                                    <th class="sortable" data-sort-type="text">Producer</th>
+                                    <th class="sortable" data-sort-type="date">Weekend Bill</th>
+                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Billing</th>
+                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Hours</th>
+                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Commission</th>
+                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Commission</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commission_table_body"></tbody>
+                        </table>
+                    </div>
+                    <div class="total-footer" id="total-footer"></div>
+                </div>
+                <div class="card commission-form-panel">
+                    <h3 style="margin:0 0 16px;color:var(--text-primary);text-align:center;">Producer Commission Settings</h3>
+                    <form id="producerCommissionForm">
+                        <div class="producer-form-grid">
+                            <div class="form-group">
+                                <label class="form-label" for="producer_name_input">Producer Name</label>
+                                <input class="form-input" type="text" id="producer_name_input" placeholder="e.g., John Doe" name="producer_name" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="commission_start_date">Start Date</label>
+                                <input class="form-input" type="date" id="commission_start_date" name="commission_start_date" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="commission_end_date">End Date</label>
+                                <input class="form-input" type="date" id="commission_end_date" name="commission_end_date">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Edit Producer?</label>
+                                <select class="form-select" id="existing_producer_select">
+                                    <option value="">-- Select Producer --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="branches_container">
+                            <p style="color:var(--text-secondary);text-align:center;">Branch commission settings will load once a data source table is created in Supabase.</p>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;" name="submit_producer_commissions">Save Producer Commission</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+
+        await checkAuth();
+        await checkPageAccess('commission');
+        renderNavbar();
+        await renderSidebar();
+        initInactivityTimer();
+    </script>
+    <script>
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#6B7280';
+
+        const sampleCommissionData = [
+            { branch: 'Austell', producer: 'John Doe', weekend_bill: '2025-01-05', dhp_billing: 15000, gsp_hours: 320, dhp_commission: 750, gsp_commission: 480 },
+            { branch: 'Rome', producer: 'Jane Smith', weekend_bill: '2025-01-05', dhp_billing: 12000, gsp_hours: 280, dhp_commission: 600, gsp_commission: 420 },
+            { branch: 'Kennesaw', producer: 'Bob Wilson', weekend_bill: '2025-01-12', dhp_billing: 18000, gsp_hours: 400, dhp_commission: 900, gsp_commission: 600 },
+        ];
+
+        function renderCommissionTable(data) {
+            const tbody = document.getElementById('commission_table_body');
+            tbody.innerHTML = '';
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.branch}</td>
+                    <td>${row.producer}</td>
+                    <td>${row.weekend_bill}</td>
+                    <td style="text-align:right;font-weight:600">${row.dhp_billing.toFixed(2)}</td>
+                    <td style="text-align:right;font-weight:600">${row.gsp_hours.toFixed(2)}</td>
+                    <td style="text-align:right;font-weight:600">${row.dhp_commission.toFixed(2)}</td>
+                    <td style="text-align:right;font-weight:600">${row.gsp_commission.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        const today = new Date();
+        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        document.getElementById('start_date').value = lastMonth.toISOString().split('T')[0];
+        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+
+        renderCommissionTable(sampleCommissionData);
+
+        document.getElementById('filterForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Commission filters will be connected once a commissions table is created in Supabase.');
+        });
+
+        document.getElementById('producerCommissionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('Producer commission settings will be connected once a producer_commissions table is created in Supabase.');
+        });
+
+        document.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const table = th.closest('table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const colIndex = Array.from(th.parentNode.children).indexOf(th);
+                const isAsc = th.classList.contains('sort-asc');
+
+                table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+
+                rows.sort((a, b) => {
+                    const aVal = a.children[colIndex].textContent.trim();
+                    const bVal = b.children[colIndex].textContent.trim();
+                    const sortType = th.dataset.sortType;
+                    if (sortType === 'numeric') return (isAsc ? -1 : 1) * (parseFloat(aVal.replace(/,/g, '')) - parseFloat(bVal.replace(/,/g, '')));
+                    return (isAsc ? -1 : 1) * aVal.localeCompare(bVal);
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            });
+        });
+    </script>
+</body>
+</html>
