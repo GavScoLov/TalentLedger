@@ -13,7 +13,6 @@ export default defineConfig({
         descendingRevenue: resolve(__dirname, 'descending-revenue.html'),
         directHire: resolve(__dirname, 'direct-hire.html'),
         generalStaffing: resolve(__dirname, 'general-staffing.html'),
-        tableEditor: resolve(__dirname, 'table-editor.html'),
         psaProfitLoss: resolve(__dirname, 'psa-profit-loss.html'),
         admin: resolve(__dirname, 'admin.html'),
       },
