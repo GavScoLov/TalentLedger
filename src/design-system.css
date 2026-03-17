@@ -43,7 +43,10 @@ a:hover { text-decoration: underline; }
   margin-left: var(--sidebar-width);
   margin-top: var(--topbar-height);
   padding: 24px;
-  min-height: calc(100vh - var(--topbar-height));
+  height: calc(100vh - var(--topbar-height));
+  max-height: calc(100vh - var(--topbar-height));
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 @media (max-width: 768px) {
