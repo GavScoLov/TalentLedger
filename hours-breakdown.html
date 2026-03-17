@@ -476,6 +476,19 @@
             document.getElementById('stat-total').textContent = formatNumber(total, 2) + ' hrs';
         }
 
+        // ── Date Label Formatter ─────────────────────────────────
+        const shortMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        function formatDateLabel(key, interval) {
+            if (interval === 'weekly') {
+                const d = new Date(key + 'T00:00:00');
+                return `${shortMonths[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}, ${d.getFullYear()}`;
+            } else if (interval === 'monthly') {
+                const parts = key.split('-');
+                return `${shortMonths[parseInt(parts[1]) - 1]} ${parts[0]}`;
+            }
+            return key;
+        }
+
         // ── Render Time-Series Chart ──────────────────────────────
         function renderTimeChart(timeSeries, label) {
             const ctx = document.getElementById('mainChart').getContext('2d');
@@ -533,7 +546,8 @@
 
             updateStats(timeSeries, forecastValues.length);
 
-            const allLabels = [...labels, ...forecastLabels];
+            const allLabelsRaw = [...labels, ...forecastLabels];
+            const allLabels = allLabelsRaw.map(k => formatDateLabel(k, interval));
             const actualData = [...values, ...forecastValues.map(() => null)];
             const forecastDataFull = values.map((_, i) => i === values.length - 1 ? values[i] : null);
             forecastValues.forEach(v => forecastDataFull.push(v));

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - Settings</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        .settings-table-wrap {
+            overflow-y: auto;
+            max-height: calc(100vh - 280px);
+        }
+        .settings-table-wrap .data-table {
+            width: 100%;
+        }
+        .settings-table-wrap .data-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-paper);
+            z-index: 1;
+        }
+        .settings-table-wrap .data-table td .form-input {
+            width: 100%;
+            margin: 0;
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+        .settings-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .status-message {
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .status-message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .loading-indicator {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+        }
+        .tab-bar .tab {
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 2px solid var(--border-color);
+            background: var(--bg-default);
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .tab-bar .tab:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+        .tab-bar .tab:last-child {
+            border-radius: 0 6px 6px 0;
+        }
+        .tab-bar .tab:not(:first-child) {
+            border-left: none;
+        }
+        .tab-bar .tab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Settings</h1>
+                <p class="page-subtitle">Manage application configuration</p>
+            </div>
+
+            <div class="tab-bar">
+                <div class="tab active">Branch</div>
+            </div>
+
+            <div class="card" style="padding: 16px;">
+                <div id="branch-content">
+                    <div class="loading-indicator" id="loading">Loading branches...</div>
+                </div>
+                <div class="settings-actions" id="actions" style="display:none;">
+                    <button class="btn btn-primary" id="save-btn">Save All</button>
+                    <span class="status-message" id="status" style="display:none;"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+        import { supabase } from './src/supabaseClient.js';
+        import { getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+
+        await checkAuth();
+        await checkPageAccess('settings');
+        renderNavbar();
+        await renderSidebar();
+        initInactivityTimer();
+
+        async function fetchBranches() {
+            const startDate = getDefaultStartDate();
+            const endDate = getDefaultEndDate();
+            const url = new URL('/api/psa', window.location.origin);
+            url.searchParams.set('endpoint', '/api/invoice_register/query');
+            url.searchParams.set('start_date', startDate);
+            url.searchParams.set('end_date', endDate);
+            const res = await fetch(url.toString());
+            const data = await res.json();
+            const branches = new Set();
+            data.forEach(r => {
+                const b = r.branch || r.branchname || '';
+                const n = b.toLowerCase();
+                if (b && !n.includes('corporate') && !n.includes('_corp')) branches.add(b);
+            });
+            return [...branches].sort();
+        }
+
+        async function loadSavedSettings() {
+            const { data, error } = await supabase.from('branch_settings').select('*');
+            if (error) {
+                console.error('Error loading branch settings:', error);
+                return {};
+            }
+            const map = {};
+            (data || []).forEach(row => {
+                map[row.branch] = { acronym: row.acronym || '', address: row.address || '' };
+            });
+            return map;
+        }
+
+        function renderTable(branches, saved) {
+            const contentEl = document.getElementById('branch-content');
+            if (branches.length === 0) {
+                contentEl.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">No branches found.</p>';
+                return;
+            }
+
+            let rows = branches.map(branch => {
+                const s = saved[branch] || { acronym: '', address: '' };
+                return `<tr>
+                    <td style="font-weight:600;white-space:nowrap;">${branch}</td>
+                    <td><input type="text" class="form-input branch-acronym" data-branch="${branch}" value="${s.acronym}" placeholder="e.g. ATL"></td>
+                    <td><input type="text" class="form-input branch-address" data-branch="${branch}" value="${s.address}" placeholder="123 Main St, City, ST 00000"></td>
+                </tr>`;
+            }).join('');
+
+            contentEl.innerHTML = `
+                <div class="settings-table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Branch Name</th>
+                                <th>Acronym</th>
+                                <th>Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+            document.getElementById('actions').style.display = 'flex';
+        }
+
+        async function saveAll() {
+            const statusEl = document.getElementById('status');
+            const saveBtn = document.getElementById('save-btn');
+            statusEl.style.display = 'none';
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            const rows = [];
+            document.querySelectorAll('.branch-acronym').forEach(input => {
+                const branch = input.dataset.branch;
+                const acronym = input.value.trim();
+                const addressInput = document.querySelector(`.branch-address[data-branch="${branch}"]`);
+                const address = addressInput ? addressInput.value.trim() : '';
+                rows.push({ branch, acronym, address, updated_at: new Date().toISOString() });
+            });
+
+            const { error } = await supabase.from('branch_settings').upsert(rows, { onConflict: 'branch' });
+
+            statusEl.style.display = 'inline-block';
+            if (error) {
+                statusEl.className = 'status-message error';
+                statusEl.textContent = 'Error saving settings: ' + error.message;
+            } else {
+                statusEl.className = 'status-message success';
+                statusEl.textContent = 'All branch settings saved successfully.';
+            }
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save All';
+
+            setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+        }
+
+        document.getElementById('save-btn').addEventListener('click', saveAll);
+
+        try {
+            const [branches, saved] = await Promise.all([fetchBranches(), loadSavedSettings()]);
+            renderTable(branches, saved);
+        } catch (err) {
+            console.error('Error initializing settings:', err);
+            document.getElementById('branch-content').innerHTML =
+                '<p style="color:#dc2626;text-align:center;padding:20px;">Failed to load branches. Please try again later.</p>';
+        }
+    </script>
+</body>
+</html>

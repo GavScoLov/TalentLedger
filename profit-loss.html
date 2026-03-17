@@ -554,6 +554,19 @@
             document.getElementById('total-revenue').textContent = `Revenue: ${formatCurrency2(totalRev)} | Gross Profit: ${formatCurrency2(totalGrossProfit)} | Overhead: ${formatCurrency2(totalOverhead)} | Net: ${formatCurrency2(totalNet)}`;
         }
 
+        // Format date labels: "Feb 08, 2026" for weekly, "Feb 2026" for monthly
+        const shortMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        function formatDateLabel(key, interval) {
+            if (interval === 'weekly') {
+                const d = new Date(key + 'T00:00:00');
+                return `${shortMonths[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}, ${d.getFullYear()}`;
+            } else if (interval === 'monthly') {
+                const parts = key.split('-');
+                return `${shortMonths[parseInt(parts[1]) - 1]} ${parts[0]}`;
+            }
+            return key;
+        }
+
         function renderChart() {
             const ctx = document.getElementById('profitLossChart').getContext('2d');
             if (profitLossChart) profitLossChart.destroy();
@@ -577,23 +590,48 @@
                 timeAgg[key] = (timeAgg[key] || 0) + (Number(r.invoiceamount) || 0);
             });
             const sorted = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
+            const dataValues = sorted.map(([, v]) => v);
+            const chartTotal = dataValues.reduce((s, v) => s + v, 0);
 
             const ChartDataLabels = window.ChartDataLabels || null;
             const plugins = ChartDataLabels ? [ChartDataLabels] : [];
 
+            // Colors: black for >= 0, red for < 0
+            const barColors = dataValues.map(v => v >= 0 ? 'rgba(30,30,30,0.8)' : 'rgba(220,38,38,0.8)');
+            const borderColors = dataValues.map(v => v >= 0 ? '#1E1E1E' : '#DC2626');
+
             profitLossChart = new Chart(ctx, {
                 type,
                 data: {
-                    labels: sorted.map(([k]) => k),
+                    labels: sorted.map(([k]) => formatDateLabel(k, interval)),
                     datasets: [{
                         label: 'Revenue',
-                        data: sorted.map(([, v]) => v),
-                        backgroundColor: 'rgba(234,137,56,0.7)',
-                        borderColor: 'rgb(234,137,56)',
+                        data: dataValues,
+                        backgroundColor: type === 'bar' ? barColors : 'rgba(0,0,0,0)',
+                        borderColor: type === 'bar' ? borderColors : dataValues.map(v => v >= 0 ? '#1E1E1E' : '#DC2626'),
                         borderWidth: 2, fill: false, tension: 0.3,
+                        segment: type === 'line' ? {
+                            borderColor: ctx => {
+                                const yVal = ctx.p1.parsed.y;
+                                return yVal >= 0 ? '#1E1E1E' : '#DC2626';
+                            }
+                        } : undefined,
+                        pointBackgroundColor: type === 'line' ? borderColors : undefined,
+                        pointRadius: type === 'line' ? 4 : undefined,
                     }]
                 },
-                plugins,
+                plugins: [...plugins, {
+                    id: 'totalAnnotation',
+                    afterDraw(chart) {
+                        const { ctx: c } = chart;
+                        c.save();
+                        c.font = 'bold 12px Inter, sans-serif';
+                        c.fillStyle = chartTotal >= 0 ? '#1E1E1E' : '#DC2626';
+                        c.textAlign = 'right';
+                        c.fillText(`Total: ${formatCurrency(chartTotal)}`, chart.width - 16, 16);
+                        c.restore();
+                    }
+                }],
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
@@ -602,13 +640,18 @@
                                 const val = context.parsed?.y ?? context.parsed;
                                 return val !== null && val !== undefined && val !== 0;
                             },
-                            anchor: 'end', align: 'top', color: '#333',
+                            anchor: 'end', align: 'top',
+                            color: function(context) {
+                                const val = context.parsed?.y ?? context.parsed;
+                                return val >= 0 ? '#1E1E1E' : '#DC2626';
+                            },
                             font: { size: 10, weight: '600' },
                             formatter: (value) => formatCurrency(value),
                             rotation: type === 'bar' ? -45 : 0, offset: 2,
                         },
                     },
                     scales: {
+                        x: { ticks: { color: '#6B7280', maxRotation: 45 }, grid: { color: '#E8E8E8' } },
                         y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } },
                     },
                     layout: { padding: { top: 30 } },
