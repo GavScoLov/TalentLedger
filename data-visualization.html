@@ -10,23 +10,64 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .viz-layout { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: auto auto 1fr; gap: 16px; }
+        .viz-layout { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: auto auto auto 1fr; gap: 16px; }
         .viz-filters { grid-row: 1; grid-column: 1 / 3; }
-        .viz-total-bar { grid-row: 2; grid-column: 1 / 3; }
-        .viz-table-section { grid-row: 3; grid-column: 1; }
-        .viz-chart-section { grid-row: 3; grid-column: 2; }
+        .viz-report-title { grid-row: 2; grid-column: 1 / 3; }
+        .viz-stats-bar { grid-row: 3; grid-column: 1 / 3; }
+        .viz-table-section { grid-row: 4; grid-column: 1; }
+        .viz-chart-section { grid-row: 4; grid-column: 2; }
         .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .filter-row + .filter-row { margin-top: 8px; }
         .filter-row .form-select, .filter-row .form-input { min-width: 120px; }
         .filter-row label { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
-        .table-scroll { overflow-y: auto; max-height: calc(100vh - 420px); }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 480px); }
         .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-weight: 700; font-size: 15px; }
         .chart-wrap { position: relative; min-height: 350px; padding: 12px; flex: 1; }
         .chart-wrap canvas { max-height: 500px; }
         .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
         .btn-icon { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; display: flex; align-items: center; transition: background-color 0.2s; }
         .btn-icon:hover { background-color: var(--bg-default); }
-        @media (max-width: 900px) { .viz-layout { grid-template-columns: 1fr; } .viz-chart-section, .viz-table-section { grid-column: 1; } }
+
+        /* Report title bar */
+        .report-title-bar { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 16px; text-align: center; }
+        .report-title-bar h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+        /* Stats bar */
+        .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .stat-card { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px 16px; text-align: center; }
+        .stat-card .stat-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .stat-card .stat-value { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+        .stat-card .stat-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .stat-positive { color: #059669 !important; }
+        .stat-negative { color: #DC2626 !important; }
+
+        /* Custom radio buttons for report type */
+        .radio-btn-group { display: flex; gap: 0; }
+        .radio-btn-group input[type="radio"] { display: none; }
+        .radio-btn-group label {
+            padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+            border: 2px solid var(--border-color); background: var(--bg-default); color: var(--text-secondary);
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .radio-btn-group label:first-of-type { border-radius: 6px 0 0 6px; }
+        .radio-btn-group label:last-of-type { border-radius: 0 6px 6px 0; }
+        .radio-btn-group label:not(:first-of-type) { border-left: none; }
+        .radio-btn-group input[type="radio"]:checked + label {
+            background: var(--primary); border-color: var(--primary); color: #fff;
+        }
+
+        /* Custom toggle checkboxes for DHP/GSP */
+        .toggle-checkbox input[type="checkbox"] { display: none; }
+        .toggle-checkbox label {
+            display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
+            border: 2px solid var(--border-color); border-radius: 6px; font-size: 13px; font-weight: 600;
+            color: var(--text-secondary); background: var(--bg-default); cursor: pointer; transition: all 0.2s;
+        }
+        .toggle-checkbox input[type="checkbox"]:checked + label {
+            background: var(--primary); border-color: var(--primary); color: #fff;
+        }
+
+        @media (max-width: 900px) { .viz-layout { grid-template-columns: 1fr; } .viz-chart-section, .viz-table-section { grid-column: 1; } .stats-bar { grid-template-columns: repeat(2, 1fr); } }
         @media print {
             body { background: #fff !important; }
             .sidebar, .topbar, .viz-filters { display: none !important; }
@@ -51,12 +92,14 @@
                 <div class="viz-filters">
                     <div class="card" style="padding:12px;">
                         <div class="filter-row">
-                            <select class="form-select" id="report_type" style="min-width:200px;">
-                                <option value="DRR" selected>DRR - Descending Revenue</option>
-                                <option value="GSR">GSR - General Staffing</option>
-                                <option value="DHR">DHR - Direct Hire</option>
-                                <option value="PLR">PLR - Profit & Loss</option>
-                            </select>
+                            <div class="radio-btn-group">
+                                <input type="radio" name="report_type" id="rt_drr" value="DRR" checked>
+                                <label for="rt_drr">DRR</label>
+                                <input type="radio" name="report_type" id="rt_gsr" value="GSR">
+                                <label for="rt_gsr">GSR</label>
+                                <input type="radio" name="report_type" id="rt_dhr" value="DHR">
+                                <label for="rt_dhr">DHR</label>
+                            </div>
                             <select class="form-select" id="branch_filter">
                                 <option value="all" selected>All Branches</option>
                             </select>
@@ -66,8 +109,14 @@
                             <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
                         </div>
                         <div class="filter-row">
-                            <label><input type="checkbox" id="dhp_filter"> DHP</label>
-                            <label><input type="checkbox" id="gsp_filter"> GSP</label>
+                            <div class="toggle-checkbox">
+                                <input type="checkbox" id="dhp_filter">
+                                <label for="dhp_filter">DHP</label>
+                            </div>
+                            <div class="toggle-checkbox">
+                                <input type="checkbox" id="gsp_filter">
+                                <label for="gsp_filter">GSP</label>
+                            </div>
                             <select class="form-select" id="interval_select" style="max-width:120px;">
                                 <option value="weekly" selected>Weekly</option>
                                 <option value="monthly">Monthly</option>
@@ -78,7 +127,14 @@
                                 <option value="line">Line</option>
                                 <option value="pie">Pie</option>
                             </select>
-                            <label><input type="checkbox" id="forecast_check"> Forecast</label>
+                            <select class="form-select" id="group_by" style="max-width:160px;">
+                                <option value="company" selected>Group By: Company</option>
+                                <option value="branch">Group By: Branch</option>
+                            </select>
+                            <div class="toggle-checkbox">
+                                <input type="checkbox" id="forecast_check">
+                                <label for="forecast_check">Forecast</label>
+                            </div>
                             <input class="form-input" type="date" id="forecast_end" style="max-width:150px;display:none;">
                             <button class="btn-icon" type="button" id="print-btn" title="Print" style="margin-left:auto;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -86,8 +142,29 @@
                         </div>
                     </div>
                 </div>
-                <div class="viz-total-bar">
-                    <div class="total-bar" id="total-bar">Total: $0</div>
+                <div class="viz-report-title">
+                    <div class="report-title-bar"><h2 id="report-title">PSA - DRG - Descending Revenue Graph</h2></div>
+                </div>
+                <div class="viz-stats-bar">
+                    <div class="stats-bar">
+                        <div class="stat-card">
+                            <div class="stat-label">Average Revenue</div>
+                            <div class="stat-value" id="stat-avg-revenue">$0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">% Change</div>
+                            <div class="stat-value" id="stat-pct-change">0%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Intervals</div>
+                            <div class="stat-value" id="stat-intervals">0</div>
+                            <div class="stat-sub" id="stat-intervals-detail">0 actual / 0 forecast</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total</div>
+                            <div class="stat-value" id="stat-total">$0</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="viz-table-section">
                     <div class="card" style="padding:0;overflow:hidden;">
@@ -132,6 +209,13 @@
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
 
+        // ── Report title mapping ─────────────────────────────────
+        const reportTitles = {
+            DRR: 'PSA - DRG - Descending Revenue Graph',
+            GSR: 'PSA - GSR - General Staffing Report',
+            DHR: 'PSA - DHR - Direct Hire Report',
+        };
+
         // ── State ─────────────────────────────────────────────────
         let rawInvoices = [];
         let rawBillingByBranch = [];
@@ -145,6 +229,11 @@
         // Default forecast end: 3 months from now
         const fEnd = new Date(); fEnd.setMonth(fEnd.getMonth() + 3);
         document.getElementById('forecast_end').value = fEnd.toISOString().split('T')[0];
+
+        // ── Helper: get selected report type ─────────────────────
+        function getReportType() {
+            return document.querySelector('input[name="report_type"]:checked')?.value || 'DRR';
+        }
 
         // ── Fetch Data ────────────────────────────────────────────
         async function loadData() {
@@ -191,17 +280,17 @@
 
         // ── Process Data Based on Report Type ─────────────────────
         function processData() {
-            const report = document.getElementById('report_type').value;
+            const report = getReportType();
             const branch = document.getElementById('branch_filter').value;
             const search = (document.getElementById('company_search').value || '').toLowerCase();
             const dhpOn = document.getElementById('dhp_filter').checked;
             const gspOn = document.getElementById('gsp_filter').checked;
 
-            if (report === 'PLR') {
-                processPLR(branch, search, dhpOn, gspOn);
-            } else {
-                processCompanyReport(report, branch, search, dhpOn, gspOn);
-            }
+            // Update report title
+            document.getElementById('report-title').textContent = reportTitles[report] || '';
+            document.getElementById('print-header').textContent = reportTitles[report] || '';
+
+            processCompanyReport(report, branch, search, dhpOn, gspOn);
         }
 
         // ── DRR / GSR / DHR ───────────────────────────────────────
@@ -217,13 +306,20 @@
                 return true;
             });
 
-            // Table: aggregate by company
-            const companyAgg = {};
+            const groupBy = document.getElementById('group_by').value;
+
+            // Table: aggregate by company or branch
+            const agg = {};
             filtered.forEach(r => {
-                const key = r.customername || 'Unknown';
-                if (!companyAgg[key]) companyAgg[key] = { company: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
-                companyAgg[key].revenue += Number(r.invoiceamount) || 0;
-                if (r.branchname) companyAgg[key].branches.add(r.branchname);
+                let key;
+                if (groupBy === 'branch') {
+                    key = r.branchname || 'Unknown';
+                } else {
+                    key = r.customername || 'Unknown';
+                }
+                if (!agg[key]) agg[key] = { name: key, branch: r.branchname || '', revenue: 0, branches: new Set(), hours: 0 };
+                agg[key].revenue += Number(r.invoiceamount) || 0;
+                if (r.branchname) agg[key].branches.add(r.branchname);
             });
 
             // Merge hours data for DHR/GSR
@@ -234,14 +330,19 @@
                     if (report === 'GSR' && isDHP) return;
                     if (branch !== 'all' && r.branch !== branch) return;
                     if (search && !(r.company_name || '').toLowerCase().includes(search)) return;
-                    const key = r.company_name || 'Unknown';
-                    if (!companyAgg[key]) companyAgg[key] = { company: key, branch: r.branch || '', revenue: 0, branches: new Set() };
-                    companyAgg[key].hours = (companyAgg[key].hours || 0) + (Number(r.total_hours) || 0);
-                    if (r.branch) companyAgg[key].branches.add(r.branch);
+                    let key;
+                    if (groupBy === 'branch') {
+                        key = r.branch || 'Unknown';
+                    } else {
+                        key = r.company_name || 'Unknown';
+                    }
+                    if (!agg[key]) agg[key] = { name: key, branch: r.branch || '', revenue: 0, branches: new Set(), hours: 0 };
+                    agg[key].hours = (agg[key].hours || 0) + (Number(r.total_hours) || 0);
+                    if (r.branch) agg[key].branches.add(r.branch);
                 });
             }
 
-            const tableData = Object.values(companyAgg).map(c => ({
+            const tableData = Object.values(agg).map(c => ({
                 ...c, branch: [...c.branches].join(', ')
             })).sort((a, b) => b.revenue - a.revenue);
 
@@ -263,97 +364,59 @@
 
             // Render
             const reportLabels = { DRR: 'Descending Revenue', GSR: 'General Staffing', DHR: 'Direct Hire' };
-            document.getElementById('total-bar').textContent = `Total ${reportLabels[report]}: ${formatCurrency(total)}`;
-            document.getElementById('print-header').textContent = `${reportLabels[report]} Report`;
 
-            renderCompanyTable(report, tableData);
+            renderCompanyTable(report, tableData, groupBy);
             renderTimeChart(timeSeries, reportLabels[report]);
         }
 
-        // ── PLR ───────────────────────────────────────────────────
-        function processPLR(branch, search, dhpOn, gspOn) {
-            const grossPayMap = {};
-            rawBillingByBranch.forEach(r => {
-                const b = r.branch || 'Unknown';
-                grossPayMap[b] = (grossPayMap[b] || 0) + (Number(r.total_billing) || 0);
-            });
-
-            const branchAgg = {};
-            const timeAgg = {};
-            rawInvoices.forEach(r => {
-                const b = r.branchname || 'Unknown';
-                const isDHP = (r.customername || '').toUpperCase().includes('DHP');
-                const amount = Number(r.invoiceamount) || 0;
-                if (branch !== 'all' && b !== branch) return;
-                if (dhpOn && !isDHP) return;
-                if (gspOn && isDHP) return;
-                if (search && !(r.customername || '').toLowerCase().includes(search)) return;
-
-                if (!branchAgg[b]) branchAgg[b] = { branch: b, revenue: 0 };
-                branchAgg[b].revenue += amount;
-
-                const weekend = r.weekendbill || '';
-                if (weekend) {
-                    const interval = document.getElementById('interval_select').value;
-                    let key;
-                    if (interval === 'weekly') key = weekend;
-                    else if (interval === 'monthly') key = weekend.substring(0, 7);
-                    else key = weekend.substring(0, 4);
-                    timeAgg[key] = (timeAgg[key] || 0) + amount;
-                }
-            });
-
-            const tableData = Object.values(branchAgg).map(b => {
-                const grossPay = grossPayMap[b.branch] || 0;
-                return { branch: b.branch, revenue: b.revenue, grossPay, profit: b.revenue - grossPay };
-            }).sort((a, b) => b.profit - a.profit);
-
-            const totalProfit = tableData.reduce((s, r) => s + r.profit, 0);
-            document.getElementById('total-bar').textContent = `Total Profit: ${formatCurrency2(totalProfit)}`;
-            document.getElementById('print-header').textContent = 'Profit & Loss Report';
-
-            // Render table
-            const thead = document.getElementById('table-header');
-            thead.innerHTML = '<th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Gross Pay</th><th style="text-align:right">Profit</th>';
-            const tbody = document.getElementById('data-table-body');
-            tbody.innerHTML = '';
-            if (!tableData.length) { tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">No data.</td></tr>'; }
-            else tableData.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.grossPay)}</td><td style="text-align:right;font-weight:600;color:${row.profit >= 0 ? '#10B981' : '#DC2626'}">${formatCurrency2(row.profit)}</td>`;
-                tbody.appendChild(tr);
-            });
-
-            // Time-series for profit chart: subtract proportional gross pay
-            const totalRevenue = Object.values(timeAgg).reduce((s, v) => s + v, 0);
-            const totalGrossPay = rawBillingByBranch.reduce((s, r) => s + (Number(r.total_billing) || 0), 0);
-            const timeSeries = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0])).map(([k, rev]) => {
-                const proportion = totalRevenue > 0 ? rev / totalRevenue : 0;
-                return [k, rev - (totalGrossPay * proportion)];
-            });
-
-            renderTimeChart(timeSeries, 'Profit');
-        }
-
         // ── Render Company Table ──────────────────────────────────
-        function renderCompanyTable(report, data) {
+        function renderCompanyTable(report, data, groupBy) {
             const thead = document.getElementById('table-header');
-            if (report === 'DHR' || report === 'GSR') {
-                thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Hours</th>';
+            const showHours = report === 'DHR' || report === 'GSR';
+            if (groupBy === 'branch') {
+                thead.innerHTML = `<th>Branch</th><th style="text-align:right">Revenue</th>${showHours ? '<th style="text-align:right">Hours</th>' : ''}`;
             } else {
-                thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th>';
+                thead.innerHTML = `<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th>${showHours ? '<th style="text-align:right">Hours</th>' : ''}`;
             }
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
-            const cols = (report === 'DHR' || report === 'GSR') ? 4 : 3;
+            const cols = (groupBy === 'branch' ? 1 : 2) + 1 + (showHours ? 1 : 0);
             if (!data.length) { tbody.innerHTML = `<tr><td colspan="${cols}" class="loading-indicator">No data.</td></tr>`; return; }
             data.forEach(row => {
                 const tr = document.createElement('tr');
-                let html = `<td>${row.company}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td>`;
-                if (report === 'DHR' || report === 'GSR') html += `<td style="text-align:right;font-weight:600">${formatNumber(row.hours || 0, 2)}</td>`;
+                let html;
+                if (groupBy === 'branch') {
+                    html = `<td>${row.name}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td>`;
+                } else {
+                    html = `<td>${row.name}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td>`;
+                }
+                if (showHours) html += `<td style="text-align:right;font-weight:600">${formatNumber(row.hours || 0, 2)}</td>`;
                 tr.innerHTML = html;
                 tbody.appendChild(tr);
             });
+        }
+
+        // ── Update Stats Bar ─────────────────────────────────────
+        function updateStats(timeSeries, forecastCount) {
+            const values = timeSeries.map(([, v]) => v);
+            const total = values.reduce((s, v) => s + v, 0);
+            const avg = values.length > 0 ? total / values.length : 0;
+            const actualCount = values.length;
+            const totalIntervals = actualCount + forecastCount;
+
+            // % change: first vs last interval
+            let pctChange = 0;
+            if (values.length >= 2 && values[0] !== 0) {
+                pctChange = ((values[values.length - 1] - values[0]) / Math.abs(values[0])) * 100;
+            }
+
+            document.getElementById('stat-avg-revenue').textContent = formatCurrency2(avg);
+            const pctEl = document.getElementById('stat-pct-change');
+            pctEl.textContent = (pctChange >= 0 ? '+' : '') + pctChange.toFixed(1) + '%';
+            pctEl.className = 'stat-value ' + (pctChange >= 0 ? 'stat-positive' : 'stat-negative');
+            document.getElementById('stat-intervals').textContent = totalIntervals;
+            document.getElementById('stat-intervals-detail').textContent = `${actualCount} actual / ${forecastCount} forecast`;
+            document.getElementById('stat-total').textContent = formatCurrency2(total);
         }
 
         // ── Render Time-Series Chart ──────────────────────────────
@@ -373,7 +436,6 @@
 
             // ── Forecast ──────────────────────────────────────────
             if (forecastOn && forecastEnd && values.length >= 2) {
-                // Calculate average growth between intervals
                 const growths = [];
                 for (let i = 1; i < values.length; i++) {
                     growths.push(values[i] - values[i - 1]);
@@ -382,11 +444,10 @@
                 const lastValue = values[values.length - 1];
                 const lastDate = new Date(labels[labels.length - 1] + (interval === 'yearly' ? '-01-01' : interval === 'monthly' ? '-01' : ''));
 
-                // Generate forecast intervals
                 let current = new Date(lastDate);
                 let currentVal = lastValue;
                 const endDate = new Date(forecastEnd);
-                let maxForecast = 52; // safety limit
+                let maxForecast = 52;
 
                 while (current < endDate && maxForecast-- > 0) {
                     if (interval === 'weekly') current.setDate(current.getDate() + 7);
@@ -404,20 +465,24 @@
                 }
             }
 
+            // Update stats bar
+            updateStats(timeSeries, forecastValues.length);
+
             const allLabels = [...labels, ...forecastLabels];
             const actualData = [...values, ...forecastValues.map(() => null)];
-            const forecastData = [...values.map(() => null), ...(forecastValues.length ? [values[values.length - 1], ...forecastValues.slice(0, -1)] : [])];
-            // Connect forecast: start from last actual point
             const forecastDataFull = values.map((_, i) => i === values.length - 1 ? values[i] : null);
             forecastValues.forEach(v => forecastDataFull.push(v));
 
-            const segColors = values.map(v => v >= 0 ? 'rgba(124,58,237,0.7)' : 'rgba(255,99,132,0.7)');
-            const forecastColors = forecastValues.map(() => 'rgba(124,58,237,0.3)');
-            const allColors = [...segColors, ...forecastColors];
+            // Orange color scheme
+            const orangeMain = 'rgba(234,137,56,0.7)';
+            const orangeBorder = 'rgb(234,137,56)';
+            const orangeForecast = 'rgba(234,137,56,0.3)';
+
+            const segColors = values.map(v => v >= 0 ? orangeMain : 'rgba(255,99,132,0.7)');
+            const forecastColors = forecastValues.map(() => orangeForecast);
 
             if (graphType === 'pie') {
-                // Pie: show only actual data aggregated
-                const pieColors = allLabels.map((_, i) => `hsl(${260 + i * 18}, 60%, ${50 + (i % 4) * 8}%)`);
+                const pieColors = allLabels.map((_, i) => `hsl(${25 + i * 12}, ${70 - (i % 3) * 10}%, ${50 + (i % 4) * 8}%)`);
                 mainChart = new Chart(ctx, {
                     type: 'pie',
                     data: { labels: allLabels, datasets: [{ data: [...values, ...forecastValues].map(Math.abs), backgroundColor: pieColors }] },
@@ -431,11 +496,11 @@
                 label: label,
                 data: actualData,
                 backgroundColor: graphType === 'bar' ? segColors.concat(forecastValues.map(() => null)) : 'rgba(0,0,0,0)',
-                borderColor: 'rgb(124,58,237)',
+                borderColor: orangeBorder,
                 borderWidth: 2,
                 tension: 0.3,
                 pointRadius: 4,
-                pointBackgroundColor: 'rgb(124,58,237)',
+                pointBackgroundColor: orangeBorder,
                 spanGaps: false,
             }];
 
@@ -443,16 +508,15 @@
                 datasets.push({
                     label: 'Forecast',
                     data: forecastDataFull,
-                    backgroundColor: graphType === 'bar' ? forecastColors.map(() => 'rgba(124,58,237,0.3)') : 'rgba(0,0,0,0)',
-                    borderColor: 'rgba(124,58,237,0.4)',
+                    backgroundColor: graphType === 'bar' ? forecastColors.map(() => orangeForecast) : 'rgba(0,0,0,0)',
+                    borderColor: 'rgba(234,137,56,0.4)',
                     borderWidth: 2,
                     borderDash: [6, 4],
                     tension: 0.3,
                     pointRadius: 4,
-                    pointBackgroundColor: 'rgba(124,58,237,0.4)',
+                    pointBackgroundColor: 'rgba(234,137,56,0.4)',
                     spanGaps: true,
                 });
-                // Adjust actual data to not include null fill for bar
                 if (graphType === 'bar') {
                     datasets[0].data = [...values, ...forecastValues.map(() => 0)];
                     datasets[1].data = [...values.map(() => 0), ...forecastValues];
@@ -510,13 +574,14 @@
         document.getElementById('apply-btn').addEventListener('click', loadData);
         document.getElementById('start_date').addEventListener('change', loadData);
         document.getElementById('end_date').addEventListener('change', loadData);
-        document.getElementById('report_type').addEventListener('change', processData);
+        document.querySelectorAll('input[name="report_type"]').forEach(r => r.addEventListener('change', processData));
         document.getElementById('branch_filter').addEventListener('change', processData);
         document.getElementById('company_search').addEventListener('input', processData);
         document.getElementById('dhp_filter').addEventListener('change', processData);
         document.getElementById('gsp_filter').addEventListener('change', processData);
         document.getElementById('interval_select').addEventListener('change', processData);
         document.getElementById('graph_type').addEventListener('change', processData);
+        document.getElementById('group_by').addEventListener('change', processData);
         document.getElementById('forecast_check').addEventListener('change', () => {
             document.getElementById('forecast_end').style.display = document.getElementById('forecast_check').checked ? '' : 'none';
             processData();

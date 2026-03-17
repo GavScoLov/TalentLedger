@@ -10,47 +10,63 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .report-layout { display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto 1fr; gap: 16px; }
-        .report-tabs { grid-row: 1; grid-column: 1 / 3; }
-        .report-table-section { grid-row: 2; grid-column: 1; display: flex; flex-direction: column; }
-        .report-chart-section { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; }
+        .report-layout { display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto auto 1fr; gap: 16px; }
+        .report-filters { grid-row: 1; grid-column: 1 / 3; }
+        .report-title-row { grid-row: 2; grid-column: 1 / 3; }
+        .report-table-section { grid-row: 3; grid-column: 1; display: flex; flex-direction: column; }
+        .report-chart-section { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; }
         .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; }
-        .table-scroll { overflow-y: auto; max-height: calc(100vh - 340px); }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 380px); }
         .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px; }
         .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
         .radio-group { display: flex; gap: 12px; align-items: center; padding: 4px 12px; }
         .radio-group label { color: var(--text-primary); font-weight: 500; cursor: pointer; font-size: 14px; }
         .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .report-title-bar { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 16px; text-align: center; }
+        .report-title-bar h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+        /* Custom toggle checkboxes for DHP/GSP */
+        .toggle-checkbox input[type="checkbox"] { display: none; }
+        .toggle-checkbox label {
+            display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
+            border: 2px solid var(--border-color); border-radius: 6px; font-size: 13px; font-weight: 600;
+            color: var(--text-secondary); background: var(--bg-default); cursor: pointer; transition: all 0.2s;
+        }
+        .toggle-checkbox input[type="checkbox"]:checked + label {
+            background: var(--primary); border-color: var(--primary); color: #fff;
+        }
+
         @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } .report-chart-section { grid-column: 1; } }
     </style>
 </head>
 <body>
     <div class="app-layout">
         <div class="main-content">
-            <div class="page-header"><h1 class="page-title">Profit & Loss</h1></div>
+            <div class="page-header"><h1 class="page-title">Profit & Loss</h1><p class="page-subtitle">PSA - PLR - Profit & Loss Report (Sequenced)</p></div>
             <div class="report-layout">
-                <div class="report-tabs">
-                    <div class="card" style="padding:8px;">
-                        <div class="tab-nav" style="margin:0;border:0;">
-                            <a href="./profit-loss.html" class="tab-nav-item active">P&L</a>
-                            <a href="./descending-revenue.html" class="tab-nav-item">Desc. Revenue</a>
-                            <a href="./direct-hire.html" class="tab-nav-item">Direct Hire</a>
-                            <a href="./general-staffing.html" class="tab-nav-item">Gen. Staffing</a>
-                            <div style="flex:1;display:flex;gap:6px;justify-content:flex-end;align-items:center;">
-                                <input class="form-input" type="date" id="start_date" style="max-width:150px;">
-                                <input class="form-input" type="date" id="end_date" style="max-width:150px;">
+                <div class="report-filters">
+                    <div class="card" style="padding:10px;">
+                        <div class="filter-bar" style="padding:0;">
+                            <select class="form-select" id="table_branch_filter"><option value="all" selected>All Branches</option></select>
+                            <div class="toggle-checkbox">
+                                <input type="checkbox" id="dhp_filter">
+                                <label for="dhp_filter">DHP</label>
                             </div>
+                            <div class="toggle-checkbox">
+                                <input type="checkbox" id="gsp_filter">
+                                <label for="gsp_filter">GSP</label>
+                            </div>
+                            <input class="form-input" type="date" id="start_date" style="max-width:150px;">
+                            <input class="form-input" type="date" id="end_date" style="max-width:150px;">
+                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
                         </div>
                     </div>
                 </div>
+                <div class="report-title-row">
+                    <div class="report-title-bar"><h2>PSA - PLR - Profit & Loss Report (Sequenced)</h2></div>
+                </div>
                 <div class="report-table-section">
                     <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
-                        <div class="filter-bar">
-                            <select class="form-select" id="table_branch_filter"><option value="all" selected>All Branches</option></select>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" id="dhp_filter"> DHP</label>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" id="gsp_filter"> GSP</label>
-                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
-                        </div>
                         <div class="table-scroll">
                             <table class="data-table" id="branch-table">
                                 <thead><tr><th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Gross Pay</th><th style="text-align:right">Profit</th></tr></thead>
@@ -82,7 +98,7 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
-        import { fetchInvoiceRegister, fetchTotalBillingByBranch, formatCurrency, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+        import { fetchInvoiceRegister, fetchTotalBillingByBranch, formatCurrency, formatCurrency2, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
 
         await checkAuth();
         await checkPageAccess('profit-loss');
@@ -150,10 +166,10 @@
             else data.forEach(row => {
                 totalRev += row.revenue;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.grossPay)}</td><td style="text-align:right;font-weight:600;color:${row.profit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency(row.profit)}</td>`;
+                tr.innerHTML = `<td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.grossPay)}</td><td style="text-align:right;font-weight:600;color:${row.profit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency2(row.profit)}</td>`;
                 tbody.appendChild(tr);
             });
-            document.getElementById('total-revenue').textContent = `Total Revenue: ${formatCurrency(totalRev)}`;
+            document.getElementById('total-revenue').textContent = `Total Revenue: ${formatCurrency2(totalRev)}`;
         }
 
         function renderChart() {
@@ -163,12 +179,16 @@
             const interval = document.getElementById('graph_interval').value;
             const radioFilter = document.querySelector('input[name="plg_radio"]:checked').value;
             const bf = document.getElementById('table_branch_filter').value;
+            const dhpOn = document.getElementById('dhp_filter').checked;
+            const gspOn = document.getElementById('gsp_filter').checked;
             const timeAgg = {};
             rawInvoices.forEach(r => {
                 if (bf !== 'all' && r.branchname !== bf) return;
                 const isDHP = (r.customername || '').toUpperCase().includes('DHP');
                 if (radioFilter === 'DHP' && !isDHP) return;
                 if (radioFilter === 'GSP' && isDHP) return;
+                if (dhpOn && !isDHP) return;
+                if (gspOn && isDHP) return;
                 const d = new Date(r.weekendbill);
                 const key = interval === 'weekly' ? r.weekendbill : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
                 timeAgg[key] = (timeAgg[key] || 0) + (Number(r.invoiceamount) || 0);
@@ -176,8 +196,8 @@
             const sorted = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
             profitLossChart = new Chart(ctx, {
                 type,
-                data: { labels: sorted.map(([k]) => k), datasets: [{ label: 'Revenue', data: sorted.map(([,v]) => v), backgroundColor: 'rgba(124,58,237,0.7)', borderColor: 'rgb(124,58,237)', borderWidth: 2, fill: false, tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } } } },
+                data: { labels: sorted.map(([k]) => k), datasets: [{ label: 'Revenue', data: sorted.map(([,v]) => v), backgroundColor: 'rgba(234,137,56,0.7)', borderColor: 'rgb(234,137,56)', borderWidth: 2, fill: false, tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } } } },
             });
         }
 
@@ -185,6 +205,8 @@
         document.getElementById('start_date').addEventListener('change', loadData);
         document.getElementById('end_date').addEventListener('change', loadData);
         document.getElementById('table_branch_filter').addEventListener('change', processData);
+        document.getElementById('dhp_filter').addEventListener('change', processData);
+        document.getElementById('gsp_filter').addEventListener('change', processData);
         document.getElementById('graph_type').addEventListener('change', renderChart);
         document.getElementById('graph_interval').addEventListener('change', renderChart);
         document.querySelectorAll('input[name="plg_radio"]').forEach(r => r.addEventListener('change', renderChart));
