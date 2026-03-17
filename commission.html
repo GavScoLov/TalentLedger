@@ -127,8 +127,21 @@
                                 <option value="Company">Group By: Company</option>
                                 <option value="Producer">Group By: Producer</option>
                             </select>
-                            <input class="form-input" type="date" id="start_date" name="start_date">
-                            <input class="form-input" type="date" id="end_date" name="end_date">
+                            <select class="form-select" id="comm_month" name="comm_month" style="min-width:110px;">
+                                <option value="0">January</option>
+                                <option value="1">February</option>
+                                <option value="2">March</option>
+                                <option value="3">April</option>
+                                <option value="4">May</option>
+                                <option value="5">June</option>
+                                <option value="6">July</option>
+                                <option value="7">August</option>
+                                <option value="8">September</option>
+                                <option value="9">October</option>
+                                <option value="10">November</option>
+                                <option value="11">December</option>
+                            </select>
+                            <select class="form-select" id="comm_year" name="comm_year" style="min-width:80px;"></select>
                             <button type="button" class="btn btn-primary" id="apply-btn">Apply</button>
                             <button type="button" class="btn btn-outlined" onclick="window.print()">Print</button>
                         </div>
@@ -212,7 +225,7 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
-        import { fetchInvoiceRegister, fetchTotalBillingByCompany, formatCurrency, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+        import { fetchInvoiceRegister, fetchTotalBillingByCompany, formatCurrency } from './src/apiClient.js';
         import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
@@ -232,8 +245,16 @@
         let currentTimeframeCompanies = new Set(); // company||branch keys in current API data
         let showAllCompanies = true; // toggle: show all vs only current timeframe
 
-        document.getElementById('start_date').value = getDefaultStartDate();
-        document.getElementById('end_date').value = getDefaultEndDate();
+        // Populate month/year dropdowns
+        const now = new Date();
+        document.getElementById('comm_month').value = String(now.getMonth());
+        const yearSel = document.getElementById('comm_year');
+        for (let y = now.getFullYear(); y >= 2022; y--) {
+            const opt = document.createElement('option');
+            opt.value = y; opt.textContent = y;
+            yearSel.appendChild(opt);
+        }
+        yearSel.value = now.getFullYear();
 
         // ── Supabase: ensure tables exist & load data ─────────────
         async function ensureTables() {
@@ -473,14 +494,56 @@
             });
         }
 
+        // ── Pro-rating: split weekly amounts by weekdays in month ──
+        // weekendbill is a Sunday. The work week is Mon-Fri before it.
+        // Returns the fraction (0-1) of weekdays that fall in the target month/year.
+        function getMonthFraction(weekendbillStr, targetMonth, targetYear) {
+            const sunday = new Date(weekendbillStr + 'T00:00:00');
+            if (isNaN(sunday)) return 1;
+            // Monday = sunday - 6 days, Friday = sunday - 2 days
+            const monday = new Date(sunday);
+            monday.setDate(sunday.getDate() - 6);
+
+            let inMonth = 0;
+            for (let d = 0; d < 5; d++) { // Mon through Fri
+                const day = new Date(monday);
+                day.setDate(monday.getDate() + d);
+                if (day.getMonth() === targetMonth && day.getFullYear() === targetYear) {
+                    inMonth++;
+                }
+            }
+            return inMonth / 5;
+        }
+
         // ── Data loading ─────────────────────────────────────────
         async function loadData() {
-            const startDate = document.getElementById('start_date').value;
-            const endDate = document.getElementById('end_date').value;
-            if (!startDate || !endDate) return;
+            const targetMonth = parseInt(document.getElementById('comm_month').value);
+            const targetYear = parseInt(document.getElementById('comm_year').value);
+
+            // Fetch a wider range to capture boundary weeks:
+            // Start from ~10 days before month start, end ~10 days after month end
+            const rangeStart = new Date(targetYear, targetMonth, -10);
+            const rangeEnd = new Date(targetYear, targetMonth + 1, 10);
+            const startDate = rangeStart.toISOString().split('T')[0];
+            const endDate = rangeEnd.toISOString().split('T')[0];
+
             document.getElementById('commission_table_body').innerHTML = '<tr><td colspan="5" class="loading-indicator">Loading data...</td></tr>';
             try {
-                rawData = await fetchInvoiceRegister(startDate, endDate);
+                const allData = await fetchInvoiceRegister(startDate, endDate);
+
+                // Pro-rate each row and filter out rows with 0 fraction
+                rawData = [];
+                allData.forEach(r => {
+                    const fraction = getMonthFraction(r.weekendbill || '', targetMonth, targetYear);
+                    if (fraction > 0) {
+                        rawData.push({
+                            ...r,
+                            invoiceamount: (Number(r.invoiceamount) || 0) * fraction,
+                            _monthFraction: fraction,
+                        });
+                    }
+                });
+
                 // Track which companies are in the current timeframe
                 currentTimeframeCompanies = new Set();
                 rawData.forEach(r => {
