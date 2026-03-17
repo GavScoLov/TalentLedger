@@ -155,6 +155,7 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
+        import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
         await checkPageAccess('state-tax');
@@ -176,6 +177,48 @@
                 console.error('Failed to get Mapbox token:', err);
                 return null;
             }
+        }
+
+        // ── Tax Code Cache ──────────────────────────────────
+        // Keyed by state name → array of { county_name, city_name, county_code, jurisdiction_code }
+        const taxCodeCache = {};
+
+        async function loadTaxCodesForState(stateName) {
+            const key = stateName.toLowerCase().trim();
+            if (taxCodeCache[key]) return taxCodeCache[key];
+
+            const { data, error } = await supabase
+                .from('state_tax_codes')
+                .select('county_name, city_name, county_code, jurisdiction_code')
+                .ilike('state', stateName.trim());
+
+            if (error) {
+                console.error('Error loading tax codes for', stateName, error);
+                return [];
+            }
+            taxCodeCache[key] = data || [];
+            return taxCodeCache[key];
+        }
+
+        function findTaxCode(taxCodes, countyName, cityName) {
+            if (!taxCodes.length || !countyName) return null;
+            const cn = countyName.toUpperCase().replace(/\s*COUNTY\s*/i, '').trim();
+            const city = (cityName || '').toUpperCase().trim();
+
+            // Try exact county + city match first
+            if (city) {
+                const exact = taxCodes.find(tc =>
+                    tc.county_name.toUpperCase().trim() === cn &&
+                    tc.city_name.toUpperCase().trim() === city
+                );
+                if (exact) return exact;
+            }
+
+            // Try county name match only (return first match)
+            const countyMatch = taxCodes.find(tc =>
+                tc.county_name.toUpperCase().trim() === cn
+            );
+            return countyMatch || null;
         }
 
         // ── State ───────────────────────────────────────────
@@ -404,6 +447,7 @@
                 // County lookup results
                 mapped.county_name = '';
                 mapped.county_code = '';
+                mapped.jurisdiction_code = '';
                 mapped._countyStatus = 'pending';
                 return mapped;
             });
@@ -426,6 +470,7 @@
             mappedFields.forEach(f => { headerHTML += `<th>${f.label}</th>`; });
             headerHTML += '<th>County Name</th>';
             headerHTML += '<th>County Code</th>';
+            headerHTML += '<th>Jurisdiction Code</th>';
             extraKeys.forEach(k => { headerHTML += `<th>${k}</th>`; });
             headerHTML += '</tr>';
             thead.innerHTML = headerHTML;
@@ -441,11 +486,14 @@
                 if (row._countyStatus === 'pending') {
                     html += `<td class="county-pending">--</td>`;
                     html += `<td class="county-pending">--</td>`;
+                    html += `<td class="county-pending">--</td>`;
                 } else if (row._countyStatus === 'found') {
                     html += `<td class="county-found">${row.county_name}</td>`;
                     html += `<td class="county-found">${row.county_code}</td>`;
+                    html += `<td class="county-found">${row.jurisdiction_code || '--'}</td>`;
                 } else {
                     html += `<td class="county-error">Not found</td>`;
+                    html += `<td class="county-error">--</td>`;
                     html += `<td class="county-error">--</td>`;
                 }
 
@@ -457,7 +505,7 @@
             document.getElementById('row-count').textContent = `${mappedData.length} rows`;
         }
 
-        // ── County Lookup via Mapbox ────────────────────────
+        // ── County Lookup via Mapbox + Supabase Tax Codes ─
         async function lookupCounties() {
             const token = await getMapboxToken();
             if (!token) {
@@ -469,6 +517,13 @@
             const progress = document.getElementById('lookup-progress');
             btn.disabled = true;
             btn.textContent = 'Looking up...';
+
+            // Pre-load tax codes for all unique states in the data
+            const uniqueStates = [...new Set(mappedData.map(r => r.state).filter(Boolean))];
+            progress.textContent = 'Loading tax code database...';
+            for (const st of uniqueStates) {
+                await loadTaxCodesForState(st);
+            }
 
             let found = 0;
             let errors = 0;
@@ -497,23 +552,31 @@
                         const countyCtx = (feature.context || []).find(c =>
                             c.id && c.id.startsWith('district')
                         );
-                        // Look for region context (state) for FIPS
-                        const regionCtx = (feature.context || []).find(c =>
-                            c.id && c.id.startsWith('region')
-                        );
 
                         if (countyCtx) {
                             row.county_name = countyCtx.text || '';
-                            // Extract FIPS code from the context id if available
-                            // Mapbox district IDs sometimes contain FIPS: district.XXXXX
-                            const idParts = countyCtx.id.split('.');
-                            row.county_code = idParts.length > 1 ? idParts[1] : '';
+
+                            // Try to find the specific tax county code from Supabase
+                            const stateKey = (row.state || '').toLowerCase().trim();
+                            const taxCodes = taxCodeCache[stateKey] || [];
+                            const taxMatch = findTaxCode(taxCodes, row.county_name, row.city);
+
+                            if (taxMatch) {
+                                row.county_code = taxMatch.county_code;
+                                row.jurisdiction_code = taxMatch.jurisdiction_code;
+                            } else {
+                                // Fall back to Mapbox district ID
+                                const idParts = countyCtx.id.split('.');
+                                row.county_code = idParts.length > 1 ? idParts[1] : '';
+                                row.jurisdiction_code = '';
+                            }
+
                             row._countyStatus = 'found';
                             found++;
                         } else {
-                            // Try place-level for county info
                             row.county_name = '';
                             row.county_code = '';
+                            row.jurisdiction_code = '';
                             row._countyStatus = 'error';
                             errors++;
                         }

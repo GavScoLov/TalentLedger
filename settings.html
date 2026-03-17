@@ -7,80 +7,79 @@
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         .settings-table-wrap {
             overflow-y: auto;
-            max-height: calc(100vh - 280px);
+            max-height: calc(100vh - 320px);
         }
-        .settings-table-wrap .data-table {
-            width: 100%;
-        }
+        .settings-table-wrap .data-table { width: 100%; }
         .settings-table-wrap .data-table th {
-            position: sticky;
-            top: 0;
-            background: var(--bg-paper);
-            z-index: 1;
+            position: sticky; top: 0; background: var(--bg-paper); z-index: 1;
         }
         .settings-table-wrap .data-table td .form-input {
-            width: 100%;
-            margin: 0;
-            padding: 6px 10px;
-            font-size: 13px;
+            width: 100%; margin: 0; padding: 6px 10px; font-size: 13px;
         }
         .settings-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 12px;
+            display: flex; align-items: center; gap: 12px; margin-top: 12px;
         }
         .status-message {
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 13px;
+            padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 13px;
         }
-        .status-message.success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .status-message.error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .loading-indicator {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-secondary);
-        }
-        .tab-bar {
-            display: flex;
-            gap: 0;
-            margin-bottom: 16px;
-        }
+        .status-message.success { background-color: #d4edda; color: #155724; }
+        .status-message.error { background-color: #f8d7da; color: #721c24; }
+        .status-message.info { background-color: #cce5ff; color: #004085; }
+        .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .tab-bar { display: flex; gap: 0; margin-bottom: 12px; }
         .tab-bar .tab {
-            padding: 8px 20px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            border: 2px solid var(--border-color);
-            background: var(--bg-default);
-            color: var(--text-secondary);
-            transition: all 0.2s;
+            padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+            border: 2px solid var(--border-color); background: var(--bg-default);
+            color: var(--text-secondary); transition: all 0.2s;
         }
-        .tab-bar .tab:first-child {
-            border-radius: 6px 0 0 6px;
+        .tab-bar .tab:first-child { border-radius: 6px 0 0 6px; }
+        .tab-bar .tab:last-child { border-radius: 0 6px 6px 0; }
+        .tab-bar .tab:not(:first-child) { border-left: none; }
+        .tab-bar .tab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Upload zone */
+        .upload-zone {
+            border: 2px dashed var(--border-color); border-radius: var(--radius-lg);
+            padding: 32px 24px; text-align: center; cursor: pointer;
+            transition: all 0.2s; background: var(--bg-default); margin-bottom: 16px;
         }
-        .tab-bar .tab:last-child {
-            border-radius: 0 6px 6px 0;
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary); background: rgba(234,137,56,0.05);
         }
-        .tab-bar .tab:not(:first-child) {
-            border-left: none;
+        .upload-zone svg { width: 40px; height: 40px; color: var(--text-secondary); margin-bottom: 8px; }
+        .upload-zone h3 { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .upload-zone p { font-size: 12px; color: var(--text-secondary); margin: 0; }
+        input[type="file"] { display: none; }
+
+        /* State selector */
+        .tax-controls {
+            display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
         }
-        .tab-bar .tab.active {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: #fff;
+
+        /* Saved states list */
+        .saved-states-list {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
         }
+        .state-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 16px; font-size: 12px; font-weight: 600;
+            background: var(--bg-default); border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        .state-chip .chip-count { color: var(--text-secondary); font-weight: 400; }
+        .state-chip .chip-delete {
+            cursor: pointer; color: var(--text-disabled); font-size: 14px;
+            line-height: 1; padding: 0 2px; border-radius: 50%;
+            transition: color 0.15s;
+        }
+        .state-chip .chip-delete:hover { color: #DC2626; }
     </style>
 </head>
 <body>
@@ -91,17 +90,76 @@
                 <p class="page-subtitle">Manage application configuration</p>
             </div>
 
-            <div class="tab-bar">
-                <div class="tab active">Branch</div>
+            <div class="tab-bar" id="tab-bar">
+                <div class="tab active" data-tab="branch">Branch</div>
+                <div class="tab" data-tab="tax-codes">Tax Codes</div>
             </div>
 
-            <div class="card" style="padding: 16px;">
-                <div id="branch-content">
-                    <div class="loading-indicator" id="loading">Loading branches...</div>
+            <!-- Branch Tab -->
+            <div class="tab-content active" id="tab-branch">
+                <div class="card" style="padding: 16px;">
+                    <div id="branch-content">
+                        <div class="loading-indicator" id="loading">Loading branches...</div>
+                    </div>
+                    <div class="settings-actions" id="branch-actions" style="display:none;">
+                        <button class="btn btn-primary" id="save-btn">Save All</button>
+                        <span class="status-message" id="branch-status" style="display:none;"></span>
+                    </div>
                 </div>
-                <div class="settings-actions" id="actions" style="display:none;">
-                    <button class="btn btn-primary" id="save-btn">Save All</button>
-                    <span class="status-message" id="status" style="display:none;"></span>
+            </div>
+
+            <!-- Tax Codes Tab -->
+            <div class="tab-content" id="tab-tax-codes">
+                <div class="card" style="padding: 16px;">
+                    <h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">State Tax Code PDFs</h3>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+                        Upload state tax code PDFs (like Georgia's County &amp; City Sales Tax ID Codes). The PDF tables will be parsed and stored for county code lookups on the State Tax page.
+                    </p>
+
+                    <!-- Saved states -->
+                    <div id="saved-states-section">
+                        <h4 style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Uploaded States</h4>
+                        <div class="saved-states-list" id="saved-states-list">
+                            <span style="font-size:12px;color:var(--text-disabled);">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Upload -->
+                    <div class="tax-controls">
+                        <label style="font-size:13px;font-weight:600;">State:</label>
+                        <input type="text" class="form-input" id="tax-state-input" placeholder="e.g. Georgia, Illinois..." style="max-width:200px;">
+                    </div>
+                    <div class="upload-zone" id="pdf-upload-zone">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <h3>Upload Tax Code PDF</h3>
+                        <p>Drag and drop a .pdf file, or click to browse</p>
+                        <div id="pdf-file-info" style="display:none;margin-top:8px;font-size:12px;font-weight:600;color:var(--primary);"></div>
+                    </div>
+                    <input type="file" id="pdf-input" accept=".pdf">
+
+                    <!-- Parse progress / preview -->
+                    <div id="parse-status" style="display:none;margin-top:12px;"></div>
+
+                    <!-- Preview extracted data -->
+                    <div id="tax-preview" style="display:none;margin-top:12px;">
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                            <h4 style="font-size:13px;font-weight:600;margin:0;">Extracted Tax Codes</h4>
+                            <span class="status-message info" id="parse-count" style="display:inline-block;padding:4px 10px;font-size:11px;"></span>
+                        </div>
+                        <div class="settings-table-wrap" style="max-height:300px;">
+                            <table class="data-table" id="tax-preview-table">
+                                <thead><tr><th>County Name</th><th>City Name</th><th>County Code</th><th>Jurisdiction Code</th></tr></thead>
+                                <tbody id="tax-preview-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="settings-actions" style="margin-top:12px;">
+                            <button class="btn btn-primary" id="save-tax-codes-btn">Save to Database</button>
+                            <button class="btn" id="cancel-tax-btn">Cancel</button>
+                            <span class="status-message" id="tax-save-status" style="display:none;"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -120,6 +178,20 @@
         renderNavbar();
         await renderSidebar();
         initInactivityTimer();
+
+        // ── Tab Switching ───────────────────────────────────
+        document.querySelectorAll('.tab-bar .tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ═══════════════════════════════════════════════════
+        // ── BRANCH TAB ────────────────────────────────────
+        // ═══════════════════════════════════════════════════
 
         async function fetchBranches() {
             const startDate = getDefaultStartDate();
@@ -141,10 +213,7 @@
 
         async function loadSavedSettings() {
             const { data, error } = await supabase.from('branch_settings').select('*');
-            if (error) {
-                console.error('Error loading branch settings:', error);
-                return {};
-            }
+            if (error) { console.error('Error loading branch settings:', error); return {}; }
             const map = {};
             (data || []).forEach(row => {
                 map[row.branch] = { acronym: row.acronym || '', address: row.address || '', region: row.region || '' };
@@ -152,13 +221,12 @@
             return map;
         }
 
-        function renderTable(branches, saved) {
+        function renderBranchTable(branches, saved) {
             const contentEl = document.getElementById('branch-content');
             if (branches.length === 0) {
                 contentEl.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">No branches found.</p>';
                 return;
             }
-
             let rows = branches.map(branch => {
                 const s = saved[branch] || { acronym: '', address: '', region: '' };
                 return `<tr>
@@ -168,32 +236,22 @@
                     <td><input type="text" class="form-input branch-address" data-branch="${branch}" value="${s.address}" placeholder="123 Main St, City, ST 00000"></td>
                 </tr>`;
             }).join('');
-
             contentEl.innerHTML = `
                 <div class="settings-table-wrap">
                     <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Branch Name</th>
-                                <th>Acronym</th>
-                                <th>Region</th>
-                                <th>Address</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Branch Name</th><th>Acronym</th><th>Region</th><th>Address</th></tr></thead>
                         <tbody>${rows}</tbody>
                     </table>
-                </div>
-            `;
-            document.getElementById('actions').style.display = 'flex';
+                </div>`;
+            document.getElementById('branch-actions').style.display = 'flex';
         }
 
-        async function saveAll() {
-            const statusEl = document.getElementById('status');
+        async function saveBranches() {
+            const statusEl = document.getElementById('branch-status');
             const saveBtn = document.getElementById('save-btn');
             statusEl.style.display = 'none';
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
-
             const rows = [];
             document.querySelectorAll('.branch-acronym').forEach(input => {
                 const branch = input.dataset.branch;
@@ -204,33 +262,300 @@
                 const address = addressInput ? addressInput.value.trim() : '';
                 rows.push({ branch, acronym, region, address, updated_at: new Date().toISOString() });
             });
-
             const { error } = await supabase.from('branch_settings').upsert(rows, { onConflict: 'branch' });
-
             statusEl.style.display = 'inline-block';
             if (error) {
                 statusEl.className = 'status-message error';
-                statusEl.textContent = 'Error saving settings: ' + error.message;
+                statusEl.textContent = 'Error: ' + error.message;
             } else {
                 statusEl.className = 'status-message success';
-                statusEl.textContent = 'All branch settings saved successfully.';
+                statusEl.textContent = 'Saved successfully.';
             }
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save All';
-
             setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
         }
 
-        document.getElementById('save-btn').addEventListener('click', saveAll);
+        document.getElementById('save-btn').addEventListener('click', saveBranches);
 
+        // Load branch tab
         try {
             const [branches, saved] = await Promise.all([fetchBranches(), loadSavedSettings()]);
-            renderTable(branches, saved);
+            renderBranchTable(branches, saved);
         } catch (err) {
-            console.error('Error initializing settings:', err);
+            console.error('Error initializing branch settings:', err);
             document.getElementById('branch-content').innerHTML =
-                '<p style="color:#dc2626;text-align:center;padding:20px;">Failed to load branches. Please try again later.</p>';
+                '<p style="color:#dc2626;text-align:center;padding:20px;">Failed to load branches.</p>';
         }
+
+        // ═══════════════════════════════════════════════════
+        // ── TAX CODES TAB ─────────────────────────────────
+        // ═══════════════════════════════════════════════════
+
+        let parsedTaxCodes = [];
+
+        // ── Load saved states ───────────────────────────────
+        async function loadSavedStates() {
+            const { data, error } = await supabase
+                .from('state_tax_codes')
+                .select('state')
+                .order('state');
+            if (error) { console.error('Error loading states:', error); return []; }
+            // Count per state
+            const counts = {};
+            (data || []).forEach(r => { counts[r.state] = (counts[r.state] || 0) + 1; });
+            return Object.entries(counts).map(([state, count]) => ({ state, count }));
+        }
+
+        async function renderSavedStates() {
+            const list = document.getElementById('saved-states-list');
+            const states = await loadSavedStates();
+            if (states.length === 0) {
+                list.innerHTML = '<span style="font-size:12px;color:var(--text-disabled);">No tax codes uploaded yet.</span>';
+                return;
+            }
+            list.innerHTML = states.map(s => `
+                <span class="state-chip">
+                    ${s.state}
+                    <span class="chip-count">(${s.count} codes)</span>
+                    <span class="chip-delete" data-state="${s.state}" title="Delete ${s.state} tax codes">&times;</span>
+                </span>
+            `).join('');
+
+            // Delete handlers
+            list.querySelectorAll('.chip-delete').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const state = e.target.dataset.state;
+                    if (!confirm(`Delete all tax codes for ${state}?`)) return;
+                    const { error } = await supabase.from('state_tax_codes').delete().eq('state', state);
+                    if (error) { alert('Error deleting: ' + error.message); return; }
+                    renderSavedStates();
+                });
+            });
+        }
+
+        renderSavedStates();
+
+        // ── PDF Upload ──────────────────────────────────────
+        const pdfUploadZone = document.getElementById('pdf-upload-zone');
+        const pdfInput = document.getElementById('pdf-input');
+        const pdfFileInfo = document.getElementById('pdf-file-info');
+
+        pdfUploadZone.addEventListener('click', () => pdfInput.click());
+        pdfUploadZone.addEventListener('dragover', (e) => { e.preventDefault(); pdfUploadZone.classList.add('dragover'); });
+        pdfUploadZone.addEventListener('dragleave', () => pdfUploadZone.classList.remove('dragover'));
+        pdfUploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            pdfUploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handlePDF(e.dataTransfer.files[0]);
+        });
+        pdfInput.addEventListener('change', (e) => { if (e.target.files[0]) handlePDF(e.target.files[0]); });
+
+        async function handlePDF(file) {
+            if (!file.name.match(/\.pdf$/i)) { alert('Please upload a .pdf file.'); return; }
+            const stateName = document.getElementById('tax-state-input').value.trim();
+            if (!stateName) { alert('Please enter the state name before uploading.'); return; }
+
+            pdfFileInfo.style.display = 'block';
+            pdfFileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+            const parseStatus = document.getElementById('parse-status');
+            parseStatus.style.display = 'block';
+            parseStatus.innerHTML = '<span style="color:var(--text-secondary);font-size:13px;">Parsing PDF...</span>';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const taxCodes = await extractTaxCodesFromPDF(arrayBuffer);
+
+                if (taxCodes.length === 0) {
+                    parseStatus.innerHTML = '<span style="color:#DC2626;font-size:13px;">No tax code tables found in this PDF. Ensure it has columns like County Name, City Name, County Code, Jurisdiction Code.</span>';
+                    return;
+                }
+
+                // Attach state name
+                parsedTaxCodes = taxCodes.map(tc => ({ ...tc, state: stateName }));
+
+                parseStatus.style.display = 'none';
+                renderTaxPreview();
+            } catch (err) {
+                console.error('PDF parse error:', err);
+                parseStatus.innerHTML = `<span style="color:#DC2626;font-size:13px;">Error parsing PDF: ${err.message}</span>`;
+            }
+        }
+
+        // ── PDF Text Extraction & Table Parsing ─────────────
+        async function extractTaxCodesFromPDF(arrayBuffer) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const allCodes = [];
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+
+                // Group text items by Y position (line-based parsing)
+                const lines = {};
+                textContent.items.forEach(item => {
+                    const y = Math.round(item.transform[5]); // Y position
+                    const x = item.transform[4]; // X position
+                    if (!lines[y]) lines[y] = [];
+                    lines[y].push({ text: item.str.trim(), x });
+                });
+
+                // Sort lines top-to-bottom (higher Y = higher on page in PDF coords)
+                const sortedYs = Object.keys(lines).map(Number).sort((a, b) => b - a);
+
+                for (const y of sortedYs) {
+                    const lineItems = lines[y].sort((a, b) => a.x - b.x);
+                    const lineText = lineItems.map(i => i.text).filter(Boolean);
+
+                    // Skip header rows and empty lines
+                    if (lineText.length < 3) continue;
+                    const joined = lineText.join(' ').toUpperCase();
+                    if (joined.includes('COUNTY NAME') || joined.includes('JURISDICTION') || joined.includes('DEPARTMENT OF REVENUE') || joined.includes('LOCAL GOVERNMENT')) continue;
+                    if (/^\d+ of \d+$/.test(joined.trim())) continue;
+
+                    // Try to parse as: COUNTY_NAME CITY_NAME COUNTY_CODE JURISDICTION_CODE
+                    // County code is a 3-digit number, jurisdiction code is a 4-digit number
+                    const numbers = lineText.filter(t => /^\d{3,4}$/.test(t));
+                    const words = lineText.filter(t => !/^\d{3,4}$/.test(t));
+
+                    if (numbers.length >= 2 && words.length >= 1) {
+                        // Last two numbers are county_code and jurisdiction_code
+                        const countyCode = numbers[numbers.length - 2] || numbers[0];
+                        const jurisdictionCode = numbers[numbers.length - 1];
+
+                        // Try to split words into county and city
+                        // Use X positions to determine column breaks
+                        const wordItems = lineItems.filter(i => i.text && !/^\d{3,4}$/.test(i.text));
+
+                        let countyName = '';
+                        let cityName = '';
+
+                        if (wordItems.length >= 2) {
+                            // Find the gap between word groups to split county/city
+                            // Typically county is first column, city is second
+                            const gaps = [];
+                            for (let i = 1; i < wordItems.length; i++) {
+                                gaps.push({ idx: i, gap: wordItems[i].x - (wordItems[i-1].x + wordItems[i-1].text.length * 5) });
+                            }
+                            gaps.sort((a, b) => b.gap - a.gap);
+
+                            if (gaps.length > 0 && gaps[0].gap > 20) {
+                                // Split at biggest gap
+                                countyName = wordItems.slice(0, gaps[0].idx).map(i => i.text).join(' ');
+                                cityName = wordItems.slice(gaps[0].idx).map(i => i.text).join(' ');
+                            } else {
+                                // Assume first word is county, rest is city
+                                countyName = wordItems[0].text;
+                                cityName = wordItems.slice(1).map(i => i.text).join(' ');
+                            }
+                        } else if (wordItems.length === 1) {
+                            countyName = wordItems[0].text;
+                        }
+
+                        if (countyName || cityName) {
+                            allCodes.push({
+                                county_name: countyName.trim(),
+                                city_name: cityName.trim(),
+                                county_code: countyCode,
+                                jurisdiction_code: jurisdictionCode,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Deduplicate
+            const seen = new Set();
+            return allCodes.filter(c => {
+                const key = `${c.county_name}|${c.city_name}|${c.county_code}|${c.jurisdiction_code}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        // ── Preview ─────────────────────────────────────────
+        function renderTaxPreview() {
+            const preview = document.getElementById('tax-preview');
+            const tbody = document.getElementById('tax-preview-body');
+            const count = document.getElementById('parse-count');
+
+            preview.style.display = 'block';
+            count.textContent = `${parsedTaxCodes.length} codes extracted`;
+
+            tbody.innerHTML = parsedTaxCodes.map(tc => `
+                <tr>
+                    <td>${tc.county_name}</td>
+                    <td>${tc.city_name}</td>
+                    <td>${tc.county_code}</td>
+                    <td>${tc.jurisdiction_code}</td>
+                </tr>
+            `).join('');
+        }
+
+        // ── Save to Supabase ────────────────────────────────
+        document.getElementById('save-tax-codes-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('save-tax-codes-btn');
+            const statusEl = document.getElementById('tax-save-status');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            statusEl.style.display = 'none';
+
+            try {
+                const stateName = parsedTaxCodes[0]?.state;
+                if (!stateName) throw new Error('No state name');
+
+                // Delete existing codes for this state first
+                await supabase.from('state_tax_codes').delete().eq('state', stateName);
+
+                // Insert in batches of 500
+                const batchSize = 500;
+                for (let i = 0; i < parsedTaxCodes.length; i += batchSize) {
+                    const batch = parsedTaxCodes.slice(i, i + batchSize).map(tc => ({
+                        state: tc.state,
+                        county_name: tc.county_name,
+                        city_name: tc.city_name,
+                        county_code: tc.county_code,
+                        jurisdiction_code: tc.jurisdiction_code,
+                    }));
+                    const { error } = await supabase.from('state_tax_codes').insert(batch);
+                    if (error) throw error;
+                }
+
+                statusEl.style.display = 'inline-block';
+                statusEl.className = 'status-message success';
+                statusEl.textContent = `Saved ${parsedTaxCodes.length} tax codes for ${stateName}.`;
+
+                // Reset
+                parsedTaxCodes = [];
+                document.getElementById('tax-preview').style.display = 'none';
+                document.getElementById('pdf-file-info').style.display = 'none';
+                document.getElementById('tax-state-input').value = '';
+                pdfInput.value = '';
+
+                renderSavedStates();
+            } catch (err) {
+                console.error('Save error:', err);
+                statusEl.style.display = 'inline-block';
+                statusEl.className = 'status-message error';
+                statusEl.textContent = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save to Database';
+                setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
+            }
+        });
+
+        document.getElementById('cancel-tax-btn').addEventListener('click', () => {
+            parsedTaxCodes = [];
+            document.getElementById('tax-preview').style.display = 'none';
+            document.getElementById('parse-status').style.display = 'none';
+            document.getElementById('pdf-file-info').style.display = 'none';
+            pdfInput.value = '';
+        });
     </script>
 </body>
 </html>
