@@ -10,13 +10,14 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .report-layout { display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto auto 1fr; gap: 16px; }
-        .report-filters { grid-row: 1; grid-column: 1 / 3; }
-        .report-title-row { grid-row: 2; grid-column: 1 / 3; }
-        .report-table-section { grid-row: 3; grid-column: 1; display: flex; flex-direction: column; }
-        .report-chart-section { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; }
+        .plr-layout { display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto auto auto 1fr; gap: 16px; }
+        .plr-filters { grid-row: 1; grid-column: 1 / 3; }
+        .plr-title-row { grid-row: 2; grid-column: 1 / 3; }
+        .plr-main { grid-row: 3 / 5; grid-column: 1; display: grid; grid-template-columns: 38% 1fr; gap: 16px; }
+        .plr-overhead-panel { grid-row: 3 / 5; grid-column: 2; }
+
         .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; }
-        .table-scroll { overflow-y: auto; max-height: calc(100vh - 380px); }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 420px); }
         .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px; }
         .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
         .radio-group { display: flex; gap: 12px; align-items: center; padding: 4px 12px; }
@@ -24,8 +25,10 @@
         .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
         .report-title-bar { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 16px; text-align: center; }
         .report-title-bar h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+        .btn-icon { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; display: flex; align-items: center; transition: background-color 0.2s; }
+        .btn-icon:hover { background-color: var(--bg-default); }
 
-        /* Custom toggle checkboxes for DHP/GSP */
+        /* Toggle checkboxes */
         .toggle-checkbox input[type="checkbox"] { display: none; }
         .toggle-checkbox label {
             display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px;
@@ -36,15 +39,89 @@
             background: var(--primary); border-color: var(--primary); color: #fff;
         }
 
-        @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } .report-chart-section { grid-column: 1; } }
+        /* ── Overhead Panel ─────────────────────────────── */
+        .overhead-panel { max-height: calc(100vh - 260px); overflow-y: auto; }
+        .overhead-panel h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
+        .overhead-branch-section {
+            background: var(--bg-default); border: 1px solid var(--border-color); border-radius: var(--radius);
+            margin-bottom: 10px; overflow: hidden;
+        }
+        .overhead-branch-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; cursor: pointer; font-weight: 600; font-size: 13px;
+            color: var(--text-primary); background: var(--bg-paper); border-bottom: 1px solid var(--border-color);
+            user-select: none; transition: background 0.15s;
+        }
+        .overhead-branch-header:hover { background: var(--bg-default); }
+        .overhead-branch-header .toggle-icon { font-size: 10px; transition: transform 0.2s; }
+        .overhead-branch-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .overhead-branch-body { padding: 8px 12px; }
+        .overhead-branch-body.collapsed { display: none; }
+        .overhead-row { display: grid; grid-template-columns: 1fr 100px; gap: 6px; align-items: center; margin-bottom: 6px; }
+        .overhead-row label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+        .overhead-row input {
+            width: 100%; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px;
+            font-size: 12px; text-align: right; background: var(--bg-paper); color: var(--text-primary);
+        }
+        .overhead-total-row {
+            display: grid; grid-template-columns: 1fr 100px; gap: 6px; align-items: center;
+            padding-top: 6px; border-top: 1px solid var(--border-color); margin-top: 4px;
+        }
+        .overhead-total-row span { font-size: 12px; font-weight: 700; color: var(--text-primary); }
+        .overhead-save-btn {
+            width: 100%; padding: 10px; margin-top: 12px; background: var(--primary); color: #fff;
+            border: none; border-radius: var(--radius); font-weight: 700; font-size: 14px; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .overhead-save-btn:hover { background: var(--primary-dark); }
+        .overhead-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .overhead-status { text-align: center; font-size: 12px; margin-top: 6px; min-height: 18px; }
+        .overhead-status.success { color: #059669; }
+        .overhead-status.error { color: #DC2626; }
+
+        @media (max-width: 1100px) {
+            .plr-layout { grid-template-columns: 1fr; }
+            .plr-overhead-panel { grid-row: auto; grid-column: 1; }
+            .plr-main { grid-column: 1; }
+        }
+        @media (max-width: 900px) { .plr-main { grid-template-columns: 1fr; } }
+
+        /* ── Print Styles ──────────────────────────────── */
+        @media print {
+            body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .sidebar, .sidebar-overlay, .topbar, .plr-filters, .page-header, .page-subtitle, .plr-overhead-panel { display: none !important; }
+            .main-content { margin: 0 !important; padding: 0 !important; }
+            .plr-layout { display: block !important; }
+            .plr-main { display: block !important; }
+            .card { box-shadow: none !important; border: none !important; }
+            .print-header { display: block !important; font-size: 22px; text-align: center; font-weight: 700; padding: 12px 0 4px; color: #000; border-bottom: 2px solid #333; margin-bottom: 8px; }
+            .print-sub-header { display: block !important; font-size: 13px; text-align: center; color: #555; margin-bottom: 12px; }
+            .table-scroll { max-height: none !important; overflow: visible !important; }
+            .data-table { width: 100% !important; border-collapse: collapse !important; font-size: 11px !important; }
+            .data-table th { background: #EA8938 !important; color: #fff !important; border: 1px solid #C7712A !important; padding: 6px 8px !important; font-size: 11px !important; }
+            .data-table td { border: 1px solid #ddd !important; padding: 4px 8px !important; color: #000 !important; font-size: 11px !important; }
+            .data-table tbody tr:nth-child(even) { background: #f9f9f9 !important; }
+            .data-table tfoot td { background: #f0f0f0 !important; font-weight: 700 !important; border-top: 2px solid #333 !important; }
+            .data-table tr { page-break-inside: avoid; }
+            .print-chart-page { display: block !important; page-break-before: always; padding: 20px 0; }
+            .print-chart-page h2 { font-size: 18px; text-align: center; font-weight: 700; color: #000; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
+            .print-chart-page img { width: 100%; max-height: 600px; object-fit: contain; }
+            .filter-bar, .radio-group { display: none !important; }
+        }
+        .print-header, .print-sub-header, .print-chart-page { display: none; }
     </style>
 </head>
 <body>
     <div class="app-layout">
         <div class="main-content">
-            <div class="page-header"><h1 class="page-title">Profit & Loss</h1><p class="page-subtitle">PSA - PLR - Profit & Loss Report (Sequenced)</p></div>
-            <div class="report-layout">
-                <div class="report-filters">
+            <div class="page-header">
+                <h1 class="page-title">Profit & Loss</h1>
+                <p class="page-subtitle">PSA - PLR - Profit & Loss Report (Sequenced)</p>
+            </div>
+            <div class="print-header" id="print-header"></div>
+            <div class="print-sub-header" id="print-sub-header"></div>
+            <div class="plr-layout">
+                <div class="plr-filters">
                     <div class="card" style="padding:10px;">
                         <div class="filter-bar" style="padding:0;">
                             <select class="form-select" id="table_branch_filter"><option value="all" selected>All Branches</option></select>
@@ -59,37 +136,66 @@
                             <input class="form-input" type="date" id="start_date" style="max-width:150px;">
                             <input class="form-input" type="date" id="end_date" style="max-width:150px;">
                             <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
+                            <button class="btn-icon" type="button" id="print-btn" title="Print" style="margin-left:auto;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="report-title-row">
+                <div class="plr-title-row">
                     <div class="report-title-bar"><h2>PSA - PLR - Profit & Loss Report (Sequenced)</h2></div>
                 </div>
-                <div class="report-table-section">
-                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
-                        <div class="table-scroll">
-                            <table class="data-table" id="branch-table">
-                                <thead><tr><th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Gross Pay</th><th style="text-align:right">Profit</th></tr></thead>
-                                <tbody id="branch-table-body"><tr><td colspan="4" class="loading-indicator">Loading data...</td></tr></tbody>
-                            </table>
+                <div class="plr-main">
+                    <div style="display:flex;flex-direction:column;">
+                        <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                            <div class="table-scroll">
+                                <table class="data-table" id="branch-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Branch</th>
+                                            <th style="text-align:right">Revenue</th>
+                                            <th style="text-align:right">Gross Pay</th>
+                                            <th style="text-align:right">Gross Profit</th>
+                                            <th style="text-align:right">Overhead</th>
+                                            <th style="text-align:right">Net Profit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="branch-table-body"><tr><td colspan="6" class="loading-indicator">Loading data...</td></tr></tbody>
+                                    <tfoot id="branch-table-foot" style="display:none;"></tfoot>
+                                </table>
+                            </div>
+                            <div class="total-bar" id="total-revenue">Total Revenue: $0</div>
                         </div>
-                        <div class="total-bar" id="total-revenue">Total Revenue: $0</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;">
+                        <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                            <div class="filter-bar">
+                                <select class="form-select" id="graph_type"><option value="bar" selected>Bar</option><option value="line">Line</option></select>
+                                <select class="form-select" id="graph_interval"><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select>
+                            </div>
+                            <div class="radio-group">
+                                <label><input type="radio" name="plg_radio" value="All" checked> All</label>
+                                <label><input type="radio" name="plg_radio" value="DHP"> DHP</label>
+                                <label><input type="radio" name="plg_radio" value="GSP"> GSP</label>
+                            </div>
+                            <div class="chart-wrap"><canvas id="profitLossChart"></canvas></div>
+                        </div>
                     </div>
                 </div>
-                <div class="report-chart-section">
-                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
-                        <div class="filter-bar">
-                            <select class="form-select" id="graph_type"><option value="bar" selected>Bar</option><option value="line">Line</option></select>
-                            <select class="form-select" id="graph_interval"><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select>
+                <div class="plr-overhead-panel">
+                    <div class="card" style="padding:12px;">
+                        <h3>Branch Overhead Settings</h3>
+                        <div class="overhead-panel" id="overhead-panel">
+                            <p class="loading-indicator" style="padding:20px;">Loading branches...</p>
                         </div>
-                        <div class="radio-group">
-                            <label><input type="radio" name="plg_radio" value="All" checked> All</label>
-                            <label><input type="radio" name="plg_radio" value="DHP"> DHP</label>
-                            <label><input type="radio" name="plg_radio" value="GSP"> GSP</label>
-                        </div>
-                        <div class="chart-wrap"><canvas id="profitLossChart"></canvas></div>
+                        <button class="overhead-save-btn" id="save-overheads-btn" disabled>Save All Overheads</button>
+                        <div class="overhead-status" id="overhead-status"></div>
                     </div>
                 </div>
+            </div>
+            <div class="print-chart-page" id="print-chart-page">
+                <h2 id="print-chart-title"></h2>
+                <img id="print-chart-img" src="" alt="Chart">
             </div>
         </div>
     </div>
@@ -98,7 +204,11 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
-        import { fetchInvoiceRegister, fetchTotalBillingByBranch, formatCurrency, formatCurrency2, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+        import { supabase } from './src/supabaseClient.js';
+        import {
+            fetchInvoiceRegister, fetchTotalBillingByBranch,
+            formatCurrency, formatCurrency2, getDefaultStartDate, getDefaultEndDate
+        } from './src/apiClient.js';
 
         await checkAuth();
         await checkPageAccess('profit-loss');
@@ -109,18 +219,185 @@
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
 
+        const OVERHEAD_FIELDS = [
+            { key: 'rent', label: 'Rent' },
+            { key: 'producer_amount', label: 'Producer Amount' },
+            { key: 'ss_sm_amount', label: 'SS/SM Amount' },
+            { key: 'utilities', label: 'Utilities' },
+            { key: 'insurance', label: 'Insurance' },
+            { key: 'other', label: 'Other' },
+        ];
+
+        // ── State ────────────────────────────────────────
         let rawInvoices = [];
         let branchSummary = [];
         let profitLossChart = null;
+        let overheadsByBranch = {}; // { branchName: { rent: 0, producer_amount: 0, ... } }
 
         document.getElementById('start_date').value = getDefaultStartDate();
         document.getElementById('end_date').value = getDefaultEndDate();
 
+        // ── Helper: filter Corporate branches ────────────
+        function isCorporateBranch(name) {
+            const n = (name || '').toLowerCase();
+            return n.includes('corporate') || n.includes('_corp');
+        }
+
+        // ── Load overheads from Supabase ─────────────────
+        async function loadOverheads() {
+            try {
+                const { data, error } = await supabase.from('branch_overheads').select('*');
+                if (error) throw error;
+                overheadsByBranch = {};
+                (data || []).forEach(row => {
+                    overheadsByBranch[row.branch] = {};
+                    OVERHEAD_FIELDS.forEach(f => {
+                        overheadsByBranch[row.branch][f.key] = Number(row[f.key]) || 0;
+                    });
+                    overheadsByBranch[row.branch].notes = row.notes || '';
+                });
+            } catch (err) {
+                console.error('Overheads load error:', err);
+            }
+        }
+
+        // ── Save overheads to Supabase ───────────────────
+        async function saveOverheads() {
+            const btn = document.getElementById('save-overheads-btn');
+            const status = document.getElementById('overhead-status');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            status.textContent = '';
+            status.className = 'overhead-status';
+
+            try {
+                // Read current values from the form
+                const panel = document.getElementById('overhead-panel');
+                const sections = panel.querySelectorAll('.overhead-branch-section');
+                const upsertRows = [];
+
+                sections.forEach(section => {
+                    const branchName = section.dataset.branch;
+                    const row = { branch: branchName };
+                    OVERHEAD_FIELDS.forEach(f => {
+                        const input = section.querySelector(`input[data-field="${f.key}"]`);
+                        row[f.key] = input ? parseFloat(input.value) || 0 : 0;
+                    });
+                    const notesInput = section.querySelector('input[data-field="notes"]');
+                    row.notes = notesInput ? notesInput.value : '';
+                    row.updated_at = new Date().toISOString();
+                    upsertRows.push(row);
+                });
+
+                const { error } = await supabase.from('branch_overheads').upsert(upsertRows, { onConflict: 'branch' });
+                if (error) throw error;
+
+                // Update local state
+                upsertRows.forEach(row => {
+                    overheadsByBranch[row.branch] = {};
+                    OVERHEAD_FIELDS.forEach(f => {
+                        overheadsByBranch[row.branch][f.key] = row[f.key];
+                    });
+                    overheadsByBranch[row.branch].notes = row.notes;
+                });
+
+                status.textContent = 'Saved successfully!';
+                status.className = 'overhead-status success';
+
+                // Re-render table with new overheads
+                processData();
+            } catch (err) {
+                console.error('Save error:', err);
+                status.textContent = 'Error saving: ' + err.message;
+                status.className = 'overhead-status error';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save All Overheads';
+            }
+        }
+
+        // ── Render overhead panel ────────────────────────
+        function renderOverheadPanel(branchNames) {
+            const panel = document.getElementById('overhead-panel');
+            panel.innerHTML = '';
+
+            if (!branchNames.length) {
+                panel.innerHTML = '<p style="text-align:center;color:var(--text-secondary);font-size:13px;">No branches loaded yet.</p>';
+                return;
+            }
+
+            branchNames.forEach(branch => {
+                const oh = overheadsByBranch[branch] || {};
+                const section = document.createElement('div');
+                section.className = 'overhead-branch-section';
+                section.dataset.branch = branch;
+
+                const totalOverhead = OVERHEAD_FIELDS.reduce((sum, f) => sum + (Number(oh[f.key]) || 0), 0);
+
+                let bodyHTML = '';
+                OVERHEAD_FIELDS.forEach(f => {
+                    const val = oh[f.key] || 0;
+                    bodyHTML += `
+                        <div class="overhead-row">
+                            <label>${f.label}</label>
+                            <input type="number" step="0.01" min="0" data-field="${f.key}" value="${val}" placeholder="0.00">
+                        </div>`;
+                });
+                bodyHTML += `
+                    <div class="overhead-row">
+                        <label>Notes</label>
+                        <input type="text" data-field="notes" value="${oh.notes || ''}" placeholder="Optional" style="text-align:left;">
+                    </div>
+                    <div class="overhead-total-row">
+                        <span>Total Overhead</span>
+                        <span class="overhead-branch-total" style="text-align:right;">${formatCurrency2(totalOverhead)}</span>
+                    </div>`;
+
+                section.innerHTML = `
+                    <div class="overhead-branch-header">
+                        <span>${branch}</span>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="overhead-branch-body collapsed">${bodyHTML}</div>`;
+
+                panel.appendChild(section);
+
+                // Toggle collapse
+                const header = section.querySelector('.overhead-branch-header');
+                const body = section.querySelector('.overhead-branch-body');
+                header.addEventListener('click', () => {
+                    header.classList.toggle('collapsed');
+                    body.classList.toggle('collapsed');
+                });
+
+                // Update total on input change
+                section.querySelectorAll('input[type="number"]').forEach(input => {
+                    input.addEventListener('input', () => {
+                        const total = OVERHEAD_FIELDS.reduce((sum, f) => {
+                            const inp = section.querySelector(`input[data-field="${f.key}"]`);
+                            return sum + (parseFloat(inp?.value) || 0);
+                        }, 0);
+                        section.querySelector('.overhead-branch-total').textContent = formatCurrency2(total);
+                    });
+                });
+            });
+
+            document.getElementById('save-overheads-btn').disabled = false;
+        }
+
+        // ── Get total overhead for a branch ──────────────
+        function getBranchOverhead(branch) {
+            const oh = overheadsByBranch[branch];
+            if (!oh) return 0;
+            return OVERHEAD_FIELDS.reduce((sum, f) => sum + (Number(oh[f.key]) || 0), 0);
+        }
+
+        // ── Fetch Data ───────────────────────────────────
         async function loadData() {
             const startDate = document.getElementById('start_date').value;
             const endDate = document.getElementById('end_date').value;
             if (!startDate || !endDate) return;
-            document.getElementById('branch-table-body').innerHTML = '<tr><td colspan="4" class="loading-indicator">Loading data...</td></tr>';
+            document.getElementById('branch-table-body').innerHTML = '<tr><td colspan="6" class="loading-indicator">Loading data...</td></tr>';
             try {
                 const [invoices, billingData] = await Promise.all([
                     fetchInvoiceRegister(startDate, endDate),
@@ -128,19 +405,31 @@
                 ]);
                 rawInvoices = invoices;
                 const revenueByBranch = {};
-                invoices.forEach(r => { const b = r.branchname || 'Unknown'; revenueByBranch[b] = (revenueByBranch[b] || 0) + (Number(r.invoiceamount) || 0); });
+                invoices.forEach(r => {
+                    const b = r.branchname || 'Unknown';
+                    if (isCorporateBranch(b)) return;
+                    revenueByBranch[b] = (revenueByBranch[b] || 0) + (Number(r.invoiceamount) || 0);
+                });
                 const grossByBranch = {};
-                billingData.forEach(r => { const b = r.branch || 'Unknown'; grossByBranch[b] = (grossByBranch[b] || 0) + (Number(r.total_billing) || 0); });
+                billingData.forEach(r => {
+                    const b = r.branch || 'Unknown';
+                    if (isCorporateBranch(b)) return;
+                    grossByBranch[b] = (grossByBranch[b] || 0) + (Number(r.total_billing) || 0);
+                });
                 const allBranches = new Set([...Object.keys(revenueByBranch), ...Object.keys(grossByBranch)]);
                 branchSummary = [...allBranches].map(b => {
                     const revenue = revenueByBranch[b] || 0;
                     const grossPay = grossByBranch[b] || 0;
-                    return { branch: b, revenue, grossPay, profit: revenue - grossPay };
+                    const overhead = getBranchOverhead(b);
+                    const grossProfit = revenue - grossPay;
+                    const netProfit = grossProfit - overhead;
+                    return { branch: b, revenue, grossPay, grossProfit, overhead, netProfit };
                 }).sort((a, b) => b.revenue - a.revenue);
                 populateBranchFilter();
+                renderOverheadPanel([...allBranches].sort());
                 processData();
             } catch (err) {
-                document.getElementById('branch-table-body').innerHTML = `<tr><td colspan="4" class="loading-indicator" style="color:#DC2626">Error: ${err.message}</td></tr>`;
+                document.getElementById('branch-table-body').innerHTML = `<tr><td colspan="6" class="loading-indicator" style="color:#DC2626">Error: ${err.message}</td></tr>`;
             }
         }
 
@@ -148,28 +437,68 @@
             const sel = document.getElementById('table_branch_filter');
             const cur = sel.value;
             sel.innerHTML = '<option value="all">All Branches</option>';
-            branchSummary.forEach(b => { const o = document.createElement('option'); o.value = b.branch; o.textContent = b.branch; if (b.branch === cur) o.selected = true; sel.appendChild(o); });
+            branchSummary.forEach(b => {
+                const o = document.createElement('option');
+                o.value = b.branch; o.textContent = b.branch;
+                if (b.branch === cur) o.selected = true;
+                sel.appendChild(o);
+            });
         }
 
         function processData() {
             const bf = document.getElementById('table_branch_filter').value;
             const filtered = bf === 'all' ? branchSummary : branchSummary.filter(b => b.branch === bf);
+
+            // Update print headers
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            document.getElementById('print-header').textContent = 'PSA - PLR - Profit & Loss Report (Sequenced)';
+            const branchLabel = bf === 'all' ? 'All Branches' : bf;
+            document.getElementById('print-sub-header').textContent = `${startDate} to ${endDate} | ${branchLabel}`;
+
             renderTable(filtered);
             renderChart();
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('branch-table-body');
+            const tfoot = document.getElementById('branch-table-foot');
             tbody.innerHTML = '';
-            let totalRev = 0;
-            if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">No data.</td></tr>'; }
-            else data.forEach(row => {
-                totalRev += row.revenue;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.grossPay)}</td><td style="text-align:right;font-weight:600;color:${row.profit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency2(row.profit)}</td>`;
-                tbody.appendChild(tr);
-            });
-            document.getElementById('total-revenue').textContent = `Total Revenue: ${formatCurrency2(totalRev)}`;
+            let totalRev = 0, totalGross = 0, totalOverhead = 0, totalGrossProfit = 0, totalNet = 0;
+
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="loading-indicator">No data.</td></tr>';
+                tfoot.style.display = 'none';
+            } else {
+                data.forEach(row => {
+                    totalRev += row.revenue;
+                    totalGross += row.grossPay;
+                    totalOverhead += row.overhead;
+                    totalGrossProfit += row.grossProfit;
+                    totalNet += row.netProfit;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.branch}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency2(row.grossPay)}</td>
+                        <td style="text-align:right;font-weight:600;color:${row.grossProfit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency2(row.grossProfit)}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency2(row.overhead)}</td>
+                        <td style="text-align:right;font-weight:600;color:${row.netProfit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency2(row.netProfit)}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                tfoot.style.display = '';
+                tfoot.innerHTML = `<tr>
+                    <td style="font-weight:700">Totals (${data.length})</td>
+                    <td style="text-align:right;font-weight:700">${formatCurrency2(totalRev)}</td>
+                    <td style="text-align:right;font-weight:700">${formatCurrency2(totalGross)}</td>
+                    <td style="text-align:right;font-weight:700;color:${totalGrossProfit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency2(totalGrossProfit)}</td>
+                    <td style="text-align:right;font-weight:700">${formatCurrency2(totalOverhead)}</td>
+                    <td style="text-align:right;font-weight:700;color:${totalNet >= 0 ? '#059669' : '#DC2626'}">${formatCurrency2(totalNet)}</td>
+                </tr>`;
+            }
+
+            document.getElementById('total-revenue').textContent = `Revenue: ${formatCurrency2(totalRev)} | Gross Profit: ${formatCurrency2(totalGrossProfit)} | Overhead: ${formatCurrency2(totalOverhead)} | Net Profit: ${formatCurrency2(totalNet)}`;
         }
 
         function renderChart() {
@@ -183,6 +512,7 @@
             const gspOn = document.getElementById('gsp_filter').checked;
             const timeAgg = {};
             rawInvoices.forEach(r => {
+                if (isCorporateBranch(r.branchname)) return;
                 if (bf !== 'all' && r.branchname !== bf) return;
                 const isDHP = (r.customername || '').toUpperCase().includes('DHP');
                 if (radioFilter === 'DHP' && !isDHP) return;
@@ -194,13 +524,46 @@
                 timeAgg[key] = (timeAgg[key] || 0) + (Number(r.invoiceamount) || 0);
             });
             const sorted = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
+
+            const ChartDataLabels = window.ChartDataLabels || null;
+            const plugins = ChartDataLabels ? [ChartDataLabels] : [];
+
             profitLossChart = new Chart(ctx, {
                 type,
-                data: { labels: sorted.map(([k]) => k), datasets: [{ label: 'Revenue', data: sorted.map(([,v]) => v), backgroundColor: 'rgba(234,137,56,0.7)', borderColor: 'rgb(234,137,56)', borderWidth: 2, fill: false, tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { datalabels: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } } } },
+                data: {
+                    labels: sorted.map(([k]) => k),
+                    datasets: [{
+                        label: 'Revenue',
+                        data: sorted.map(([, v]) => v),
+                        backgroundColor: 'rgba(234,137,56,0.7)',
+                        borderColor: 'rgb(234,137,56)',
+                        borderWidth: 2, fill: false, tension: 0.3,
+                    }]
+                },
+                plugins,
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        datalabels: {
+                            display: function(context) {
+                                const val = context.parsed?.y ?? context.parsed;
+                                return val !== null && val !== undefined && val !== 0;
+                            },
+                            anchor: 'end', align: 'top', color: '#333',
+                            font: { size: 10, weight: '600' },
+                            formatter: (value) => formatCurrency(value),
+                            rotation: type === 'bar' ? -45 : 0, offset: 2,
+                        },
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } },
+                    },
+                    layout: { padding: { top: 30 } },
+                },
             });
         }
 
+        // ── Event Listeners ──────────────────────────────
         document.getElementById('apply-btn').addEventListener('click', loadData);
         document.getElementById('start_date').addEventListener('change', loadData);
         document.getElementById('end_date').addEventListener('change', loadData);
@@ -210,6 +573,17 @@
         document.getElementById('graph_type').addEventListener('change', renderChart);
         document.getElementById('graph_interval').addEventListener('change', renderChart);
         document.querySelectorAll('input[name="plg_radio"]').forEach(r => r.addEventListener('change', renderChart));
+        document.getElementById('save-overheads-btn').addEventListener('click', saveOverheads);
+        document.getElementById('print-btn').addEventListener('click', () => {
+            if (profitLossChart) {
+                document.getElementById('print-chart-img').src = profitLossChart.toBase64Image();
+                document.getElementById('print-chart-title').textContent = 'PSA - PLR - Revenue Chart';
+            }
+            setTimeout(() => window.print(), 100);
+        });
+
+        // ── Initial Load ─────────────────────────────────
+        await loadOverheads();
         await loadData();
     </script>
 </body>
