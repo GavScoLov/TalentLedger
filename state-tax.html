@@ -96,21 +96,51 @@
             border-top: 2px solid var(--border-color);
         }
 
-        /* ── Saved batches list ─────────────────────────── */
-        .batch-chip {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600;
-            background: var(--bg-default); border: 1px solid var(--border-color);
-            color: var(--text-primary); cursor: pointer; transition: all 0.15s;
+        /* ── Batch list ───────────────────────────────────── */
+        .batch-list { display: flex; flex-direction: column; gap: 0; }
+        .batch-item {
+            display: flex; align-items: center; gap: 16px; padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color); transition: background 0.15s;
         }
-        .batch-chip:hover { border-color: var(--primary); background: rgba(234,137,56,0.05); }
-        .batch-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-        .batch-chip .chip-count { opacity: 0.7; font-weight: 400; }
-        .batch-chip .chip-delete {
-            font-size: 14px; line-height: 1; padding: 0 2px; border-radius: 50%;
-            color: inherit; opacity: 0.5; transition: opacity 0.15s;
+        .batch-item:last-child { border-bottom: none; }
+        .batch-item:hover { background: var(--bg-default); }
+        .batch-info { flex: 1; min-width: 0; }
+        .batch-info .batch-date {
+            font-size: 14px; font-weight: 700; color: var(--text-primary);
         }
-        .batch-chip .chip-delete:hover { opacity: 1; color: #DC2626; }
+        .batch-info .batch-meta {
+            font-size: 12px; color: var(--text-secondary); margin-top: 2px;
+            display: flex; gap: 12px; flex-wrap: wrap;
+        }
+        .batch-info .batch-meta span { display: inline-flex; align-items: center; gap: 4px; }
+        .batch-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .batch-actions .btn { padding: 6px 14px; font-size: 12px; }
+        .batch-actions .btn-danger {
+            background: transparent; color: #DC2626; border: 1px solid #fca5a5;
+        }
+        .batch-actions .btn-danger:hover { background: #fef2f2; border-color: #DC2626; }
+
+        /* ── Custom checkbox (Group by County Code) ─────── */
+        .custom-checkbox {
+            display: flex; align-items: center; gap: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; color: var(--text-primary);
+            user-select: none; white-space: nowrap;
+        }
+        .custom-checkbox input { display: none; }
+        .custom-checkbox .check-box {
+            width: 18px; height: 18px; border-radius: 4px;
+            border: 2px solid var(--border-color); background: var(--bg-default);
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; flex-shrink: 0;
+        }
+        .custom-checkbox .check-box svg {
+            width: 12px; height: 12px; color: #fff; opacity: 0; transition: opacity 0.15s;
+        }
+        .custom-checkbox input:checked + .check-box {
+            background: var(--primary); border-color: var(--primary);
+        }
+        .custom-checkbox input:checked + .check-box svg { opacity: 1; }
+        .custom-checkbox:hover .check-box { border-color: var(--primary); }
 
         @media print {
             .sidebar, .sidebar-overlay, .topbar, .action-bar, .page-header, .page-subtitle, #step-upload, .saved-header { display: none !important; }
@@ -129,25 +159,44 @@
                 <p class="page-subtitle">Upload CSV, map columns, and match county codes from uploaded tax PDFs</p>
             </div>
 
-            <!-- Step 0: Saved Data View -->
+            <!-- Step 0: Batch List View -->
             <div class="step" id="step-saved">
+                <div class="saved-header" style="margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <h2 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0;">Uploaded Batches</h2>
+                        <span class="badge" id="batch-count"></span>
+                        <div style="margin-left:auto;">
+                            <button class="btn btn-primary" id="new-upload-from-saved" style="padding:6px 14px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M12 5v14M5 12h14"/></svg>
+                                New Upload
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="padding:0;overflow:hidden;">
+                    <div class="batch-list" id="batch-list"></div>
+                </div>
+                <span class="status-msg" id="batch-status-msg" style="margin-top:8px;"></span>
+            </div>
+
+            <!-- Step 0b: Batch Detail View -->
+            <div class="step" id="step-batch-detail">
                 <div class="saved-header" style="margin-bottom:12px;">
                     <div class="card" style="padding:12px 16px;">
                         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                            <label style="font-size:13px;font-weight:600;white-space:nowrap;">Filter State:</label>
-                            <select class="form-select" id="saved-state-filter" style="max-width:180px;">
-                                <option value="">All States</option>
-                            </select>
-                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
-                                <input type="checkbox" id="group-by-county" style="accent-color:var(--primary);">
+                            <button class="btn" id="back-to-batches" style="padding:6px 14px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                                Back to Batches
+                            </button>
+                            <label class="custom-checkbox">
+                                <input type="checkbox" id="group-by-county">
+                                <span class="check-box">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                </span>
                                 Group by County Code
                             </label>
                             <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
                                 <button class="btn btn-primary" id="save-edits-btn" style="padding:6px 14px;display:none;">Save Edits</button>
-                                <button class="btn" id="new-upload-from-saved" style="padding:6px 14px;">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M12 5v14M5 12h14"/></svg>
-                                    New Upload
-                                </button>
                                 <button class="btn-icon" id="print-saved-btn" title="Print">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                                 </button>
@@ -186,7 +235,7 @@
             <div class="step" id="step-map">
                 <div class="card" style="padding:24px;">
                     <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text-primary);">Map CSV Columns</h3>
-                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Select which CSV column corresponds to each field. Only Address, City, State, and Zip are required for county lookup.</p>
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Select which CSV column corresponds to each field. Only Country, City, State, and Zip are required for county lookup.</p>
                     <div class="mapping-grid" id="mapping-grid"></div>
                     <div style="margin-top:20px;display:flex;gap:8px;justify-content:center;">
                         <button class="btn" id="back-to-upload" style="padding:8px 20px;">Back</button>
@@ -233,7 +282,7 @@
     </div>
 
     <script type="module">
-        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { checkAuth, checkPageAccess, getUser } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
@@ -246,7 +295,6 @@
         initInactivityTimer();
 
         // ── Tax Code Cache ──────────────────────────────────
-        // Keyed by state name → array of { county_name, city_name, county_code, jurisdiction_code }
         const taxCodeCache = {};
 
         async function loadTaxCodesForState(stateName) {
@@ -264,12 +312,8 @@
         function findTaxCodeByCity(taxCodes, cityName) {
             if (!taxCodes.length || !cityName) return null;
             const city = cityName.toUpperCase().trim();
-
-            // Exact city name match
             const exact = taxCodes.find(tc => tc.city_name.toUpperCase().trim() === city);
             if (exact) return exact;
-
-            // Try partial match (city contains or is contained by)
             const partial = taxCodes.find(tc => {
                 const tcCity = tc.city_name.toUpperCase().trim();
                 return tcCity.includes(city) || city.includes(tcCity);
@@ -283,11 +327,13 @@
         let mappedData = [];
         let columnMapping = {};
         let savedRecords = [];
-        let editedRecords = {}; // id -> { county_name, county_code, jurisdiction_code }
+        let allRecords = [];
+        let editedRecords = {};
+        let currentBatchId = null;
 
         const EXPECTED_FIELDS = [
             { key: 'company', label: 'Company / Employee', required: false },
-            { key: 'address', label: 'Address', required: true },
+            { key: 'country', label: 'Country', required: true },
             { key: 'city', label: 'City', required: true },
             { key: 'state', label: 'State', required: true },
             { key: 'zip', label: 'Zip Code', required: true },
@@ -304,51 +350,144 @@
         }
 
         // ══════════════════════════════════════════════════════
-        // ── SAVED DATA VIEW ──────────────────────────────────
+        // ── BATCH LIST VIEW ──────────────────────────────────
         // ══════════════════════════════════════════════════════
 
-        async function loadSavedRecords() {
+        async function loadAllRecords() {
             const { data, error } = await supabase
                 .from('state_tax_records')
                 .select('*')
                 .order('created_at', { ascending: false });
-            if (error) { console.error('Error loading saved records:', error); return []; }
+            if (error) { console.error('Error loading records:', error); return []; }
             return data || [];
         }
 
-        function populateStateFilter(records) {
-            const select = document.getElementById('saved-state-filter');
-            const currentVal = select.value;
-            const states = [...new Set(records.map(r => r.state).filter(Boolean))].sort();
-            select.innerHTML = '<option value="">All States</option>';
-            states.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s;
-                opt.textContent = s;
-                if (s === currentVal) opt.selected = true;
-                select.appendChild(opt);
+        function groupIntoBatches(records) {
+            const batches = {};
+            records.forEach(r => {
+                if (!batches[r.batch_id]) {
+                    batches[r.batch_id] = {
+                        batch_id: r.batch_id,
+                        created_at: r.created_at,
+                        uploaded_by: r.uploaded_by || '',
+                        records: [],
+                        states: new Set(),
+                    };
+                }
+                batches[r.batch_id].records.push(r);
+                if (r.state) batches[r.batch_id].states.add(r.state);
+            });
+            // Sort by date descending
+            return Object.values(batches).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        }
+
+        function formatDate(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+
+        function renderBatchList() {
+            const container = document.getElementById('batch-list');
+            const batches = groupIntoBatches(allRecords);
+
+            document.getElementById('batch-count').textContent = `${batches.length} batch${batches.length !== 1 ? 'es' : ''}`;
+
+            if (batches.length === 0) {
+                container.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-secondary);font-size:14px;">No uploads yet. Click "New Upload" to get started.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            batches.forEach(batch => {
+                const statesList = [...batch.states].sort().join(', ') || 'N/A';
+                const div = document.createElement('div');
+                div.className = 'batch-item';
+                div.innerHTML = `
+                    <div class="batch-info">
+                        <div class="batch-date">${formatDate(batch.created_at)}</div>
+                        <div class="batch-meta">
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                ${batch.uploaded_by || 'Unknown'}
+                            </span>
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                ${batch.records.length} record${batch.records.length !== 1 ? 's' : ''}
+                            </span>
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                ${statesList}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="batch-actions">
+                        <button class="btn btn-primary view-batch-btn" data-batch="${batch.batch_id}">View</button>
+                        <button class="btn btn-danger delete-batch-btn" data-batch="${batch.batch_id}">Delete</button>
+                    </div>`;
+                container.appendChild(div);
+            });
+
+            // Attach event listeners
+            container.querySelectorAll('.view-batch-btn').forEach(btn => {
+                btn.addEventListener('click', () => viewBatch(btn.dataset.batch));
+            });
+            container.querySelectorAll('.delete-batch-btn').forEach(btn => {
+                btn.addEventListener('click', () => deleteBatch(btn.dataset.batch));
             });
         }
 
-        function getFilteredRecords() {
-            const stateFilter = document.getElementById('saved-state-filter').value;
-            let filtered = savedRecords;
-            if (stateFilter) {
-                filtered = filtered.filter(r => r.state === stateFilter);
-            }
-            return filtered;
+        function viewBatch(batchId) {
+            currentBatchId = batchId;
+            savedRecords = allRecords.filter(r => r.batch_id === batchId);
+            editedRecords = {};
+            updateSaveEditsBtn();
+            document.getElementById('group-by-county').checked = false;
+            renderSavedTable();
+            showStep('step-batch-detail');
         }
+
+        async function deleteBatch(batchId) {
+            if (!confirm('Are you sure you want to delete this upload? This cannot be undone.')) return;
+
+            const statusEl = document.getElementById('batch-status-msg');
+            try {
+                const { error } = await supabase
+                    .from('state_tax_records')
+                    .delete()
+                    .eq('batch_id', batchId);
+                if (error) throw error;
+
+                // Remove from local data
+                allRecords = allRecords.filter(r => r.batch_id !== batchId);
+                renderBatchList();
+
+                statusEl.textContent = 'Batch deleted successfully.';
+                statusEl.className = 'status-msg success';
+                setTimeout(() => { statusEl.className = 'status-msg'; }, 4000);
+
+                // If no records left, show upload
+                if (allRecords.length === 0) showStep('step-upload');
+            } catch (err) {
+                console.error('Delete error:', err);
+                statusEl.textContent = 'Error deleting: ' + err.message;
+                statusEl.className = 'status-msg error';
+            }
+        }
+
+        // ══════════════════════════════════════════════════════
+        // ── BATCH DETAIL VIEW ─────────────────────────────────
+        // ══════════════════════════════════════════════════════
 
         function renderSavedTable() {
             const thead = document.getElementById('saved-thead');
             const tbody = document.getElementById('saved-tbody');
             const groupBy = document.getElementById('group-by-county').checked;
-            const filtered = getFilteredRecords();
+            const filtered = savedRecords;
 
             // Header
             let headerHTML = '<tr>';
             headerHTML += '<th style="width:30px;">#</th>';
-            headerHTML += '<th>Company</th><th>Address</th><th>City</th><th>State</th><th>Zip</th>';
+            headerHTML += '<th>Company</th><th>Country</th><th>City</th><th>State</th><th>Zip</th>';
             headerHTML += '<th>Total Sales</th><th>Net Sales</th><th>Taxes</th><th>Shipping</th>';
             headerHTML += '<th>County Name</th><th>County Code</th><th>Jurisdiction Code</th>';
             headerHTML += '</tr>';
@@ -376,7 +515,6 @@
             let counter = 0;
 
             rows.forEach((row) => {
-                // Group header
                 if (groupBy) {
                     const groupKey = row.county_code || '(No Code)';
                     if (groupKey !== currentGroup) {
@@ -401,7 +539,7 @@
                 tr.innerHTML = `
                     <td style="color:var(--text-disabled);font-size:11px;">${counter}</td>
                     <td>${row.company || ''}</td>
-                    <td>${row.address || ''}</td>
+                    <td>${row.country || ''}</td>
                     <td>${row.city || ''}</td>
                     <td>${row.state || ''}</td>
                     <td>${row.zip || ''}</td>
@@ -434,7 +572,6 @@
                     if (!editedRecords[id]) editedRecords[id] = {};
                     editedRecords[id][field] = e.target.value.trim();
 
-                    // If value matches original, remove the edit
                     if (editedRecords[id][field] === (original[field] || '')) {
                         delete editedRecords[id][field];
                         if (Object.keys(editedRecords[id]).length === 0) delete editedRecords[id];
@@ -470,6 +607,8 @@
                     // Update local data
                     const rec = savedRecords.find(r => r.id === id);
                     if (rec) Object.assign(rec, updates);
+                    const allRec = allRecords.find(r => r.id === id);
+                    if (allRec) Object.assign(allRec, updates);
                 }
 
                 editedRecords = {};
@@ -489,25 +628,26 @@
             }
         }
 
-        // ── Init: Load saved data on page load ──────────────
-        savedRecords = await loadSavedRecords();
-        if (savedRecords.length > 0) {
-            populateStateFilter(savedRecords);
-            renderSavedTable();
+        // ── Init: Load data on page load ─────────────────────
+        allRecords = await loadAllRecords();
+        if (allRecords.length > 0) {
+            renderBatchList();
             showStep('step-saved');
         } else {
             showStep('step-upload');
         }
 
-        // Saved view event listeners
-        document.getElementById('saved-state-filter').addEventListener('change', () => {
+        // Batch list event listeners
+        document.getElementById('new-upload-from-saved').addEventListener('click', () => showStep('step-upload'));
+
+        // Batch detail event listeners
+        document.getElementById('back-to-batches').addEventListener('click', () => {
+            currentBatchId = null;
             editedRecords = {};
-            updateSaveEditsBtn();
-            renderSavedTable();
+            showStep('step-saved');
         });
         document.getElementById('group-by-county').addEventListener('change', renderSavedTable);
         document.getElementById('save-edits-btn').addEventListener('click', saveEdits);
-        document.getElementById('new-upload-from-saved').addEventListener('click', () => showStep('step-upload'));
         document.getElementById('print-saved-btn').addEventListener('click', () => window.print());
 
         // ══════════════════════════════════════════════════════
@@ -556,7 +696,7 @@
                 let bestMatch = '';
                 const patterns = {
                     company: ['company', 'employee', 'name', 'employer', 'client'],
-                    address: ['address', 'street', 'addr', 'address1', 'streetaddress'],
+                    country: ['country', 'address', 'street', 'addr', 'address1', 'streetaddress'],
                     city: ['city', 'town', 'municipality'],
                     state: ['state', 'st', 'statecode', 'stateabbr'],
                     zip: ['zip', 'zipcode', 'postal', 'postalcode', 'zip5'],
@@ -736,7 +876,6 @@
             const progress = document.getElementById('lookup-progress');
             btn.disabled = true; btn.textContent = 'Looking up...';
 
-            // Pre-load tax codes for all unique states in the data
             const uniqueStates = [...new Set(mappedData.map(r => r.state).filter(Boolean))];
             progress.textContent = 'Loading tax code database...';
 
@@ -785,7 +924,6 @@
                     }
                 }
 
-                // Update table every 50 rows for visual feedback
                 if ((i + 1) % 50 === 0 || i === mappedData.length - 1) {
                     renderResultsTable();
                 }
@@ -814,13 +952,21 @@
                     }
                 });
 
+                // Get current user email
+                let uploadedBy = '';
+                try {
+                    const user = await getUser();
+                    uploadedBy = user?.email || '';
+                } catch (e) { console.warn('Could not get user:', e); }
+
                 const batchId = `batch_${Date.now()}`;
                 const toNum = (v) => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
 
                 const records = mappedData.map(row => ({
                     batch_id: batchId,
+                    uploaded_by: uploadedBy,
                     company: row.company || '',
-                    address: row.address || '',
+                    country: row.country || '',
                     city: row.city || '',
                     state: row.state || '',
                     zip: row.zip || '',
@@ -843,12 +989,10 @@
 
                 showStatus(`Saved ${records.length} records.`, 'success');
 
-                // Reload saved view
-                savedRecords = await loadSavedRecords();
-                populateStateFilter(savedRecords);
+                // Reload batch list
+                allRecords = await loadAllRecords();
+                renderBatchList();
                 editedRecords = {};
-                updateSaveEditsBtn();
-                renderSavedTable();
                 showStep('step-saved');
             } catch (err) {
                 console.error('Save error:', err);

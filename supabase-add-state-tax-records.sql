@@ -4,8 +4,9 @@
 CREATE TABLE IF NOT EXISTS state_tax_records (
     id BIGSERIAL PRIMARY KEY,
     batch_id TEXT NOT NULL,
+    uploaded_by TEXT DEFAULT '',
     company TEXT DEFAULT '',
-    address TEXT DEFAULT '',
+    country TEXT DEFAULT '',
     city TEXT DEFAULT '',
     state TEXT NOT NULL DEFAULT '',
     zip TEXT DEFAULT '',
@@ -34,3 +35,11 @@ CREATE POLICY "Allow all for authenticated users" ON state_tax_records
     FOR ALL
     USING (true)
     WITH CHECK (true);
+
+-- If you already created the table, run these ALTER statements instead:
+-- ALTER TABLE state_tax_records RENAME COLUMN address TO country;
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS uploaded_by TEXT DEFAULT '';
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS total_sales NUMERIC(12,2) DEFAULT 0;
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS net_sales NUMERIC(12,2) DEFAULT 0;
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS taxes NUMERIC(12,2) DEFAULT 0;
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS shipping_charges NUMERIC(12,2) DEFAULT 0;
