@@ -36,20 +36,20 @@ export async function fetchInvoiceRegister(startDate, endDate) {
   }));
 }
 
-// ── Employee Hours — Raw Query ────────────────────────────────────
+// ── Employee Hours — By Company (for GSP commission) ─────────────
 
 export async function fetchEmployeeHours(startDate, endDate) {
-  const data = await psaFetch('/api/employee_hours/query', {
+  const data = await psaFetch('/api/employee_hours/total_hours_by_company', {
     start_date: startDate,
     end_date: endDate,
   });
-  // Normalize field names
+  // Normalize field names (total_hours_by_company returns: branch, company_name, weekend_bill, total_hours, producer_name)
   return data.map(r => ({
     ...r,
     branchname: r.branch || r.branchname || '',
-    customername: r.customer || r.customername || '',
+    customername: r.company_name || r.customer || r.customername || '',
     weekendbill: r.weekend_bill || r.weekendbill || '',
-    hours: r.hours ?? r.total_hours ?? 0,
+    hours: r.total_hours ?? r.hours ?? 0,
   }));
 }
 

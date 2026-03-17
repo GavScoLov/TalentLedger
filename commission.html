@@ -370,9 +370,9 @@
 
         // ── Persistent company list (synced to Supabase) ─────────
         async function syncCompaniesToSupabase() {
-            // Collect unique company+branch pairs from current API data
+            // Collect unique company+branch pairs from both invoice register AND employee hours
             const seen = new Map();
-            rawData.forEach(r => {
+            const addCompany = (r) => {
                 const branch = r.branchname || 'Unknown';
                 const company = r.customername || 'Unknown';
                 const key = `${company}||${branch}`;
@@ -383,7 +383,9 @@
                         is_dhp: company.toUpperCase().includes('DHP'),
                     });
                 }
-            });
+            };
+            rawData.forEach(addCompany);
+            rawHours.forEach(addCompany);
 
             // Upsert new companies (ignore conflicts on existing ones)
             const rows = [...seen.values()];
@@ -561,13 +563,15 @@
                     }
                 });
 
-                // Track which companies are in the current timeframe
+                // Track which companies are in the current timeframe (from both invoice register and employee hours)
                 currentTimeframeCompanies = new Set();
-                rawData.forEach(r => {
+                const trackCompany = (r) => {
                     const company = r.customername || 'Unknown';
                     const branch = r.branchname || 'Unknown';
                     currentTimeframeCompanies.add(`${company}||${branch}`);
-                });
+                };
+                rawData.forEach(trackCompany);
+                rawHours.forEach(trackCompany);
                 // Sync any new companies to the persistent list, then load all
                 if (tablesOk) {
                     await syncCompaniesToSupabase();

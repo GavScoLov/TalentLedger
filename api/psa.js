@@ -26,7 +26,6 @@ export default async function handler(req, res) {
     '/api/employee_hours/total_billing_by_company',
     '/api/employee_hours/unique_count_by_branch',
     '/api/employee_hours/unique_count_by_company',
-    '/api/employee_hours/query',
   ];
 
   if (!allowedEndpoints.includes(endpoint)) {
