@@ -10,15 +10,14 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .plr-layout { display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto auto auto 1fr; gap: 16px; }
-        .plr-filters { grid-row: 1; grid-column: 1 / 3; }
-        .plr-title-row { grid-row: 2; grid-column: 1 / 3; }
-        .plr-main { grid-row: 3 / 5; grid-column: 1; display: grid; grid-template-columns: 38% 1fr; gap: 16px; }
-        .plr-overhead-panel { grid-row: 3 / 5; grid-column: 2; }
-
+        .report-layout { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: auto auto 1fr; gap: 16px; }
+        .report-filters { grid-row: 1; grid-column: 1 / 3; }
+        .report-title-row { grid-row: 2; grid-column: 1 / 3; }
+        .report-table-section { grid-row: 3; grid-column: 1; display: flex; flex-direction: column; }
+        .report-chart-section { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; }
         .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; }
-        .table-scroll { overflow-y: auto; max-height: calc(100vh - 420px); }
-        .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px; }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 380px); }
+        .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 14px; }
         .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
         .radio-group { display: flex; gap: 12px; align-items: center; padding: 4px 12px; }
         .radio-group label { color: var(--text-primary); font-weight: 500; cursor: pointer; font-size: 14px; }
@@ -39,9 +38,30 @@
             background: var(--primary); border-color: var(--primary); color: #fff;
         }
 
-        /* ── Overhead Panel ─────────────────────────────── */
-        .overhead-panel { max-height: calc(100vh - 260px); overflow-y: auto; }
-        .overhead-panel h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; }
+        /* ── Overhead Drawer ──────────────────────────── */
+        .drawer-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 9998;
+            opacity: 0; transition: opacity 0.25s;
+        }
+        .drawer-overlay.open { display: block; opacity: 1; }
+        .overhead-drawer {
+            position: fixed; top: 0; right: -380px; width: 360px; height: 100vh;
+            background: var(--bg-paper); box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+            z-index: 9999; transition: right 0.3s ease; display: flex; flex-direction: column;
+        }
+        .overhead-drawer.open { right: 0; }
+        .drawer-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--border-color);
+        }
+        .drawer-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+        .drawer-close-btn {
+            background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-secondary);
+            padding: 4px 8px; border-radius: 4px; transition: background 0.15s;
+        }
+        .drawer-close-btn:hover { background: var(--bg-default); }
+        .drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+        .drawer-footer { padding: 12px 20px; border-top: 1px solid var(--border-color); }
         .overhead-branch-section {
             background: var(--bg-default); border: 1px solid var(--border-color); border-radius: var(--radius);
             margin-bottom: 10px; overflow: hidden;
@@ -62,6 +82,7 @@
         .overhead-row input {
             width: 100%; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px;
             font-size: 12px; text-align: right; background: var(--bg-paper); color: var(--text-primary);
+            box-sizing: border-box;
         }
         .overhead-total-row {
             display: grid; grid-template-columns: 1fr 100px; gap: 6px; align-items: center;
@@ -69,7 +90,7 @@
         }
         .overhead-total-row span { font-size: 12px; font-weight: 700; color: var(--text-primary); }
         .overhead-save-btn {
-            width: 100%; padding: 10px; margin-top: 12px; background: var(--primary); color: #fff;
+            width: 100%; padding: 10px; background: var(--primary); color: #fff;
             border: none; border-radius: var(--radius); font-weight: 700; font-size: 14px; cursor: pointer;
             transition: background 0.2s;
         }
@@ -79,20 +100,22 @@
         .overhead-status.success { color: #059669; }
         .overhead-status.error { color: #DC2626; }
 
-        @media (max-width: 1100px) {
-            .plr-layout { grid-template-columns: 1fr; }
-            .plr-overhead-panel { grid-row: auto; grid-column: 1; }
-            .plr-main { grid-column: 1; }
+        /* Overhead trigger button */
+        .overhead-trigger-btn {
+            padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+            border: 2px solid var(--primary); border-radius: 6px; background: var(--bg-default);
+            color: var(--primary); transition: all 0.2s; display: inline-flex; align-items: center; gap: 5px;
         }
-        @media (max-width: 900px) { .plr-main { grid-template-columns: 1fr; } }
+        .overhead-trigger-btn:hover { background: var(--primary); color: #fff; }
+
+        @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } .report-chart-section { grid-column: 1; } }
 
         /* ── Print Styles ──────────────────────────────── */
         @media print {
             body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            .sidebar, .sidebar-overlay, .topbar, .plr-filters, .page-header, .page-subtitle, .plr-overhead-panel { display: none !important; }
+            .sidebar, .sidebar-overlay, .topbar, .report-filters, .page-header, .page-subtitle, .overhead-drawer, .drawer-overlay { display: none !important; }
             .main-content { margin: 0 !important; padding: 0 !important; }
-            .plr-layout { display: block !important; }
-            .plr-main { display: block !important; }
+            .report-layout { display: block !important; }
             .card { box-shadow: none !important; border: none !important; }
             .print-header { display: block !important; font-size: 22px; text-align: center; font-weight: 700; padding: 12px 0 4px; color: #000; border-bottom: 2px solid #333; margin-bottom: 8px; }
             .print-sub-header { display: block !important; font-size: 13px; text-align: center; color: #555; margin-bottom: 12px; }
@@ -107,6 +130,7 @@
             .print-chart-page h2 { font-size: 18px; text-align: center; font-weight: 700; color: #000; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
             .print-chart-page img { width: 100%; max-height: 600px; object-fit: contain; }
             .filter-bar, .radio-group { display: none !important; }
+            .report-chart-section { display: none !important; }
         }
         .print-header, .print-sub-header, .print-chart-page { display: none; }
     </style>
@@ -120,8 +144,8 @@
             </div>
             <div class="print-header" id="print-header"></div>
             <div class="print-sub-header" id="print-sub-header"></div>
-            <div class="plr-layout">
-                <div class="plr-filters">
+            <div class="report-layout">
+                <div class="report-filters">
                     <div class="card" style="padding:10px;">
                         <div class="filter-bar" style="padding:0;">
                             <select class="form-select" id="table_branch_filter"><option value="all" selected>All Branches</option></select>
@@ -136,60 +160,52 @@
                             <input class="form-input" type="date" id="start_date" style="max-width:150px;">
                             <input class="form-input" type="date" id="end_date" style="max-width:150px;">
                             <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
+                            <button class="overhead-trigger-btn" type="button" id="open-overhead-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
+                                Overheads
+                            </button>
                             <button class="btn-icon" type="button" id="print-btn" title="Print" style="margin-left:auto;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                             </button>
                         </div>
                     </div>
                 </div>
-                <div class="plr-title-row">
+                <div class="report-title-row">
                     <div class="report-title-bar"><h2>PSA - PLR - Profit & Loss Report (Sequenced)</h2></div>
                 </div>
-                <div class="plr-main">
-                    <div style="display:flex;flex-direction:column;">
-                        <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
-                            <div class="table-scroll">
-                                <table class="data-table" id="branch-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Branch</th>
-                                            <th style="text-align:right">Revenue</th>
-                                            <th style="text-align:right">Gross Pay</th>
-                                            <th style="text-align:right">Gross Profit</th>
-                                            <th style="text-align:right">Overhead</th>
-                                            <th style="text-align:right">Net Profit</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="branch-table-body"><tr><td colspan="6" class="loading-indicator">Loading data...</td></tr></tbody>
-                                    <tfoot id="branch-table-foot" style="display:none;"></tfoot>
-                                </table>
-                            </div>
-                            <div class="total-bar" id="total-revenue">Total Revenue: $0</div>
+                <div class="report-table-section">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                        <div class="table-scroll">
+                            <table class="data-table" id="branch-table">
+                                <thead>
+                                    <tr>
+                                        <th>Branch</th>
+                                        <th style="text-align:right">Revenue</th>
+                                        <th style="text-align:right">Gross Pay</th>
+                                        <th style="text-align:right">Gross Profit</th>
+                                        <th style="text-align:right">Overhead</th>
+                                        <th style="text-align:right">Net Profit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="branch-table-body"><tr><td colspan="6" class="loading-indicator">Loading data...</td></tr></tbody>
+                                <tfoot id="branch-table-foot" style="display:none;"></tfoot>
+                            </table>
                         </div>
-                    </div>
-                    <div style="display:flex;flex-direction:column;">
-                        <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
-                            <div class="filter-bar">
-                                <select class="form-select" id="graph_type"><option value="bar" selected>Bar</option><option value="line">Line</option></select>
-                                <select class="form-select" id="graph_interval"><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select>
-                            </div>
-                            <div class="radio-group">
-                                <label><input type="radio" name="plg_radio" value="All" checked> All</label>
-                                <label><input type="radio" name="plg_radio" value="DHP"> DHP</label>
-                                <label><input type="radio" name="plg_radio" value="GSP"> GSP</label>
-                            </div>
-                            <div class="chart-wrap"><canvas id="profitLossChart"></canvas></div>
-                        </div>
+                        <div class="total-bar" id="total-revenue">Total Revenue: $0</div>
                     </div>
                 </div>
-                <div class="plr-overhead-panel">
-                    <div class="card" style="padding:12px;">
-                        <h3>Branch Overhead Settings</h3>
-                        <div class="overhead-panel" id="overhead-panel">
-                            <p class="loading-indicator" style="padding:20px;">Loading branches...</p>
+                <div class="report-chart-section">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
+                        <div class="filter-bar">
+                            <select class="form-select" id="graph_type"><option value="bar" selected>Bar</option><option value="line">Line</option></select>
+                            <select class="form-select" id="graph_interval"><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select>
                         </div>
-                        <button class="overhead-save-btn" id="save-overheads-btn" disabled>Save All Overheads</button>
-                        <div class="overhead-status" id="overhead-status"></div>
+                        <div class="radio-group">
+                            <label><input type="radio" name="plg_radio" value="All" checked> All</label>
+                            <label><input type="radio" name="plg_radio" value="DHP"> DHP</label>
+                            <label><input type="radio" name="plg_radio" value="GSP"> GSP</label>
+                        </div>
+                        <div class="chart-wrap"><canvas id="profitLossChart"></canvas></div>
                     </div>
                 </div>
             </div>
@@ -199,6 +215,23 @@
             </div>
         </div>
     </div>
+
+    <!-- Overhead Slide-Out Drawer -->
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <div class="overhead-drawer" id="overhead-drawer">
+        <div class="drawer-header">
+            <h3>Branch Overhead Settings</h3>
+            <button class="drawer-close-btn" id="close-drawer-btn">&times;</button>
+        </div>
+        <div class="drawer-body" id="overhead-panel">
+            <p class="loading-indicator" style="padding:20px;">Loading branches...</p>
+        </div>
+        <div class="drawer-footer">
+            <button class="overhead-save-btn" id="save-overheads-btn" disabled>Save All Overheads</button>
+            <div class="overhead-status" id="overhead-status"></div>
+        </div>
+    </div>
+
     <script type="module">
         import { checkAuth, checkPageAccess } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
@@ -232,10 +265,23 @@
         let rawInvoices = [];
         let branchSummary = [];
         let profitLossChart = null;
-        let overheadsByBranch = {}; // { branchName: { rent: 0, producer_amount: 0, ... } }
+        let overheadsByBranch = {};
 
         document.getElementById('start_date').value = getDefaultStartDate();
         document.getElementById('end_date').value = getDefaultEndDate();
+
+        // ── Drawer open/close ────────────────────────────
+        function openDrawer() {
+            document.getElementById('overhead-drawer').classList.add('open');
+            document.getElementById('drawer-overlay').classList.add('open');
+        }
+        function closeDrawer() {
+            document.getElementById('overhead-drawer').classList.remove('open');
+            document.getElementById('drawer-overlay').classList.remove('open');
+        }
+        document.getElementById('open-overhead-btn').addEventListener('click', openDrawer);
+        document.getElementById('close-drawer-btn').addEventListener('click', closeDrawer);
+        document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
 
         // ── Helper: filter Corporate branches ────────────
         function isCorporateBranch(name) {
@@ -271,7 +317,6 @@
             status.className = 'overhead-status';
 
             try {
-                // Read current values from the form
                 const panel = document.getElementById('overhead-panel');
                 const sections = panel.querySelectorAll('.overhead-branch-section');
                 const upsertRows = [];
@@ -304,7 +349,8 @@
                 status.textContent = 'Saved successfully!';
                 status.className = 'overhead-status success';
 
-                // Re-render table with new overheads
+                // Re-calculate with updated overheads
+                recalcSummary();
                 processData();
             } catch (err) {
                 console.error('Save error:', err);
@@ -354,7 +400,7 @@
                     </div>`;
 
                 section.innerHTML = `
-                    <div class="overhead-branch-header">
+                    <div class="overhead-branch-header collapsed">
                         <span>${branch}</span>
                         <span class="toggle-icon">▼</span>
                     </div>
@@ -390,6 +436,14 @@
             const oh = overheadsByBranch[branch];
             if (!oh) return 0;
             return OVERHEAD_FIELDS.reduce((sum, f) => sum + (Number(oh[f.key]) || 0), 0);
+        }
+
+        // ── Re-calculate summary with current overheads ──
+        function recalcSummary() {
+            branchSummary.forEach(b => {
+                b.overhead = getBranchOverhead(b.branch);
+                b.netProfit = b.grossProfit - b.overhead;
+            });
         }
 
         // ── Fetch Data ───────────────────────────────────
@@ -449,7 +503,6 @@
             const bf = document.getElementById('table_branch_filter').value;
             const filtered = bf === 'all' ? branchSummary : branchSummary.filter(b => b.branch === bf);
 
-            // Update print headers
             const startDate = document.getElementById('start_date').value;
             const endDate = document.getElementById('end_date').value;
             document.getElementById('print-header').textContent = 'PSA - PLR - Profit & Loss Report (Sequenced)';
@@ -498,7 +551,7 @@
                 </tr>`;
             }
 
-            document.getElementById('total-revenue').textContent = `Revenue: ${formatCurrency2(totalRev)} | Gross Profit: ${formatCurrency2(totalGrossProfit)} | Overhead: ${formatCurrency2(totalOverhead)} | Net Profit: ${formatCurrency2(totalNet)}`;
+            document.getElementById('total-revenue').textContent = `Revenue: ${formatCurrency2(totalRev)} | Gross Profit: ${formatCurrency2(totalGrossProfit)} | Overhead: ${formatCurrency2(totalOverhead)} | Net: ${formatCurrency2(totalNet)}`;
         }
 
         function renderChart() {
