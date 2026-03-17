@@ -39,11 +39,18 @@
         }
         .multi-select-dropdown.open { display: block; }
         .multi-select-option {
-            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+            display: flex; align-items: center; gap: 0; padding: 0;
             cursor: pointer; font-size: 0.85rem; transition: background 0.15s;
         }
         .multi-select-option:hover { background: var(--bg-default); }
-        .multi-select-option input { accent-color: var(--primary); }
+        .multi-select-option input { display: none; }
+        .multi-select-option label {
+            display: block; width: 100%; padding: 8px 12px; cursor: pointer;
+            transition: background 0.15s, color 0.15s; user-select: none;
+        }
+        .multi-select-option input:checked + label {
+            background: var(--primary); color: #fff; font-weight: 600;
+        }
 
         /* Branch group with companies */
         .branch-group { margin-bottom: 14px; }
@@ -225,7 +232,7 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
-        import { fetchInvoiceRegister, fetchEmployeeHours, formatCurrency } from './src/apiClient.js';
+        import { fetchInvoiceRegister, fetchEmployeeHours, formatCurrency2 as formatCurrency } from './src/apiClient.js';
         import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
@@ -342,15 +349,16 @@
                 div.className = 'multi-select-option';
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
+                cb.id = `producer-report-${p.id}`;
                 cb.value = p.id;
                 cb.checked = reportProducerIds.includes(String(p.id));
                 cb.addEventListener('change', () => {
                     if (cb.checked) { if (!reportProducerIds.includes(String(p.id))) reportProducerIds.push(String(p.id)); }
                     else { reportProducerIds = reportProducerIds.filter(id => id !== String(p.id)); }
-                    updateReportBtn();
                     processData();
                 });
-                const lbl = document.createElement('span');
+                const lbl = document.createElement('label');
+                lbl.htmlFor = `producer-report-${p.id}`;
                 lbl.textContent = p.name;
                 div.appendChild(cb);
                 div.appendChild(lbl);
@@ -358,15 +366,7 @@
             });
         }
 
-        function updateReportBtn() {
-            const btn = document.getElementById('producer-report-btn');
-            if (reportProducerIds.length === 0) {
-                btn.textContent = 'Select Producer(s)';
-            } else {
-                const names = producers.filter(p => reportProducerIds.includes(String(p.id))).map(p => p.name);
-                btn.textContent = names.join(', ');
-            }
-        }
+        // Button always shows "Select Producer(s)" — selected producers are highlighted in the dropdown
 
         // ── Persistent company list (synced to Supabase) ─────────
         async function syncCompaniesToSupabase() {
