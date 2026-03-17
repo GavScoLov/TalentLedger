@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
           generalStaffing: resolve(__dirnameESM, 'general-staffing.html'),
           psaProfitLoss: resolve(__dirnameESM, 'psa-profit-loss.html'),
           admin: resolve(__dirnameESM, 'admin.html'),
+          settings: resolve(__dirnameESM, 'settings.html'),
         },
       },
     },
