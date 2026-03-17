@@ -36,6 +36,23 @@ export async function fetchInvoiceRegister(startDate, endDate) {
   }));
 }
 
+// ── Employee Hours — Raw Query ────────────────────────────────────
+
+export async function fetchEmployeeHours(startDate, endDate) {
+  const data = await psaFetch('/api/employee_hours/query', {
+    start_date: startDate,
+    end_date: endDate,
+  });
+  // Normalize field names
+  return data.map(r => ({
+    ...r,
+    branchname: r.branch || r.branchname || '',
+    customername: r.customer || r.customername || '',
+    weekendbill: r.weekend_bill || r.weekendbill || '',
+    hours: r.hours ?? r.total_hours ?? 0,
+  }));
+}
+
 // ── Employee Hours — Aggregated Queries ───────────────────────────
 
 export async function fetchTotalHoursByBranch(startDate, endDate) {

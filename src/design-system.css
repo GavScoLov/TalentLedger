@@ -1,11 +1,11 @@
-/* TalentLedger Design System — KitchenLogic-inspired, Violet accent */
+/* TalentLedger Design System — KitchenLogic-inspired, Orange accent */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --primary: #7C3AED;
-  --primary-light: #8B5CF6;
-  --primary-dark: #5B21B6;
-  --primary-rgb: 124, 58, 237;
+  --primary: #EA8938;
+  --primary-light: #F0A05C;
+  --primary-dark: #C7712A;
+  --primary-rgb: 234, 137, 56;
   --bg-default: #F5F5F5;
   --bg-paper: #FFFFFF;
   --border-color: #E8E8E8;

@@ -119,7 +119,7 @@
                     <div class="card" style="padding:10px;">
                         <div class="commission-filters-inner">
                             <div class="multi-select-wrap" id="producer-report-wrap" style="min-width:200px;flex:1;">
-                                <div class="multi-select-btn" id="producer-report-btn">Add Producer to Report</div>
+                                <div class="multi-select-btn" id="producer-report-btn">Select Producer(s)</div>
                                 <div class="multi-select-dropdown" id="producer-report-dropdown"></div>
                             </div>
                             <select class="form-select" id="group_by" name="group_by">
@@ -192,8 +192,8 @@
                     <!-- Company assignments by branch -->
                     <div class="pct-header">
                         <span>Company</span>
-                        <span style="text-align:center;">DHP %</span>
-                        <span style="text-align:center;">GSP %</span>
+                        <span style="text-align:center;" title="% of DHP Billing">DHP %</span>
+                        <span style="text-align:center;" title="% of GSP Hours">GSP %</span>
                     </div>
                     <div class="companies-scroll" id="companies-container">
                         <p style="color:var(--text-secondary);text-align:center;padding:20px;font-size:13px;">Select a producer or create a new one to assign commission percentages.</p>
@@ -225,7 +225,7 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
-        import { fetchInvoiceRegister, fetchTotalBillingByCompany, formatCurrency } from './src/apiClient.js';
+        import { fetchInvoiceRegister, fetchEmployeeHours, formatCurrency } from './src/apiClient.js';
         import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
@@ -236,6 +236,7 @@
 
         // ── State ────────────────────────────────────────────────
         let rawData = [];
+        let rawHours = []; // employee hours data (for GSP commission calc)
         let producers = [];
         let commissions = []; // { producer_id, company_name, branch, dhp_pct, gsp_pct }
         let companiesByBranch = {}; // { branch: [{ company, isDHP }] }
@@ -360,7 +361,7 @@
         function updateReportBtn() {
             const btn = document.getElementById('producer-report-btn');
             if (reportProducerIds.length === 0) {
-                btn.textContent = 'Add Producer to Report';
+                btn.textContent = 'Select Producer(s)';
             } else {
                 const names = producers.filter(p => reportProducerIds.includes(String(p.id))).map(p => p.name);
                 btn.textContent = names.join(', ');
@@ -529,9 +530,12 @@
 
             document.getElementById('commission_table_body').innerHTML = '<tr><td colspan="5" class="loading-indicator">Loading data...</td></tr>';
             try {
-                const allData = await fetchInvoiceRegister(startDate, endDate);
+                const [allData, allHours] = await Promise.all([
+                    fetchInvoiceRegister(startDate, endDate),
+                    fetchEmployeeHours(startDate, endDate),
+                ]);
 
-                // Pro-rate each row and filter out rows with 0 fraction
+                // Pro-rate billing data and filter out rows with 0 fraction
                 rawData = [];
                 allData.forEach(r => {
                     const fraction = getMonthFraction(r.weekendbill || '', targetMonth, targetYear);
@@ -539,6 +543,19 @@
                         rawData.push({
                             ...r,
                             invoiceamount: (Number(r.invoiceamount) || 0) * fraction,
+                            _monthFraction: fraction,
+                        });
+                    }
+                });
+
+                // Pro-rate hours data the same way
+                rawHours = [];
+                allHours.forEach(r => {
+                    const fraction = getMonthFraction(r.weekendbill || '', targetMonth, targetYear);
+                    if (fraction > 0) {
+                        rawHours.push({
+                            ...r,
+                            hours: (Number(r.hours) || 0) * fraction,
                             _monthFraction: fraction,
                         });
                     }
@@ -563,6 +580,20 @@
             }
         }
 
+        // Build a lookup of GSP hours by branch||company||weekend
+        function buildHoursLookup() {
+            const lookup = {};
+            rawHours.forEach(r => {
+                const company = r.customername || 'Unknown';
+                if (company.toUpperCase().includes('DHP')) return; // skip DHP companies
+                const branch = r.branchname || 'Unknown';
+                const weekend = r.weekendbill || '';
+                const key = `${branch}||${company}||${weekend}`;
+                lookup[key] = (lookup[key] || 0) + (Number(r.hours) || 0);
+            });
+            return lookup;
+        }
+
         function processData() {
             const groupBy = document.getElementById('group_by').value;
 
@@ -572,17 +603,28 @@
             }
 
             const agg = {};
+            // DHP Billing from invoice register
             rawData.forEach(r => {
                 const key = groupBy === 'Branch'
                     ? `${r.branchname || 'Unknown'}||${r.weekendbill || ''}`
                     : `${r.customername || 'Unknown'}||${r.weekendbill || ''}`;
                 const isDHP = (r.customername || '').toUpperCase().includes('DHP');
-                if (!agg[key]) agg[key] = { label: groupBy === 'Branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown'), weekend: r.weekendbill || '', dhp: 0, gsp: 0 };
+                if (!agg[key]) agg[key] = { label: groupBy === 'Branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown'), weekend: r.weekendbill || '', dhp: 0, gspHours: 0 };
                 if (isDHP) agg[key].dhp += Number(r.invoiceamount) || 0;
-                else agg[key].gsp += Number(r.invoiceamount) || 0;
             });
 
-            const rows = Object.values(agg).sort((a, b) => b.weekend.localeCompare(a.weekend) || (b.dhp + b.gsp) - (a.dhp + a.gsp));
+            // GSP Hours from employee hours
+            rawHours.forEach(r => {
+                const company = r.customername || 'Unknown';
+                if (company.toUpperCase().includes('DHP')) return;
+                const key = groupBy === 'Branch'
+                    ? `${r.branchname || 'Unknown'}||${r.weekendbill || ''}`
+                    : `${company}||${r.weekendbill || ''}`;
+                if (!agg[key]) agg[key] = { label: groupBy === 'Branch' ? (r.branchname || 'Unknown') : company, weekend: r.weekendbill || '', dhp: 0, gspHours: 0 };
+                agg[key].gspHours += Number(r.hours) || 0;
+            });
+
+            const rows = Object.values(agg).sort((a, b) => b.weekend.localeCompare(a.weekend) || (b.dhp + b.gspHours) - (a.dhp + a.gspHours));
             renderTable(rows, groupBy);
         }
 
@@ -614,22 +656,29 @@
                 lookup[c.producer_id][`${c.branch}||${c.company_name}`] = c;
             });
 
-            // For each producer, calculate total DHP commission, GSP commission from rawData
+            // For each producer: DHP commission = % of DHP Billing, GSP commission = % of GSP Hours
             const rows = targetProducers.map(producer => {
                 const pLookup = lookup[producer.id] || {};
                 let dhpComm = 0, gspComm = 0;
 
+                // DHP commission from billing data
                 rawData.forEach(r => {
-                    const branch = r.branchname || 'Unknown';
                     const company = r.customername || 'Unknown';
-                    const isDHP = company.toUpperCase().includes('DHP');
+                    if (!company.toUpperCase().includes('DHP')) return;
+                    const branch = r.branchname || 'Unknown';
                     const amount = Number(r.invoiceamount) || 0;
                     const comm = pLookup[`${branch}||${company}`];
-                    if (comm) {
-                        const pct = isDHP ? (comm.dhp_pct || 0) : (comm.gsp_pct || 0);
-                        if (isDHP) dhpComm += amount * pct / 100;
-                        else gspComm += amount * pct / 100;
-                    }
+                    if (comm) dhpComm += amount * (comm.dhp_pct || 0) / 100;
+                });
+
+                // GSP commission from hours data
+                rawHours.forEach(r => {
+                    const company = r.customername || 'Unknown';
+                    if (company.toUpperCase().includes('DHP')) return;
+                    const branch = r.branchname || 'Unknown';
+                    const hours = Number(r.hours) || 0;
+                    const comm = pLookup[`${branch}||${company}`];
+                    if (comm) gspComm += hours * (comm.gsp_pct || 0) / 100;
                 });
 
                 return { label: producer.name, weekend: '', dhp: dhpComm, gsp: gspComm };
@@ -637,12 +686,12 @@
 
             rows.sort((a, b) => (b.dhp + b.gsp) - (a.dhp + a.gsp));
 
-            // Render table without extra producer commission columns (the values ARE the commissions)
+            // Render table — DHP commission is $ (from billing), GSP commission is hours-based
             const headRow = document.querySelector('#commission_table thead tr');
             headRow.innerHTML = `
                 <th class="sortable" data-sort-type="text">Producer</th>
-                <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Commission</th>
-                <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Commission</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Commission (Billing)</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Commission (Hours)</th>
                 <th class="sortable" data-sort-type="numeric" style="text-align:right">Total Commission</th>
             `;
 
@@ -672,7 +721,6 @@
 
         function renderTable(rows, groupBy) {
             const tbody = document.getElementById('commission_table_body');
-            const headers = document.querySelectorAll('#commission_table thead tr th');
 
             // If producers are selected for report, add commission columns
             const selectedProducers = producers.filter(p => reportProducerIds.includes(String(p.id)));
@@ -683,8 +731,7 @@
                 <th class="sortable" data-sort-type="text">${groupBy}</th>
                 <th class="sortable" data-sort-type="date">Weekend Bill</th>
                 <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Billing</th>
-                <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Billing</th>
-                <th class="sortable" data-sort-type="numeric" style="text-align:right">Total</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Hours</th>
             `;
             selectedProducers.forEach(p => {
                 const th = document.createElement('th');
@@ -693,32 +740,23 @@
                 headRow.appendChild(th);
             });
 
-            // Load all commissions for selected producers
-            const commissionLookups = {};
-            selectedProducers.forEach(p => { commissionLookups[p.id] = {}; });
-
-            // We need to fetch commissions for report producers
-            // For now, use in-memory data if loaded, else show $0
             tbody.innerHTML = '';
-            let totalAll = 0;
-            const colSpan = 5 + selectedProducers.length;
+            let totalDHP = 0, totalGSPHours = 0;
+            const colSpan = 4 + selectedProducers.length;
 
             if (!rows.length) {
                 tbody.innerHTML = `<tr><td colspan="${colSpan}" class="loading-indicator">No data.</td></tr>`;
             } else {
                 rows.forEach(row => {
-                    const total = row.dhp + row.gsp;
-                    totalAll += total;
+                    totalDHP += row.dhp;
+                    totalGSPHours += row.gspHours;
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${row.label}</td>
                         <td>${row.weekend}</td>
                         <td style="text-align:right;font-weight:600">${formatCurrency(row.dhp)}</td>
-                        <td style="text-align:right;font-weight:600">${formatCurrency(row.gsp)}</td>
-                        <td style="text-align:right;font-weight:600">${formatCurrency(total)}</td>
+                        <td style="text-align:right;font-weight:600">${row.gspHours.toFixed(1)}</td>
                     `;
-                    // Commission columns would need producer_commissions data per producer
-                    // This will be calculated once we have the data
                     selectedProducers.forEach(() => {
                         const td = document.createElement('td');
                         td.style.textAlign = 'right';
@@ -729,7 +767,7 @@
                     tbody.appendChild(tr);
                 });
             }
-            document.getElementById('total-footer').textContent = `Total: ${formatCurrency(totalAll)}`;
+            document.getElementById('total-footer').textContent = `DHP Billing: ${formatCurrency(totalDHP)} | GSP Hours: ${totalGSPHours.toFixed(1)}`;
 
             // Re-attach sort listeners
             attachSortListeners();
@@ -755,12 +793,9 @@
                 lookup[c.producer_id][`${c.branch}||${c.company_name}`] = c;
             });
 
-            // Now we need to calculate commission per row
-            // For each row (branch+weekend or company+weekend), sum up the commission
             const tbody = document.getElementById('commission_table_body');
             const tableRows = tbody.querySelectorAll('tr');
 
-            // We need raw data grouped the same way to calculate per-company billing
             tableRows.forEach((tr, idx) => {
                 if (idx >= rows.length) return;
                 const row = rows[idx];
@@ -769,7 +804,7 @@
                     const pLookup = lookup[producer.id] || {};
                     let commTotal = 0;
 
-                    // Find all raw invoices matching this row
+                    // DHP commission = % of DHP Billing
                     rawData.forEach(r => {
                         const matchLabel = groupBy === 'Branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown');
                         const matchWeekend = r.weekendbill || '';
@@ -777,19 +812,30 @@
 
                         const branch = r.branchname || 'Unknown';
                         const company = r.customername || 'Unknown';
-                        const isDHP = company.toUpperCase().includes('DHP');
-                        const amount = Number(r.invoiceamount) || 0;
+                        if (!company.toUpperCase().includes('DHP')) return;
 
-                        // Find commission % for this company
+                        const amount = Number(r.invoiceamount) || 0;
                         const comm = pLookup[`${branch}||${company}`];
-                        if (comm) {
-                            const pct = isDHP ? (comm.dhp_pct || 0) : (comm.gsp_pct || 0);
-                            commTotal += amount * pct / 100;
-                        }
+                        if (comm) commTotal += amount * (comm.dhp_pct || 0) / 100;
                     });
 
-                    // Update the cell (5 base columns + producer index)
-                    const cell = tr.children[5 + pIdx];
+                    // GSP commission = % of GSP Hours
+                    rawHours.forEach(r => {
+                        const company = r.customername || 'Unknown';
+                        if (company.toUpperCase().includes('DHP')) return;
+
+                        const matchLabel = groupBy === 'Branch' ? (r.branchname || 'Unknown') : company;
+                        const matchWeekend = r.weekendbill || '';
+                        if (matchLabel !== row.label || matchWeekend !== row.weekend) return;
+
+                        const branch = r.branchname || 'Unknown';
+                        const hours = Number(r.hours) || 0;
+                        const comm = pLookup[`${branch}||${company}`];
+                        if (comm) commTotal += hours * (comm.gsp_pct || 0) / 100;
+                    });
+
+                    // Update the cell (4 base columns + producer index)
+                    const cell = tr.children[4 + pIdx];
                     if (cell) {
                         cell.textContent = formatCurrency(commTotal);
                         cell.style.color = commTotal > 0 ? '#16A34A' : 'var(--text-secondary)';
