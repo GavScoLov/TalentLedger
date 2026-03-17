@@ -577,6 +577,10 @@
                     await syncCompaniesToSupabase();
                     await loadCompaniesFromSupabase();
                 }
+                // Update print header with selected month/year
+                const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                document.getElementById('print-header').textContent = `Commission Report — ${monthNames[targetMonth]} ${targetYear}`;
+
                 renderCompanyPanel();
                 processData();
             } catch (err) {
