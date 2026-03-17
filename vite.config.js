@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
           psaProfitLoss: resolve(__dirnameESM, 'psa-profit-loss.html'),
           admin: resolve(__dirnameESM, 'admin.html'),
           settings: resolve(__dirnameESM, 'settings.html'),
+          stateTax: resolve(__dirnameESM, 'state-tax.html'),
         },
       },
     },

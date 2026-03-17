@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - State Tax</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        /* ── Steps ──────────────────────────────────────── */
+        .step { display: none; }
+        .step.active { display: block; }
+
+        /* ── Upload Zone ────────────────────────────────── */
+        .upload-zone {
+            border: 2px dashed var(--border-color); border-radius: var(--radius-lg);
+            padding: 48px 24px; text-align: center; cursor: pointer;
+            transition: all 0.2s; background: var(--bg-default);
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary); background: rgba(234,137,56,0.05);
+        }
+        .upload-zone svg { width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 12px; }
+        .upload-zone h3 { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+        .upload-zone p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+        .upload-zone .file-info { margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--primary); }
+        input[type="file"] { display: none; }
+
+        /* ── Mapping ────────────────────────────────────── */
+        .mapping-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            max-width: 600px; margin: 0 auto;
+        }
+        .mapping-row { display: contents; }
+        .mapping-row label { font-size: 13px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; }
+        .mapping-row select { width: 100%; }
+        .preview-table-wrap { overflow-x: auto; margin-top: 16px; max-height: 200px; overflow-y: auto; }
+        .preview-table-wrap table { font-size: 12px; }
+
+        /* ── Results Table ──────────────────────────────── */
+        .results-table-wrap {
+            overflow-y: auto; overflow-x: auto;
+            max-height: calc(100vh - 300px);
+        }
+        .results-table-wrap .data-table { width: 100%; white-space: nowrap; }
+        .results-table-wrap .data-table th {
+            position: sticky; top: 0; background: var(--bg-paper); z-index: 1;
+        }
+
+        /* ── Action bar ─────────────────────────────────── */
+        .action-bar {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+        }
+        .action-bar .badge {
+            font-size: 12px; font-weight: 600; padding: 4px 10px;
+            border-radius: 12px; background: var(--bg-default); color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* ── Status indicators ──────────────────────────── */
+        .county-pending { color: var(--text-disabled); font-style: italic; font-size: 12px; }
+        .county-found { color: #059669; font-weight: 600; font-size: 12px; }
+        .county-error { color: #DC2626; font-size: 12px; }
+        .lookup-progress { font-size: 13px; color: var(--text-secondary); }
+
+        /* ── Status message ─────────────────────────────── */
+        .status-msg {
+            padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 13px;
+            display: none;
+        }
+        .status-msg.success { display: inline-block; background: #d4edda; color: #155724; }
+        .status-msg.error { display: inline-block; background: #f8d7da; color: #721c24; }
+        .status-msg.info { display: inline-block; background: #cce5ff; color: #004085; }
+
+        @media print {
+            .sidebar, .sidebar-overlay, .topbar, .action-bar, .page-header, .page-subtitle { display: none !important; }
+            .main-content { margin: 0 !important; padding: 0 !important; height: auto !important; max-height: none !important; overflow: visible !important; }
+            .results-table-wrap { max-height: none !important; overflow: visible !important; }
+            .data-table th { background: #EA8938 !important; color: #fff !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">State Tax</h1>
+                <p class="page-subtitle">Upload CSV, map columns, and look up county data</p>
+            </div>
+
+            <!-- Step 1: Upload CSV -->
+            <div class="step active" id="step-upload">
+                <div class="card" style="padding:24px;">
+                    <div class="upload-zone" id="upload-zone">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                        </svg>
+                        <h3>Upload CSV File</h3>
+                        <p>Drag and drop a .csv file here, or click to browse</p>
+                        <div class="file-info" id="file-info" style="display:none;"></div>
+                    </div>
+                    <input type="file" id="csv-input" accept=".csv,.txt">
+                </div>
+            </div>
+
+            <!-- Step 2: Map Columns -->
+            <div class="step" id="step-map">
+                <div class="card" style="padding:24px;">
+                    <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text-primary);">Map CSV Columns</h3>
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Select which CSV column corresponds to each field. Only Address, City, State, and Zip are required for county lookup.</p>
+                    <div class="mapping-grid" id="mapping-grid"></div>
+                    <div style="margin-top:20px;display:flex;gap:8px;justify-content:center;">
+                        <button class="btn" id="back-to-upload" style="padding:8px 20px;">Back</button>
+                        <button class="btn btn-primary" id="apply-mapping" style="padding:8px 20px;">Apply Mapping & View Data</button>
+                    </div>
+                    <h4 style="font-size:13px;font-weight:600;margin-top:20px;color:var(--text-secondary);">CSV Preview (first 5 rows)</h4>
+                    <div class="preview-table-wrap" id="preview-table"></div>
+                </div>
+            </div>
+
+            <!-- Step 3: Results Table -->
+            <div class="step" id="step-results">
+                <div class="action-bar">
+                    <button class="btn" id="back-to-map" style="padding:6px 14px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        Re-Map
+                    </button>
+                    <button class="btn btn-primary" id="lookup-counties-btn" style="padding:6px 14px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                        Lookup Counties
+                    </button>
+                    <button class="btn" id="new-upload-btn" style="padding:6px 14px;">New Upload</button>
+                    <button class="btn-icon" id="print-btn" title="Print" style="margin-left:auto;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    </button>
+                    <span class="badge" id="row-count"></span>
+                    <span class="lookup-progress" id="lookup-progress"></span>
+                    <span class="status-msg" id="status-msg"></span>
+                </div>
+                <div class="card" style="padding:0;overflow:hidden;">
+                    <div class="results-table-wrap">
+                        <table class="data-table" id="results-table">
+                            <thead id="results-thead"></thead>
+                            <tbody id="results-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+
+        await checkAuth();
+        await checkPageAccess('state-tax');
+        renderNavbar();
+        await renderSidebar();
+        initInactivityTimer();
+
+        // ── Mapbox Token ────────────────────────────────────
+        // Fetched from serverless function to keep token server-side
+        let mapboxToken = null;
+        async function getMapboxToken() {
+            if (mapboxToken) return mapboxToken;
+            try {
+                const res = await fetch('/api/mapbox-token');
+                const data = await res.json();
+                mapboxToken = data.token;
+                return mapboxToken;
+            } catch (err) {
+                console.error('Failed to get Mapbox token:', err);
+                return null;
+            }
+        }
+
+        // ── State ───────────────────────────────────────────
+        let csvHeaders = [];
+        let csvRows = [];
+        let mappedData = [];
+        let columnMapping = {};
+
+        // Expected fields for mapping
+        const EXPECTED_FIELDS = [
+            { key: 'company', label: 'Company / Employee', required: false },
+            { key: 'address', label: 'Address', required: true },
+            { key: 'city', label: 'City', required: true },
+            { key: 'state', label: 'State', required: true },
+            { key: 'zip', label: 'Zip Code', required: true },
+        ];
+
+        // ── Step Navigation ─────────────────────────────────
+        function showStep(stepId) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        // ── CSV Parsing ─────────────────────────────────────
+        function parseCSV(text) {
+            const lines = text.split(/\r?\n/).filter(line => line.trim());
+            if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+
+            // Parse respecting quoted fields
+            function parseLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        if (inQuotes && line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                result.push(current.trim());
+                return result;
+            }
+
+            const headers = parseLine(lines[0]);
+            const rows = [];
+            for (let i = 1; i < lines.length; i++) {
+                const vals = parseLine(lines[i]);
+                if (vals.length === headers.length) {
+                    const row = {};
+                    headers.forEach((h, idx) => { row[h] = vals[idx]; });
+                    rows.push(row);
+                }
+            }
+            return { headers, rows };
+        }
+
+        // ── Auto-guess mapping ──────────────────────────────
+        function guessMapping(headers) {
+            const mapping = {};
+            const lowerHeaders = headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+            EXPECTED_FIELDS.forEach(field => {
+                let bestMatch = '';
+                const patterns = {
+                    company: ['company', 'employee', 'name', 'employer', 'client'],
+                    address: ['address', 'street', 'addr', 'address1', 'streetaddress'],
+                    city: ['city', 'town', 'municipality'],
+                    state: ['state', 'st', 'statecode', 'stateabbr'],
+                    zip: ['zip', 'zipcode', 'postal', 'postalcode', 'zip5'],
+                };
+
+                const fieldPatterns = patterns[field.key] || [field.key];
+                for (const h of lowerHeaders) {
+                    for (const p of fieldPatterns) {
+                        if (h === p || h.includes(p)) {
+                            bestMatch = headers[lowerHeaders.indexOf(h)];
+                            break;
+                        }
+                    }
+                    if (bestMatch) break;
+                }
+                mapping[field.key] = bestMatch;
+            });
+
+            return mapping;
+        }
+
+        // ── Upload Handling ─────────────────────────────────
+        const uploadZone = document.getElementById('upload-zone');
+        const csvInput = document.getElementById('csv-input');
+        const fileInfo = document.getElementById('file-info');
+
+        uploadZone.addEventListener('click', () => csvInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+        csvInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file.name.match(/\.(csv|txt)$/i)) {
+                alert('Please upload a .csv file.');
+                return;
+            }
+            fileInfo.style.display = 'block';
+            fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const result = parseCSV(e.target.result);
+                    csvHeaders = result.headers;
+                    csvRows = result.rows;
+                    columnMapping = guessMapping(csvHeaders);
+                    renderMappingStep();
+                    showStep('step-map');
+                } catch (err) {
+                    alert('Error parsing CSV: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ── Mapping Step ────────────────────────────────────
+        function renderMappingStep() {
+            const grid = document.getElementById('mapping-grid');
+            grid.innerHTML = '';
+
+            EXPECTED_FIELDS.forEach(field => {
+                const label = document.createElement('label');
+                label.textContent = field.label + (field.required ? ' *' : '');
+
+                const select = document.createElement('select');
+                select.className = 'form-select';
+                select.dataset.field = field.key;
+
+                const emptyOpt = document.createElement('option');
+                emptyOpt.value = '';
+                emptyOpt.textContent = '-- Skip --';
+                select.appendChild(emptyOpt);
+
+                csvHeaders.forEach(h => {
+                    const opt = document.createElement('option');
+                    opt.value = h;
+                    opt.textContent = h;
+                    if (columnMapping[field.key] === h) opt.selected = true;
+                    select.appendChild(opt);
+                });
+
+                const row = document.createElement('div');
+                row.className = 'mapping-row';
+                row.appendChild(label);
+                row.appendChild(select);
+                grid.appendChild(label);
+                grid.appendChild(select);
+            });
+
+            // Preview table
+            renderPreviewTable();
+        }
+
+        function renderPreviewTable() {
+            const wrap = document.getElementById('preview-table');
+            const previewRows = csvRows.slice(0, 5);
+            let html = '<table class="data-table"><thead><tr>';
+            csvHeaders.forEach(h => { html += `<th>${h}</th>`; });
+            html += '</tr></thead><tbody>';
+            previewRows.forEach(row => {
+                html += '<tr>';
+                csvHeaders.forEach(h => { html += `<td>${row[h] || ''}</td>`; });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            wrap.innerHTML = html;
+        }
+
+        // ── Apply Mapping ───────────────────────────────────
+        document.getElementById('apply-mapping').addEventListener('click', () => {
+            // Read mapping selections
+            const selects = document.querySelectorAll('#mapping-grid select');
+            columnMapping = {};
+            selects.forEach(sel => {
+                columnMapping[sel.dataset.field] = sel.value;
+            });
+
+            // Validate required fields
+            const missing = EXPECTED_FIELDS.filter(f => f.required && !columnMapping[f.key]);
+            if (missing.length > 0) {
+                alert('Please map required fields: ' + missing.map(f => f.label).join(', '));
+                return;
+            }
+
+            // Build mapped data
+            mappedData = csvRows.map(row => {
+                const mapped = { _original: row };
+                EXPECTED_FIELDS.forEach(f => {
+                    mapped[f.key] = columnMapping[f.key] ? (row[columnMapping[f.key]] || '') : '';
+                });
+                // Also keep all extra CSV columns
+                mapped._extras = {};
+                csvHeaders.forEach(h => {
+                    const isMapped = Object.values(columnMapping).includes(h);
+                    if (!isMapped) mapped._extras[h] = row[h] || '';
+                });
+                // County lookup results
+                mapped.county_name = '';
+                mapped.county_code = '';
+                mapped._countyStatus = 'pending';
+                return mapped;
+            });
+
+            renderResultsTable();
+            showStep('step-results');
+        });
+
+        // ── Render Results ──────────────────────────────────
+        function renderResultsTable() {
+            const thead = document.getElementById('results-thead');
+            const tbody = document.getElementById('results-tbody');
+
+            // Build header: mapped fields + County Name + County Code + extras
+            const mappedFields = EXPECTED_FIELDS.filter(f => columnMapping[f.key]);
+            const extraKeys = Object.keys(mappedData[0]?._extras || {});
+
+            let headerHTML = '<tr>';
+            headerHTML += '<th style="width:30px;">#</th>';
+            mappedFields.forEach(f => { headerHTML += `<th>${f.label}</th>`; });
+            headerHTML += '<th>County Name</th>';
+            headerHTML += '<th>County Code</th>';
+            extraKeys.forEach(k => { headerHTML += `<th>${k}</th>`; });
+            headerHTML += '</tr>';
+            thead.innerHTML = headerHTML;
+
+            // Build rows
+            tbody.innerHTML = '';
+            mappedData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                let html = `<td style="color:var(--text-disabled);font-size:11px;">${idx + 1}</td>`;
+                mappedFields.forEach(f => { html += `<td>${row[f.key]}</td>`; });
+
+                // County cells
+                if (row._countyStatus === 'pending') {
+                    html += `<td class="county-pending">--</td>`;
+                    html += `<td class="county-pending">--</td>`;
+                } else if (row._countyStatus === 'found') {
+                    html += `<td class="county-found">${row.county_name}</td>`;
+                    html += `<td class="county-found">${row.county_code}</td>`;
+                } else {
+                    html += `<td class="county-error">Not found</td>`;
+                    html += `<td class="county-error">--</td>`;
+                }
+
+                extraKeys.forEach(k => { html += `<td>${row._extras[k] || ''}</td>`; });
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('row-count').textContent = `${mappedData.length} rows`;
+        }
+
+        // ── County Lookup via Mapbox ────────────────────────
+        async function lookupCounties() {
+            const token = await getMapboxToken();
+            if (!token) {
+                showStatus('Mapbox token not configured. Add MAPBOX_TOKEN to your Vercel environment variables.', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('lookup-counties-btn');
+            const progress = document.getElementById('lookup-progress');
+            btn.disabled = true;
+            btn.textContent = 'Looking up...';
+
+            let found = 0;
+            let errors = 0;
+            const total = mappedData.length;
+
+            for (let i = 0; i < mappedData.length; i++) {
+                const row = mappedData[i];
+                progress.textContent = `Processing ${i + 1} / ${total}...`;
+
+                try {
+                    const addressParts = [row.address, row.city, row.state, row.zip].filter(Boolean);
+                    const query = addressParts.join(', ');
+                    if (!query.trim()) {
+                        row._countyStatus = 'error';
+                        errors++;
+                        continue;
+                    }
+
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=US&types=address,place&limit=1`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+
+                    if (data.features && data.features.length > 0) {
+                        const feature = data.features[0];
+                        // Look for district context (county)
+                        const countyCtx = (feature.context || []).find(c =>
+                            c.id && c.id.startsWith('district')
+                        );
+                        // Look for region context (state) for FIPS
+                        const regionCtx = (feature.context || []).find(c =>
+                            c.id && c.id.startsWith('region')
+                        );
+
+                        if (countyCtx) {
+                            row.county_name = countyCtx.text || '';
+                            // Extract FIPS code from the context id if available
+                            // Mapbox district IDs sometimes contain FIPS: district.XXXXX
+                            const idParts = countyCtx.id.split('.');
+                            row.county_code = idParts.length > 1 ? idParts[1] : '';
+                            row._countyStatus = 'found';
+                            found++;
+                        } else {
+                            // Try place-level for county info
+                            row.county_name = '';
+                            row.county_code = '';
+                            row._countyStatus = 'error';
+                            errors++;
+                        }
+                    } else {
+                        row._countyStatus = 'error';
+                        errors++;
+                    }
+                } catch (err) {
+                    console.error('Geocoding error for row', i, err);
+                    row._countyStatus = 'error';
+                    errors++;
+                }
+
+                // Rate limiting — Mapbox allows 600 req/min for geocoding
+                if (i < mappedData.length - 1) {
+                    await new Promise(r => setTimeout(r, 120));
+                }
+
+                // Update table every 10 rows for visual feedback
+                if ((i + 1) % 10 === 0 || i === mappedData.length - 1) {
+                    renderResultsTable();
+                }
+            }
+
+            progress.textContent = '';
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>Lookup Counties';
+            showStatus(`Done! ${found} found, ${errors} not found out of ${total} rows.`, found > 0 ? 'success' : 'error');
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status-msg');
+            el.textContent = msg;
+            el.className = 'status-msg ' + type;
+            setTimeout(() => { el.className = 'status-msg'; }, 8000);
+        }
+
+        // ── Event Listeners ─────────────────────────────────
+        document.getElementById('back-to-upload').addEventListener('click', () => showStep('step-upload'));
+        document.getElementById('back-to-map').addEventListener('click', () => {
+            renderMappingStep();
+            showStep('step-map');
+        });
+        document.getElementById('new-upload-btn').addEventListener('click', () => {
+            csvHeaders = [];
+            csvRows = [];
+            mappedData = [];
+            columnMapping = {};
+            csvInput.value = '';
+            fileInfo.style.display = 'none';
+            showStep('step-upload');
+        });
+        document.getElementById('lookup-counties-btn').addEventListener('click', lookupCounties);
+        document.getElementById('print-btn').addEventListener('click', () => window.print());
+    </script>
+</body>
+</html>
