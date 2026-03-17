@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS branch_settings (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     branch TEXT NOT NULL,
     acronym TEXT DEFAULT '',
+    region TEXT DEFAULT '',
     address TEXT DEFAULT '',
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(branch)

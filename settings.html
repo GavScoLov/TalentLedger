@@ -147,7 +147,7 @@
             }
             const map = {};
             (data || []).forEach(row => {
-                map[row.branch] = { acronym: row.acronym || '', address: row.address || '' };
+                map[row.branch] = { acronym: row.acronym || '', address: row.address || '', region: row.region || '' };
             });
             return map;
         }
@@ -160,10 +160,11 @@
             }
 
             let rows = branches.map(branch => {
-                const s = saved[branch] || { acronym: '', address: '' };
+                const s = saved[branch] || { acronym: '', address: '', region: '' };
                 return `<tr>
                     <td style="font-weight:600;white-space:nowrap;">${branch}</td>
                     <td><input type="text" class="form-input branch-acronym" data-branch="${branch}" value="${s.acronym}" placeholder="e.g. ATL"></td>
+                    <td><input type="text" class="form-input branch-region" data-branch="${branch}" value="${s.region}" placeholder="e.g. Southeast"></td>
                     <td><input type="text" class="form-input branch-address" data-branch="${branch}" value="${s.address}" placeholder="123 Main St, City, ST 00000"></td>
                 </tr>`;
             }).join('');
@@ -175,6 +176,7 @@
                             <tr>
                                 <th>Branch Name</th>
                                 <th>Acronym</th>
+                                <th>Region</th>
                                 <th>Address</th>
                             </tr>
                         </thead>
@@ -196,9 +198,11 @@
             document.querySelectorAll('.branch-acronym').forEach(input => {
                 const branch = input.dataset.branch;
                 const acronym = input.value.trim();
+                const regionInput = document.querySelector(`.branch-region[data-branch="${branch}"]`);
+                const region = regionInput ? regionInput.value.trim() : '';
                 const addressInput = document.querySelector(`.branch-address[data-branch="${branch}"]`);
                 const address = addressInput ? addressInput.value.trim() : '';
-                rows.push({ branch, acronym, address, updated_at: new Date().toISOString() });
+                rows.push({ branch, acronym, region, address, updated_at: new Date().toISOString() });
             });
 
             const { error } = await supabase.from('branch_settings').upsert(rows, { onConflict: 'branch' });
