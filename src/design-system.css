@@ -339,5 +339,5 @@ a:hover { text-decoration: underline; }
 
 @media print {
   .sidebar, .topbar, .sidebar-overlay { display: none !important; }
-  .main-content { margin: 0 !important; padding: 16px !important; }
+  .main-content { margin: 0 !important; padding: 16px !important; height: auto !important; max-height: none !important; overflow: visible !important; }
 }
