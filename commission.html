@@ -125,6 +125,7 @@
                             <select class="form-select" id="group_by" name="group_by">
                                 <option value="Branch" selected>Group By: Branch</option>
                                 <option value="Company">Group By: Company</option>
+                                <option value="Producer">Group By: Producer</option>
                             </select>
                             <input class="form-input" type="date" id="start_date" name="start_date">
                             <input class="form-input" type="date" id="end_date" name="end_date">
@@ -165,6 +166,14 @@
                             <option value="">-- Select Producer --</option>
                         </select>
                         <button type="button" class="btn btn-outlined btn-sm" id="new-producer-btn" title="Add new producer">+ New</button>
+                    </div>
+
+                    <!-- Show/hide old companies toggle -->
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-secondary);">
+                            <input type="checkbox" id="show-all-companies" checked style="accent-color:var(--primary);">
+                            Show companies outside current timeframe
+                        </label>
                     </div>
 
                     <!-- Company assignments by branch -->
@@ -220,6 +229,8 @@
         let selectedProducerId = '';
         let reportProducerIds = []; // producers selected for report
         let tablesOk = false;
+        let currentTimeframeCompanies = new Set(); // company||branch keys in current API data
+        let showAllCompanies = true; // toggle: show all vs only current timeframe
 
         document.getElementById('start_date').value = getDefaultStartDate();
         document.getElementById('end_date').value = getDefaultEndDate();
@@ -396,13 +407,20 @@
 
             container.innerHTML = '';
             branches.forEach(branch => {
+                // Filter companies based on toggle
+                const companies = companiesByBranch[branch].filter(({ company }) => {
+                    if (showAllCompanies) return true;
+                    return currentTimeframeCompanies.has(`${company}||${branch}`);
+                });
+                if (companies.length === 0) return; // skip empty branches
+
                 const group = document.createElement('div');
                 group.className = 'branch-group';
 
                 // Collapsible header
                 const header = document.createElement('div');
                 header.className = 'branch-group-header';
-                header.innerHTML = `<span>${branch} (${companiesByBranch[branch].length})</span><span class="toggle-icon">▼</span>`;
+                header.innerHTML = `<span>${branch} (${companies.length})</span><span class="toggle-icon">▼</span>`;
                 header.addEventListener('click', () => {
                     header.classList.toggle('collapsed');
                     body.classList.toggle('collapsed');
@@ -433,13 +451,15 @@
                     });
                 });
 
-                companiesByBranch[branch].forEach(({ company, isDHP }) => {
+                companies.forEach(({ company, isDHP }) => {
                     const key = `${branch}||${company}`;
                     const existing = lookup[key];
+                    const inTimeframe = currentTimeframeCompanies.has(`${company}||${branch}`);
                     const row = document.createElement('div');
                     row.className = 'company-row';
+                    row.style.opacity = inTimeframe ? '1' : '0.5';
                     row.innerHTML = `
-                        <span class="company-name ${isDHP ? 'dhp' : ''}" title="${company}">${company}</span>
+                        <span class="company-name ${isDHP ? 'dhp' : ''}" title="${company}${inTimeframe ? '' : ' (not in current timeframe)'}">${company}</span>
                         <input type="number" class="pct-input" data-branch="${branch}" data-company="${company}" data-type="dhp"
                             min="0" max="100" step="0.5" value="${existing?.dhp_pct ?? ''}" placeholder="%">
                         <input type="number" class="pct-input" data-branch="${branch}" data-company="${company}" data-type="gsp"
@@ -461,6 +481,13 @@
             document.getElementById('commission_table_body').innerHTML = '<tr><td colspan="5" class="loading-indicator">Loading data...</td></tr>';
             try {
                 rawData = await fetchInvoiceRegister(startDate, endDate);
+                // Track which companies are in the current timeframe
+                currentTimeframeCompanies = new Set();
+                rawData.forEach(r => {
+                    const company = r.customername || 'Unknown';
+                    const branch = r.branchname || 'Unknown';
+                    currentTimeframeCompanies.add(`${company}||${branch}`);
+                });
                 // Sync any new companies to the persistent list, then load all
                 if (tablesOk) {
                     await syncCompaniesToSupabase();
@@ -475,8 +502,13 @@
 
         function processData() {
             const groupBy = document.getElementById('group_by').value;
-            const agg = {};
 
+            if (groupBy === 'Producer') {
+                processProducerGrouping();
+                return;
+            }
+
+            const agg = {};
             rawData.forEach(r => {
                 const key = groupBy === 'Branch'
                     ? `${r.branchname || 'Unknown'}||${r.weekendbill || ''}`
@@ -489,6 +521,90 @@
 
             const rows = Object.values(agg).sort((a, b) => b.weekend.localeCompare(a.weekend) || (b.dhp + b.gsp) - (a.dhp + a.gsp));
             renderTable(rows, groupBy);
+        }
+
+        async function processProducerGrouping() {
+            // Fetch commissions for all selected report producers (or all producers if none selected)
+            const targetProducers = reportProducerIds.length > 0
+                ? producers.filter(p => reportProducerIds.includes(String(p.id)))
+                : producers;
+
+            if (targetProducers.length === 0) {
+                const tbody = document.getElementById('commission_table_body');
+                tbody.innerHTML = '<tr><td colspan="5" class="loading-indicator">No producers available. Add producers to see data grouped by producer.</td></tr>';
+                document.getElementById('total-footer').textContent = '';
+                return;
+            }
+
+            const ids = targetProducers.map(p => p.id);
+            const { data: commData, error } = await supabase
+                .from('producer_commissions')
+                .select('*')
+                .in('producer_id', ids);
+            if (error) { console.error('producer grouping error:', error); return; }
+
+            // Build lookup: { producerId: { "branch||company": { dhp_pct, gsp_pct } } }
+            const lookup = {};
+            ids.forEach(id => { lookup[id] = {}; });
+            (commData || []).forEach(c => {
+                if (!lookup[c.producer_id]) lookup[c.producer_id] = {};
+                lookup[c.producer_id][`${c.branch}||${c.company_name}`] = c;
+            });
+
+            // For each producer, calculate total DHP commission, GSP commission from rawData
+            const rows = targetProducers.map(producer => {
+                const pLookup = lookup[producer.id] || {};
+                let dhpComm = 0, gspComm = 0;
+
+                rawData.forEach(r => {
+                    const branch = r.branchname || 'Unknown';
+                    const company = r.customername || 'Unknown';
+                    const isDHP = company.toUpperCase().includes('DHP');
+                    const amount = Number(r.invoiceamount) || 0;
+                    const comm = pLookup[`${branch}||${company}`];
+                    if (comm) {
+                        const pct = isDHP ? (comm.dhp_pct || 0) : (comm.gsp_pct || 0);
+                        if (isDHP) dhpComm += amount * pct / 100;
+                        else gspComm += amount * pct / 100;
+                    }
+                });
+
+                return { label: producer.name, weekend: '', dhp: dhpComm, gsp: gspComm };
+            });
+
+            rows.sort((a, b) => (b.dhp + b.gsp) - (a.dhp + a.gsp));
+
+            // Render table without extra producer commission columns (the values ARE the commissions)
+            const headRow = document.querySelector('#commission_table thead tr');
+            headRow.innerHTML = `
+                <th class="sortable" data-sort-type="text">Producer</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Commission</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Commission</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">Total Commission</th>
+            `;
+
+            const tbody = document.getElementById('commission_table_body');
+            tbody.innerHTML = '';
+            let totalAll = 0;
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">No data.</td></tr>';
+            } else {
+                rows.forEach(row => {
+                    const total = row.dhp + row.gsp;
+                    totalAll += total;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.label}</td>
+                        <td style="text-align:right;font-weight:600;color:${row.dhp > 0 ? '#16A34A' : 'var(--text-secondary)'}">${formatCurrency(row.dhp)}</td>
+                        <td style="text-align:right;font-weight:600;color:${row.gsp > 0 ? '#16A34A' : 'var(--text-secondary)'}">${formatCurrency(row.gsp)}</td>
+                        <td style="text-align:right;font-weight:600;color:${total > 0 ? '#16A34A' : 'var(--text-secondary)'}">${formatCurrency(total)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById('total-footer').textContent = `Total Commission: ${formatCurrency(totalAll)}`;
+            attachSortListeners();
         }
 
         function renderTable(rows, groupBy) {
@@ -643,6 +759,12 @@
         // ── Event listeners ──────────────────────────────────────
         document.getElementById('apply-btn').addEventListener('click', loadData);
         document.getElementById('group_by').addEventListener('change', processData);
+
+        // Show/hide old companies toggle
+        document.getElementById('show-all-companies').addEventListener('change', (e) => {
+            showAllCompanies = e.target.checked;
+            renderCompanyPanel();
+        });
 
         // Producer select
         document.getElementById('producer_select').addEventListener('change', async (e) => {
