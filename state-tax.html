@@ -73,11 +73,51 @@
         .status-msg.error { display: inline-block; background: #f8d7da; color: #721c24; }
         .status-msg.info { display: inline-block; background: #cce5ff; color: #004085; }
 
+        /* ── Editable cells ─────────────────────────────── */
+        .editable-cell {
+            padding: 0 !important;
+        }
+        .editable-cell input {
+            width: 100%; border: none; background: transparent;
+            font-size: 12px; font-weight: 600; color: #059669;
+            padding: 8px 10px; outline: none; font-family: inherit;
+        }
+        .editable-cell input:focus {
+            background: rgba(234,137,56,0.06);
+            outline: 2px solid var(--primary); outline-offset: -2px;
+            border-radius: 4px;
+        }
+        .editable-cell.edited input { color: var(--primary); }
+
+        /* ── Group header row ───────────────────────────── */
+        .group-header-row td {
+            background: var(--bg-default) !important; font-weight: 700 !important;
+            font-size: 13px; color: var(--text-primary); padding: 10px 12px !important;
+            border-top: 2px solid var(--border-color);
+        }
+
+        /* ── Saved batches list ─────────────────────────── */
+        .batch-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600;
+            background: var(--bg-default); border: 1px solid var(--border-color);
+            color: var(--text-primary); cursor: pointer; transition: all 0.15s;
+        }
+        .batch-chip:hover { border-color: var(--primary); background: rgba(234,137,56,0.05); }
+        .batch-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .batch-chip .chip-count { opacity: 0.7; font-weight: 400; }
+        .batch-chip .chip-delete {
+            font-size: 14px; line-height: 1; padding: 0 2px; border-radius: 50%;
+            color: inherit; opacity: 0.5; transition: opacity 0.15s;
+        }
+        .batch-chip .chip-delete:hover { opacity: 1; color: #DC2626; }
+
         @media print {
-            .sidebar, .sidebar-overlay, .topbar, .action-bar, .page-header, .page-subtitle { display: none !important; }
+            .sidebar, .sidebar-overlay, .topbar, .action-bar, .page-header, .page-subtitle, #step-upload, .saved-header { display: none !important; }
             .main-content { margin: 0 !important; padding: 0 !important; height: auto !important; max-height: none !important; overflow: visible !important; }
             .results-table-wrap { max-height: none !important; overflow: visible !important; }
             .data-table th { background: #EA8938 !important; color: #fff !important; }
+            .editable-cell input { padding: 4px 6px; }
         }
     </style>
 </head>
@@ -86,7 +126,45 @@
         <div class="main-content">
             <div class="page-header">
                 <h1 class="page-title">State Tax</h1>
-                <p class="page-subtitle">Upload CSV, map columns, and look up county data</p>
+                <p class="page-subtitle">Upload CSV, map columns, and match county codes from uploaded tax PDFs</p>
+            </div>
+
+            <!-- Step 0: Saved Data View -->
+            <div class="step" id="step-saved">
+                <div class="saved-header" style="margin-bottom:12px;">
+                    <div class="card" style="padding:12px 16px;">
+                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                            <label style="font-size:13px;font-weight:600;white-space:nowrap;">Filter State:</label>
+                            <select class="form-select" id="saved-state-filter" style="max-width:180px;">
+                                <option value="">All States</option>
+                            </select>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" id="group-by-county" style="accent-color:var(--primary);">
+                                Group by County Code
+                            </label>
+                            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                                <button class="btn btn-primary" id="save-edits-btn" style="padding:6px 14px;display:none;">Save Edits</button>
+                                <button class="btn" id="new-upload-from-saved" style="padding:6px 14px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M12 5v14M5 12h14"/></svg>
+                                    New Upload
+                                </button>
+                                <button class="btn-icon" id="print-saved-btn" title="Print">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                </button>
+                                <span class="badge" id="saved-row-count"></span>
+                                <span class="status-msg" id="saved-status-msg"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="padding:0;overflow:hidden;">
+                    <div class="results-table-wrap">
+                        <table class="data-table" id="saved-table">
+                            <thead id="saved-thead"></thead>
+                            <tbody id="saved-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- Step 1: Upload CSV -->
@@ -127,8 +205,12 @@
                         Re-Map
                     </button>
                     <button class="btn btn-primary" id="lookup-counties-btn" style="padding:6px 14px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         Lookup Counties
+                    </button>
+                    <button class="btn btn-primary" id="save-data-btn" style="padding:6px 14px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Save Data
                     </button>
                     <button class="btn" id="new-upload-btn" style="padding:6px 14px;">New Upload</button>
                     <button class="btn-icon" id="print-btn" title="Print" style="margin-left:auto;">
@@ -163,22 +245,6 @@
         await renderSidebar();
         initInactivityTimer();
 
-        // ── Mapbox Token ────────────────────────────────────
-        // Fetched from serverless function to keep token server-side
-        let mapboxToken = null;
-        async function getMapboxToken() {
-            if (mapboxToken) return mapboxToken;
-            try {
-                const res = await fetch('/api/mapbox-token');
-                const data = await res.json();
-                mapboxToken = data.token;
-                return mapboxToken;
-            } catch (err) {
-                console.error('Failed to get Mapbox token:', err);
-                return null;
-            }
-        }
-
         // ── Tax Code Cache ──────────────────────────────────
         // Keyed by state name → array of { county_name, city_name, county_code, jurisdiction_code }
         const taxCodeCache = {};
@@ -186,39 +252,29 @@
         async function loadTaxCodesForState(stateName) {
             const key = stateName.toLowerCase().trim();
             if (taxCodeCache[key]) return taxCodeCache[key];
-
             const { data, error } = await supabase
                 .from('state_tax_codes')
                 .select('county_name, city_name, county_code, jurisdiction_code')
                 .ilike('state', stateName.trim());
-
-            if (error) {
-                console.error('Error loading tax codes for', stateName, error);
-                return [];
-            }
+            if (error) { console.error('Error loading tax codes for', stateName, error); return []; }
             taxCodeCache[key] = data || [];
             return taxCodeCache[key];
         }
 
-        function findTaxCode(taxCodes, countyName, cityName) {
-            if (!taxCodes.length || !countyName) return null;
-            const cn = countyName.toUpperCase().replace(/\s*COUNTY\s*/i, '').trim();
-            const city = (cityName || '').toUpperCase().trim();
+        function findTaxCodeByCity(taxCodes, cityName) {
+            if (!taxCodes.length || !cityName) return null;
+            const city = cityName.toUpperCase().trim();
 
-            // Try exact county + city match first
-            if (city) {
-                const exact = taxCodes.find(tc =>
-                    tc.county_name.toUpperCase().trim() === cn &&
-                    tc.city_name.toUpperCase().trim() === city
-                );
-                if (exact) return exact;
-            }
+            // Exact city name match
+            const exact = taxCodes.find(tc => tc.city_name.toUpperCase().trim() === city);
+            if (exact) return exact;
 
-            // Try county name match only (return first match)
-            const countyMatch = taxCodes.find(tc =>
-                tc.county_name.toUpperCase().trim() === cn
-            );
-            return countyMatch || null;
+            // Try partial match (city contains or is contained by)
+            const partial = taxCodes.find(tc => {
+                const tcCity = tc.city_name.toUpperCase().trim();
+                return tcCity.includes(city) || city.includes(tcCity);
+            });
+            return partial || null;
         }
 
         // ── State ───────────────────────────────────────────
@@ -226,8 +282,9 @@
         let csvRows = [];
         let mappedData = [];
         let columnMapping = {};
+        let savedRecords = [];
+        let editedRecords = {}; // id -> { county_name, county_code, jurisdiction_code }
 
-        // Expected fields for mapping
         const EXPECTED_FIELDS = [
             { key: 'company', label: 'Company / Employee', required: false },
             { key: 'address', label: 'Address', required: true },
@@ -242,12 +299,215 @@
             document.getElementById(stepId).classList.add('active');
         }
 
+        // ══════════════════════════════════════════════════════
+        // ── SAVED DATA VIEW ──────────────────────────────────
+        // ══════════════════════════════════════════════════════
+
+        async function loadSavedRecords() {
+            const { data, error } = await supabase
+                .from('state_tax_records')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) { console.error('Error loading saved records:', error); return []; }
+            return data || [];
+        }
+
+        function populateStateFilter(records) {
+            const select = document.getElementById('saved-state-filter');
+            const currentVal = select.value;
+            const states = [...new Set(records.map(r => r.state).filter(Boolean))].sort();
+            select.innerHTML = '<option value="">All States</option>';
+            states.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                if (s === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        function getFilteredRecords() {
+            const stateFilter = document.getElementById('saved-state-filter').value;
+            let filtered = savedRecords;
+            if (stateFilter) {
+                filtered = filtered.filter(r => r.state === stateFilter);
+            }
+            return filtered;
+        }
+
+        function renderSavedTable() {
+            const thead = document.getElementById('saved-thead');
+            const tbody = document.getElementById('saved-tbody');
+            const groupBy = document.getElementById('group-by-county').checked;
+            const filtered = getFilteredRecords();
+
+            // Header
+            let headerHTML = '<tr>';
+            headerHTML += '<th style="width:30px;">#</th>';
+            headerHTML += '<th>Company</th><th>Address</th><th>City</th><th>State</th><th>Zip</th>';
+            headerHTML += '<th>County Name</th><th>County Code</th><th>Jurisdiction Code</th>';
+            headerHTML += '</tr>';
+            thead.innerHTML = headerHTML;
+
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-secondary);">No records found.</td></tr>';
+                document.getElementById('saved-row-count').textContent = '0 rows';
+                return;
+            }
+
+            let rows = filtered;
+            if (groupBy) {
+                rows = [...filtered].sort((a, b) => {
+                    const codeA = a.county_code || 'zzz';
+                    const codeB = b.county_code || 'zzz';
+                    if (codeA !== codeB) return codeA.localeCompare(codeB);
+                    return (a.county_name || '').localeCompare(b.county_name || '');
+                });
+            }
+
+            let currentGroup = null;
+            let counter = 0;
+
+            rows.forEach((row) => {
+                // Group header
+                if (groupBy) {
+                    const groupKey = row.county_code || '(No Code)';
+                    if (groupKey !== currentGroup) {
+                        currentGroup = groupKey;
+                        const groupCount = rows.filter(r => (r.county_code || '(No Code)') === groupKey).length;
+                        const gtr = document.createElement('tr');
+                        gtr.className = 'group-header-row';
+                        gtr.innerHTML = `<td colspan="9">County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount} records)</td>`;
+                        tbody.appendChild(gtr);
+                    }
+                }
+
+                counter++;
+                const tr = document.createElement('tr');
+                const edited = editedRecords[row.id];
+                const cnVal = edited?.county_name ?? row.county_name ?? '';
+                const ccVal = edited?.county_code ?? row.county_code ?? '';
+                const jcVal = edited?.jurisdiction_code ?? row.jurisdiction_code ?? '';
+
+                tr.innerHTML = `
+                    <td style="color:var(--text-disabled);font-size:11px;">${counter}</td>
+                    <td>${row.company || ''}</td>
+                    <td>${row.address || ''}</td>
+                    <td>${row.city || ''}</td>
+                    <td>${row.state || ''}</td>
+                    <td>${row.zip || ''}</td>
+                    <td class="editable-cell ${edited?.county_name !== undefined ? 'edited' : ''}">
+                        <input type="text" value="${cnVal}" data-id="${row.id}" data-field="county_name">
+                    </td>
+                    <td class="editable-cell ${edited?.county_code !== undefined ? 'edited' : ''}">
+                        <input type="text" value="${ccVal}" data-id="${row.id}" data-field="county_code">
+                    </td>
+                    <td class="editable-cell ${edited?.jurisdiction_code !== undefined ? 'edited' : ''}">
+                        <input type="text" value="${jcVal}" data-id="${row.id}" data-field="jurisdiction_code">
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('saved-row-count').textContent = `${filtered.length} rows`;
+
+            // Attach edit listeners
+            tbody.querySelectorAll('.editable-cell input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const id = parseInt(e.target.dataset.id);
+                    const field = e.target.dataset.field;
+                    const original = savedRecords.find(r => r.id === id);
+                    if (!original) return;
+
+                    if (!editedRecords[id]) editedRecords[id] = {};
+                    editedRecords[id][field] = e.target.value.trim();
+
+                    // If value matches original, remove the edit
+                    if (editedRecords[id][field] === (original[field] || '')) {
+                        delete editedRecords[id][field];
+                        if (Object.keys(editedRecords[id]).length === 0) delete editedRecords[id];
+                    }
+
+                    e.target.closest('.editable-cell').classList.toggle('edited', editedRecords[id]?.[field] !== undefined);
+                    updateSaveEditsBtn();
+                });
+            });
+        }
+
+        function updateSaveEditsBtn() {
+            const btn = document.getElementById('save-edits-btn');
+            const count = Object.keys(editedRecords).length;
+            btn.style.display = count > 0 ? 'inline-flex' : 'none';
+            btn.textContent = `Save Edits (${count})`;
+        }
+
+        async function saveEdits() {
+            const btn = document.getElementById('save-edits-btn');
+            const statusEl = document.getElementById('saved-status-msg');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            statusEl.className = 'status-msg';
+
+            try {
+                const ids = Object.keys(editedRecords).map(Number);
+                for (const id of ids) {
+                    const updates = { ...editedRecords[id], updated_at: new Date().toISOString() };
+                    const { error } = await supabase.from('state_tax_records').update(updates).eq('id', id);
+                    if (error) throw error;
+
+                    // Update local data
+                    const rec = savedRecords.find(r => r.id === id);
+                    if (rec) Object.assign(rec, updates);
+                }
+
+                editedRecords = {};
+                renderSavedTable();
+                updateSaveEditsBtn();
+
+                statusEl.textContent = `Saved ${ids.length} record${ids.length > 1 ? 's' : ''}.`;
+                statusEl.className = 'status-msg success';
+                setTimeout(() => { statusEl.className = 'status-msg'; }, 4000);
+            } catch (err) {
+                console.error('Save error:', err);
+                statusEl.textContent = 'Error: ' + err.message;
+                statusEl.className = 'status-msg error';
+            } finally {
+                btn.disabled = false;
+                updateSaveEditsBtn();
+            }
+        }
+
+        // ── Init: Load saved data on page load ──────────────
+        savedRecords = await loadSavedRecords();
+        if (savedRecords.length > 0) {
+            populateStateFilter(savedRecords);
+            renderSavedTable();
+            showStep('step-saved');
+        } else {
+            showStep('step-upload');
+        }
+
+        // Saved view event listeners
+        document.getElementById('saved-state-filter').addEventListener('change', () => {
+            editedRecords = {};
+            updateSaveEditsBtn();
+            renderSavedTable();
+        });
+        document.getElementById('group-by-county').addEventListener('change', renderSavedTable);
+        document.getElementById('save-edits-btn').addEventListener('click', saveEdits);
+        document.getElementById('new-upload-from-saved').addEventListener('click', () => showStep('step-upload'));
+        document.getElementById('print-saved-btn').addEventListener('click', () => window.print());
+
+        // ══════════════════════════════════════════════════════
+        // ── CSV UPLOAD FLOW ──────────────────────────────────
+        // ══════════════════════════════════════════════════════
+
         // ── CSV Parsing ─────────────────────────────────────
         function parseCSV(text) {
             const lines = text.split(/\r?\n/).filter(line => line.trim());
             if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
 
-            // Parse respecting quoted fields
             function parseLine(line) {
                 const result = [];
                 let current = '';
@@ -255,18 +515,11 @@
                 for (let i = 0; i < line.length; i++) {
                     const char = line[i];
                     if (char === '"') {
-                        if (inQuotes && line[i + 1] === '"') {
-                            current += '"';
-                            i++;
-                        } else {
-                            inQuotes = !inQuotes;
-                        }
+                        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+                        else { inQuotes = !inQuotes; }
                     } else if (char === ',' && !inQuotes) {
-                        result.push(current.trim());
-                        current = '';
-                    } else {
-                        current += char;
-                    }
+                        result.push(current.trim()); current = '';
+                    } else { current += char; }
                 }
                 result.push(current.trim());
                 return result;
@@ -285,11 +538,9 @@
             return { headers, rows };
         }
 
-        // ── Auto-guess mapping ──────────────────────────────
         function guessMapping(headers) {
             const mapping = {};
             const lowerHeaders = headers.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
-
             EXPECTED_FIELDS.forEach(field => {
                 let bestMatch = '';
                 const patterns = {
@@ -299,20 +550,17 @@
                     state: ['state', 'st', 'statecode', 'stateabbr'],
                     zip: ['zip', 'zipcode', 'postal', 'postalcode', 'zip5'],
                 };
-
                 const fieldPatterns = patterns[field.key] || [field.key];
                 for (const h of lowerHeaders) {
                     for (const p of fieldPatterns) {
                         if (h === p || h.includes(p)) {
-                            bestMatch = headers[lowerHeaders.indexOf(h)];
-                            break;
+                            bestMatch = headers[lowerHeaders.indexOf(h)]; break;
                         }
                     }
                     if (bestMatch) break;
                 }
                 mapping[field.key] = bestMatch;
             });
-
             return mapping;
         }
 
@@ -322,43 +570,26 @@
         const fileInfo = document.getElementById('file-info');
 
         uploadZone.addEventListener('click', () => csvInput.click());
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
+        uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+        uploadZone.addEventListener('dragleave', () => { uploadZone.classList.remove('dragover'); });
         uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file) handleFile(file);
+            e.preventDefault(); uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
         });
-        csvInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) handleFile(e.target.files[0]);
-        });
+        csvInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
 
         function handleFile(file) {
-            if (!file.name.match(/\.(csv|txt)$/i)) {
-                alert('Please upload a .csv file.');
-                return;
-            }
+            if (!file.name.match(/\.(csv|txt)$/i)) { alert('Please upload a .csv file.'); return; }
             fileInfo.style.display = 'block';
             fileInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const result = parseCSV(e.target.result);
-                    csvHeaders = result.headers;
-                    csvRows = result.rows;
+                    csvHeaders = result.headers; csvRows = result.rows;
                     columnMapping = guessMapping(csvHeaders);
-                    renderMappingStep();
-                    showStep('step-map');
-                } catch (err) {
-                    alert('Error parsing CSV: ' + err.message);
-                }
+                    renderMappingStep(); showStep('step-map');
+                } catch (err) { alert('Error parsing CSV: ' + err.message); }
             };
             reader.readAsText(file);
         }
@@ -367,37 +598,22 @@
         function renderMappingStep() {
             const grid = document.getElementById('mapping-grid');
             grid.innerHTML = '';
-
             EXPECTED_FIELDS.forEach(field => {
                 const label = document.createElement('label');
                 label.textContent = field.label + (field.required ? ' *' : '');
-
                 const select = document.createElement('select');
-                select.className = 'form-select';
-                select.dataset.field = field.key;
-
+                select.className = 'form-select'; select.dataset.field = field.key;
                 const emptyOpt = document.createElement('option');
-                emptyOpt.value = '';
-                emptyOpt.textContent = '-- Skip --';
+                emptyOpt.value = ''; emptyOpt.textContent = '-- Skip --';
                 select.appendChild(emptyOpt);
-
                 csvHeaders.forEach(h => {
                     const opt = document.createElement('option');
-                    opt.value = h;
-                    opt.textContent = h;
+                    opt.value = h; opt.textContent = h;
                     if (columnMapping[field.key] === h) opt.selected = true;
                     select.appendChild(opt);
                 });
-
-                const row = document.createElement('div');
-                row.className = 'mapping-row';
-                row.appendChild(label);
-                row.appendChild(select);
-                grid.appendChild(label);
-                grid.appendChild(select);
+                grid.appendChild(label); grid.appendChild(select);
             });
-
-            // Preview table
             renderPreviewTable();
         }
 
@@ -418,33 +634,23 @@
 
         // ── Apply Mapping ───────────────────────────────────
         document.getElementById('apply-mapping').addEventListener('click', () => {
-            // Read mapping selections
             const selects = document.querySelectorAll('#mapping-grid select');
             columnMapping = {};
-            selects.forEach(sel => {
-                columnMapping[sel.dataset.field] = sel.value;
-            });
+            selects.forEach(sel => { columnMapping[sel.dataset.field] = sel.value; });
 
-            // Validate required fields
             const missing = EXPECTED_FIELDS.filter(f => f.required && !columnMapping[f.key]);
-            if (missing.length > 0) {
-                alert('Please map required fields: ' + missing.map(f => f.label).join(', '));
-                return;
-            }
+            if (missing.length > 0) { alert('Please map required fields: ' + missing.map(f => f.label).join(', ')); return; }
 
-            // Build mapped data
             mappedData = csvRows.map(row => {
                 const mapped = { _original: row };
                 EXPECTED_FIELDS.forEach(f => {
                     mapped[f.key] = columnMapping[f.key] ? (row[columnMapping[f.key]] || '') : '';
                 });
-                // Also keep all extra CSV columns
                 mapped._extras = {};
                 csvHeaders.forEach(h => {
                     const isMapped = Object.values(columnMapping).includes(h);
                     if (!isMapped) mapped._extras[h] = row[h] || '';
                 });
-                // County lookup results
                 mapped.county_name = '';
                 mapped.county_code = '';
                 mapped.jurisdiction_code = '';
@@ -460,41 +666,33 @@
         function renderResultsTable() {
             const thead = document.getElementById('results-thead');
             const tbody = document.getElementById('results-tbody');
-
-            // Build header: mapped fields + County Name + County Code + extras
             const mappedFields = EXPECTED_FIELDS.filter(f => columnMapping[f.key]);
             const extraKeys = Object.keys(mappedData[0]?._extras || {});
 
             let headerHTML = '<tr>';
             headerHTML += '<th style="width:30px;">#</th>';
             mappedFields.forEach(f => { headerHTML += `<th>${f.label}</th>`; });
-            headerHTML += '<th>County Name</th>';
-            headerHTML += '<th>County Code</th>';
-            headerHTML += '<th>Jurisdiction Code</th>';
+            headerHTML += '<th>County Name</th><th>County Code</th><th>Jurisdiction Code</th>';
             extraKeys.forEach(k => { headerHTML += `<th>${k}</th>`; });
             headerHTML += '</tr>';
             thead.innerHTML = headerHTML;
 
-            // Build rows
             tbody.innerHTML = '';
             mappedData.forEach((row, idx) => {
                 const tr = document.createElement('tr');
                 let html = `<td style="color:var(--text-disabled);font-size:11px;">${idx + 1}</td>`;
                 mappedFields.forEach(f => { html += `<td>${row[f.key]}</td>`; });
 
-                // County cells
                 if (row._countyStatus === 'pending') {
-                    html += `<td class="county-pending">--</td>`;
-                    html += `<td class="county-pending">--</td>`;
-                    html += `<td class="county-pending">--</td>`;
+                    html += `<td class="county-pending">--</td><td class="county-pending">--</td><td class="county-pending">--</td>`;
                 } else if (row._countyStatus === 'found') {
-                    html += `<td class="county-found">${row.county_name}</td>`;
-                    html += `<td class="county-found">${row.county_code}</td>`;
-                    html += `<td class="county-found">${row.jurisdiction_code || '--'}</td>`;
+                    html += `<td class="editable-cell"><input type="text" value="${row.county_name}" data-idx="${idx}" data-field="county_name"></td>`;
+                    html += `<td class="editable-cell"><input type="text" value="${row.county_code}" data-idx="${idx}" data-field="county_code"></td>`;
+                    html += `<td class="editable-cell"><input type="text" value="${row.jurisdiction_code || ''}" data-idx="${idx}" data-field="jurisdiction_code"></td>`;
                 } else {
-                    html += `<td class="county-error">Not found</td>`;
-                    html += `<td class="county-error">--</td>`;
-                    html += `<td class="county-error">--</td>`;
+                    html += `<td class="editable-cell"><input type="text" value="" data-idx="${idx}" data-field="county_name" placeholder="Enter county"></td>`;
+                    html += `<td class="editable-cell"><input type="text" value="" data-idx="${idx}" data-field="county_code" placeholder="Code"></td>`;
+                    html += `<td class="editable-cell"><input type="text" value="" data-idx="${idx}" data-field="jurisdiction_code" placeholder="Jur. code"></td>`;
                 }
 
                 extraKeys.forEach(k => { html += `<td>${row._extras[k] || ''}</td>`; });
@@ -502,109 +700,142 @@
                 tbody.appendChild(tr);
             });
 
+            // Attach inline edit listeners on results table
+            tbody.querySelectorAll('.editable-cell input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const idx = parseInt(e.target.dataset.idx);
+                    const field = e.target.dataset.field;
+                    mappedData[idx][field] = e.target.value.trim();
+                    if (mappedData[idx]._countyStatus !== 'found') {
+                        mappedData[idx]._countyStatus = 'found';
+                    }
+                });
+            });
+
             document.getElementById('row-count').textContent = `${mappedData.length} rows`;
         }
 
-        // ── County Lookup via Mapbox + Supabase Tax Codes ─
+        // ── County Lookup via Supabase Tax Codes (PDF data) ─
         async function lookupCounties() {
-            const token = await getMapboxToken();
-            if (!token) {
-                showStatus('Mapbox token not configured. Add MAPBOX_TOKEN to your Vercel environment variables.', 'error');
-                return;
-            }
-
             const btn = document.getElementById('lookup-counties-btn');
             const progress = document.getElementById('lookup-progress');
-            btn.disabled = true;
-            btn.textContent = 'Looking up...';
+            btn.disabled = true; btn.textContent = 'Looking up...';
 
             // Pre-load tax codes for all unique states in the data
             const uniqueStates = [...new Set(mappedData.map(r => r.state).filter(Boolean))];
             progress.textContent = 'Loading tax code database...';
+
+            let hasAnyCodes = false;
             for (const st of uniqueStates) {
-                await loadTaxCodesForState(st);
+                const codes = await loadTaxCodesForState(st);
+                if (codes.length > 0) hasAnyCodes = true;
             }
 
-            let found = 0;
-            let errors = 0;
+            if (!hasAnyCodes) {
+                showStatus('No tax codes found in database. Upload state tax PDFs via Settings → Tax Codes first.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Lookup Counties';
+                progress.textContent = '';
+                return;
+            }
+
+            let found = 0, notFound = 0;
             const total = mappedData.length;
 
             for (let i = 0; i < mappedData.length; i++) {
                 const row = mappedData[i];
                 progress.textContent = `Processing ${i + 1} / ${total}...`;
 
-                try {
-                    const addressParts = [row.address, row.city, row.state, row.zip].filter(Boolean);
-                    const query = addressParts.join(', ');
-                    if (!query.trim()) {
-                        row._countyStatus = 'error';
-                        errors++;
-                        continue;
-                    }
+                const cityName = (row.city || '').trim();
+                const stateKey = (row.state || '').toLowerCase().trim();
+                const taxCodes = taxCodeCache[stateKey] || [];
 
-                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=US&types=address,place&limit=1`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-
-                    if (data.features && data.features.length > 0) {
-                        const feature = data.features[0];
-                        // Look for district context (county)
-                        const countyCtx = (feature.context || []).find(c =>
-                            c.id && c.id.startsWith('district')
-                        );
-
-                        if (countyCtx) {
-                            row.county_name = countyCtx.text || '';
-
-                            // Try to find the specific tax county code from Supabase
-                            const stateKey = (row.state || '').toLowerCase().trim();
-                            const taxCodes = taxCodeCache[stateKey] || [];
-                            const taxMatch = findTaxCode(taxCodes, row.county_name, row.city);
-
-                            if (taxMatch) {
-                                row.county_code = taxMatch.county_code;
-                                row.jurisdiction_code = taxMatch.jurisdiction_code;
-                            } else {
-                                // Fall back to Mapbox district ID
-                                const idParts = countyCtx.id.split('.');
-                                row.county_code = idParts.length > 1 ? idParts[1] : '';
-                                row.jurisdiction_code = '';
-                            }
-
-                            row._countyStatus = 'found';
-                            found++;
-                        } else {
-                            row.county_name = '';
-                            row.county_code = '';
-                            row.jurisdiction_code = '';
-                            row._countyStatus = 'error';
-                            errors++;
-                        }
-                    } else {
-                        row._countyStatus = 'error';
-                        errors++;
-                    }
-                } catch (err) {
-                    console.error('Geocoding error for row', i, err);
+                if (!cityName || taxCodes.length === 0) {
                     row._countyStatus = 'error';
-                    errors++;
+                    notFound++;
+                } else {
+                    const match = findTaxCodeByCity(taxCodes, cityName);
+                    if (match) {
+                        row.county_name = match.county_name;
+                        row.county_code = match.county_code;
+                        row.jurisdiction_code = match.jurisdiction_code;
+                        row._countyStatus = 'found';
+                        found++;
+                    } else {
+                        row.county_name = '';
+                        row.county_code = '';
+                        row.jurisdiction_code = '';
+                        row._countyStatus = 'error';
+                        notFound++;
+                    }
                 }
 
-                // Rate limiting — Mapbox allows 600 req/min for geocoding
-                if (i < mappedData.length - 1) {
-                    await new Promise(r => setTimeout(r, 120));
-                }
-
-                // Update table every 10 rows for visual feedback
-                if ((i + 1) % 10 === 0 || i === mappedData.length - 1) {
+                // Update table every 50 rows for visual feedback
+                if ((i + 1) % 50 === 0 || i === mappedData.length - 1) {
                     renderResultsTable();
                 }
             }
 
             progress.textContent = '';
             btn.disabled = false;
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>Lookup Counties';
-            showStatus(`Done! ${found} found, ${errors} not found out of ${total} rows.`, found > 0 ? 'success' : 'error');
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>Lookup Counties';
+            showStatus(`Done! ${found} matched, ${notFound} not found out of ${total} rows.`, found > 0 ? 'success' : 'error');
+        }
+
+        // ── Save Data to Supabase ───────────────────────────
+        async function saveDataToSupabase() {
+            const btn = document.getElementById('save-data-btn');
+            const statusEl = document.getElementById('status-msg');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                // Read latest values from editable inputs
+                document.querySelectorAll('#results-tbody .editable-cell input').forEach(input => {
+                    const idx = parseInt(input.dataset.idx);
+                    const field = input.dataset.field;
+                    if (!isNaN(idx) && mappedData[idx]) {
+                        mappedData[idx][field] = input.value.trim();
+                    }
+                });
+
+                const batchId = `batch_${Date.now()}`;
+                const records = mappedData.map(row => ({
+                    batch_id: batchId,
+                    company: row.company || '',
+                    address: row.address || '',
+                    city: row.city || '',
+                    state: row.state || '',
+                    zip: row.zip || '',
+                    county_name: row.county_name || '',
+                    county_code: row.county_code || '',
+                    jurisdiction_code: row.jurisdiction_code || '',
+                    extra_data: row._extras || {},
+                }));
+
+                // Insert in batches of 500
+                for (let i = 0; i < records.length; i += 500) {
+                    const batch = records.slice(i, i + 500);
+                    const { error } = await supabase.from('state_tax_records').insert(batch);
+                    if (error) throw error;
+                }
+
+                showStatus(`Saved ${records.length} records.`, 'success');
+
+                // Reload saved view
+                savedRecords = await loadSavedRecords();
+                populateStateFilter(savedRecords);
+                editedRecords = {};
+                updateSaveEditsBtn();
+                renderSavedTable();
+                showStep('step-saved');
+            } catch (err) {
+                console.error('Save error:', err);
+                showStatus('Error saving: ' + err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Data';
+            }
         }
 
         function showStatus(msg, type) {
@@ -616,20 +847,13 @@
 
         // ── Event Listeners ─────────────────────────────────
         document.getElementById('back-to-upload').addEventListener('click', () => showStep('step-upload'));
-        document.getElementById('back-to-map').addEventListener('click', () => {
-            renderMappingStep();
-            showStep('step-map');
-        });
+        document.getElementById('back-to-map').addEventListener('click', () => { renderMappingStep(); showStep('step-map'); });
         document.getElementById('new-upload-btn').addEventListener('click', () => {
-            csvHeaders = [];
-            csvRows = [];
-            mappedData = [];
-            columnMapping = {};
-            csvInput.value = '';
-            fileInfo.style.display = 'none';
-            showStep('step-upload');
+            csvHeaders = []; csvRows = []; mappedData = []; columnMapping = {};
+            csvInput.value = ''; fileInfo.style.display = 'none'; showStep('step-upload');
         });
         document.getElementById('lookup-counties-btn').addEventListener('click', lookupCounties);
+        document.getElementById('save-data-btn').addEventListener('click', saveDataToSupabase);
         document.getElementById('print-btn').addEventListener('click', () => window.print());
     </script>
 </body>
