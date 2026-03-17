@@ -10,34 +10,33 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .viz-layout { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: auto auto auto 1fr; gap: 16px; }
+        .viz-layout { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: auto auto auto 1fr; gap: 8px; }
         .viz-filters { grid-row: 1; grid-column: 1 / 3; }
         .viz-report-title { grid-row: 2; grid-column: 1 / 3; }
         .viz-stats-bar { grid-row: 3; grid-column: 1 / 3; }
         .viz-table-section { grid-row: 4; grid-column: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
         .viz-chart-section { grid-row: 4; grid-column: 2; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
-        .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .filter-row + .filter-row { margin-top: 8px; }
-        .filter-row .form-select, .filter-row .form-input { min-width: 120px; }
+        .filter-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .filter-row .form-select, .filter-row .form-input { min-width: 100px; }
         .filter-row label { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
-        .table-scroll { overflow-y: auto; max-height: calc(100vh - 520px); }
-        .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-weight: 700; font-size: 15px; }
-        .chart-wrap { position: relative; padding: 12px; flex: 1; overflow: hidden; height: calc(100vh - 520px); }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 420px); }
+        .total-bar { background-color: var(--primary); color: #fff; padding: 6px 12px; border-radius: 8px; text-align: center; font-weight: 700; font-size: 14px; }
+        .chart-wrap { position: relative; padding: 12px; flex: 1; overflow: hidden; height: calc(100vh - 420px); }
         .chart-wrap canvas { width: 100% !important; height: 100% !important; }
         .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
         .btn-icon { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; display: flex; align-items: center; transition: background-color 0.2s; }
         .btn-icon:hover { background-color: var(--bg-default); }
 
         /* Report title bar */
-        .report-title-bar { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 16px; text-align: center; }
-        .report-title-bar h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
+        .report-title-bar { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 6px 16px; text-align: center; }
+        .report-title-bar h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
 
         /* Stats bar */
-        .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-        .stat-card { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 12px 16px; text-align: center; }
-        .stat-card .stat-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .stat-card .stat-value { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-        .stat-card .stat-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .stat-card { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 8px 12px; text-align: center; }
+        .stat-card .stat-label { font-size: 10px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .stat-card .stat-value { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+        .stat-card .stat-sub { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
         .stat-positive { color: #059669 !important; }
         .stat-negative { color: #DC2626 !important; }
 
@@ -143,7 +142,7 @@
             <div class="print-sub-header" id="print-sub-header"></div>
             <div class="viz-layout">
                 <div class="viz-filters">
-                    <div class="card" style="padding:12px;">
+                    <div class="card" style="padding:8px 12px;">
                         <div class="filter-row">
                             <div class="radio-btn-group">
                                 <input type="radio" name="report_type" id="rt_gsr" value="GSR" checked>
@@ -151,26 +150,24 @@
                                 <input type="radio" name="report_type" id="rt_dhr" value="DHR">
                                 <label for="rt_dhr">DHR</label>
                             </div>
-                            <select class="form-select" id="branch_filter">
+                            <select class="form-select" id="branch_filter" style="max-width:150px;">
                                 <option value="all" selected>All Branches</option>
                             </select>
-                            <input class="form-input" type="date" id="start_date" style="max-width:150px;">
-                            <input class="form-input" type="date" id="end_date" style="max-width:150px;">
-                            <input class="form-input" type="text" id="company_search" placeholder="Search company..." style="max-width:180px;">
-                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
-                        </div>
-                        <div class="filter-row">
-                            <select class="form-select" id="interval_select" style="max-width:120px;">
+                            <input class="form-input" type="date" id="start_date" style="max-width:140px;">
+                            <input class="form-input" type="date" id="end_date" style="max-width:140px;">
+                            <input class="form-input" type="text" id="company_search" placeholder="Search company..." style="max-width:150px;">
+                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:5px 14px;">Apply</button>
+                            <select class="form-select" id="interval_select" style="max-width:100px;">
                                 <option value="weekly" selected>Weekly</option>
                                 <option value="monthly">Monthly</option>
                                 <option value="yearly">Yearly</option>
                             </select>
-                            <select class="form-select" id="graph_type" style="max-width:100px;">
+                            <select class="form-select" id="graph_type" style="max-width:80px;">
                                 <option value="bar" selected>Bar</option>
                                 <option value="line">Line</option>
                                 <option value="pie">Pie</option>
                             </select>
-                            <select class="form-select" id="group_by" style="max-width:160px;">
+                            <select class="form-select" id="group_by" style="max-width:150px;">
                                 <option value="company" selected>Group By: Company</option>
                                 <option value="branch">Group By: Branch</option>
                             </select>
@@ -178,7 +175,7 @@
                                 <input type="checkbox" id="forecast_check">
                                 <label for="forecast_check">Forecast</label>
                             </div>
-                            <input class="form-input" type="date" id="forecast_end" style="max-width:150px;display:none;">
+                            <input class="form-input" type="date" id="forecast_end" style="max-width:140px;display:none;">
                             <button class="btn-icon" type="button" id="print-btn" title="Print" style="margin-left:auto;">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                             </button>

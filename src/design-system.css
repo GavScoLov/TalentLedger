@@ -42,7 +42,7 @@ a:hover { text-decoration: underline; }
   flex-grow: 1;
   margin-left: var(--sidebar-width);
   margin-top: var(--topbar-height);
-  padding: 24px;
+  padding: 16px 24px;
   height: calc(100vh - var(--topbar-height));
   max-height: calc(100vh - var(--topbar-height));
   overflow-y: auto;
@@ -139,10 +139,10 @@ a:hover { text-decoration: underline; }
   .sidebar-overlay.open { display: block; }
 }
 
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-.page-header-left { display: flex; flex-direction: column; gap: 4px; }
-.page-title { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
-.page-subtitle { font-size: 0.875rem; color: var(--text-secondary); }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.page-header-left { display: flex; flex-direction: column; gap: 2px; }
+.page-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+.page-subtitle { font-size: 0.8rem; color: var(--text-secondary); }
 .page-header-actions { display: flex; gap: 8px; align-items: center; }
 
 .card {
