@@ -550,9 +550,9 @@
                         tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + formatCurrency2(ctx.parsed.y) } },
                         datalabels: {
                             display: function(context) {
-                                // Hide labels for Trend dataset and null values
                                 if (context.dataset.label === 'Trend') return false;
-                                return context.parsed.y !== null && context.parsed.y !== 0;
+                                const val = context.parsed?.y ?? context.parsed;
+                                return val !== null && val !== undefined && val !== 0;
                             },
                             anchor: graphType === 'bar' ? 'end' : 'end',
                             align: graphType === 'bar' ? 'top' : 'top',
