@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
           main: resolve(__dirnameESM, 'index.html'),
           commission: resolve(__dirnameESM, 'commission.html'),
           dataVisualization: resolve(__dirnameESM, 'data-visualization.html'),
+          hoursBreakdown: resolve(__dirnameESM, 'hours-breakdown.html'),
           profitLoss: resolve(__dirnameESM, 'profit-loss.html'),
           descendingRevenue: resolve(__dirnameESM, 'descending-revenue.html'),
           directHire: resolve(__dirnameESM, 'direct-hire.html'),

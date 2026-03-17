@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TalentLedger - Descending Revenue</title>
+    <title>TalentLedger - Hours Breakdown</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
@@ -40,6 +40,21 @@
         .stat-card .stat-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
         .stat-positive { color: #059669 !important; }
         .stat-negative { color: #DC2626 !important; }
+
+        /* Custom radio buttons for report type */
+        .radio-btn-group { display: flex; gap: 0; }
+        .radio-btn-group input[type="radio"] { display: none; }
+        .radio-btn-group label {
+            padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+            border: 2px solid var(--border-color); background: var(--bg-default); color: var(--text-secondary);
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .radio-btn-group label:first-of-type { border-radius: 6px 0 0 6px; }
+        .radio-btn-group label:last-of-type { border-radius: 0 6px 6px 0; }
+        .radio-btn-group label:not(:first-of-type) { border-left: none; }
+        .radio-btn-group input[type="radio"]:checked + label {
+            background: var(--primary); border-color: var(--primary); color: #fff;
+        }
 
         /* Custom toggle checkboxes for DHP/GSP */
         .toggle-checkbox input[type="checkbox"] { display: none; }
@@ -113,8 +128,8 @@
     <div class="app-layout">
         <div class="main-content">
             <div class="page-header">
-                <h1 class="page-title">Descending Revenue</h1>
-                <p class="page-subtitle">Revenue analytics by company and branch</p>
+                <h1 class="page-title">Hours Breakdown</h1>
+                <p class="page-subtitle">General Staffing &amp; Direct Hire hours analytics</p>
             </div>
             <div class="print-header" id="print-header"></div>
             <div class="print-sub-header" id="print-sub-header"></div>
@@ -122,6 +137,12 @@
                 <div class="viz-filters">
                     <div class="card" style="padding:12px;">
                         <div class="filter-row">
+                            <div class="radio-btn-group">
+                                <input type="radio" name="report_type" id="rt_gsr" value="GSR" checked>
+                                <label for="rt_gsr">GSR</label>
+                                <input type="radio" name="report_type" id="rt_dhr" value="DHR">
+                                <label for="rt_dhr">DHR</label>
+                            </div>
                             <select class="form-select" id="branch_filter">
                                 <option value="all" selected>All Branches</option>
                             </select>
@@ -131,14 +152,6 @@
                             <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
                         </div>
                         <div class="filter-row">
-                            <div class="toggle-checkbox">
-                                <input type="checkbox" id="dhp_filter">
-                                <label for="dhp_filter">DHP</label>
-                            </div>
-                            <div class="toggle-checkbox">
-                                <input type="checkbox" id="gsp_filter">
-                                <label for="gsp_filter">GSP</label>
-                            </div>
                             <select class="form-select" id="interval_select" style="max-width:120px;">
                                 <option value="weekly" selected>Weekly</option>
                                 <option value="monthly">Monthly</option>
@@ -165,7 +178,7 @@
                     </div>
                 </div>
                 <div class="viz-report-title">
-                    <div class="report-title-bar"><h2 id="report-title">PSA - DRG - Descending Revenue Graph</h2></div>
+                    <div class="report-title-bar"><h2 id="report-title">PSA - GSR - General Staffing Report</h2></div>
                 </div>
                 <div class="viz-stats-bar">
                     <div class="stats-bar">
@@ -225,7 +238,7 @@
         } from './src/apiClient.js';
 
         await checkAuth();
-        await checkPageAccess('data-visualization');
+        await checkPageAccess('hours-breakdown');
         renderNavbar();
         await renderSidebar();
         initInactivityTimer();
@@ -233,11 +246,16 @@
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
 
-        const REPORT_TITLE = 'PSA - DRG - Descending Revenue Graph';
+        const reportTitles = {
+            GSR: 'PSA - GSR - General Staffing Report',
+            DHR: 'PSA - DHR - Direct Hire Report',
+        };
 
         // ── State ─────────────────────────────────────────────────
         let rawInvoices = [];
         let rawBillingByBranch = [];
+        let rawHoursByCompany = [];
+        let rawBillingByCompany = [];
         let mainChart = null;
 
         // ── Init ──────────────────────────────────────────────────
@@ -246,7 +264,10 @@
         const fEnd = new Date(); fEnd.setMonth(fEnd.getMonth() + 3);
         document.getElementById('forecast_end').value = fEnd.toISOString().split('T')[0];
 
-        // ── Helper: filter Corporate branches ────────────────────
+        function getReportType() {
+            return document.querySelector('input[name="report_type"]:checked')?.value || 'GSR';
+        }
+
         function isCorporateBranch(name) {
             return (name || '').toLowerCase().includes('corporate');
         }
@@ -260,13 +281,17 @@
             document.getElementById('data-table-body').innerHTML = '<tr><td colspan="6" class="loading-indicator">Loading data...</td></tr>';
 
             try {
-                const [invoices, billingBranch] = await Promise.all([
+                const [invoices, billingBranch, hoursCo, billingCo] = await Promise.all([
                     fetchInvoiceRegister(startDate, endDate),
                     fetchTotalBillingByBranch(startDate, endDate),
+                    fetchTotalHoursByCompany(startDate, endDate),
+                    fetchTotalBillingByCompany(startDate, endDate),
                 ]);
 
                 rawInvoices = invoices;
                 rawBillingByBranch = billingBranch;
+                rawHoursByCompany = hoursCo;
+                rawBillingByCompany = billingCo;
 
                 populateBranchFilter();
                 processData();
@@ -292,45 +317,54 @@
 
         // ── Process Data ──────────────────────────────────────────
         function processData() {
+            const report = getReportType();
             const branch = document.getElementById('branch_filter').value;
             const search = (document.getElementById('company_search').value || '').toLowerCase();
-            const dhpOn = document.getElementById('dhp_filter').checked;
-            const gspOn = document.getElementById('gsp_filter').checked;
 
-            // Update titles
-            document.getElementById('report-title').textContent = REPORT_TITLE;
-            document.getElementById('print-header').textContent = REPORT_TITLE;
+            // Update report title
+            document.getElementById('report-title').textContent = reportTitles[report] || '';
+            document.getElementById('print-header').textContent = reportTitles[report] || '';
 
             // Print sub-header
             const startDate = document.getElementById('start_date').value;
             const endDate = document.getElementById('end_date').value;
             const branchLabel = branch === 'all' ? 'All Branches' : branch;
-            const filters = [];
-            if (dhpOn) filters.push('DHP Only');
-            if (gspOn) filters.push('GSP Only');
-            const filterStr = filters.length ? ` | ${filters.join(', ')}` : '';
-            document.getElementById('print-sub-header').textContent = `${startDate} to ${endDate} | ${branchLabel}${filterStr}`;
+            document.getElementById('print-sub-header').textContent = `${startDate} to ${endDate} | ${branchLabel}`;
 
-            // Filter invoices (DRR = all companies, no DHP/GSR exclusion by report type)
+            // Filter invoices: GSR = non-DHP, DHR = DHP only
             let filtered = rawInvoices.filter(r => {
                 if (isCorporateBranch(r.branchname)) return false;
                 if (branch !== 'all' && r.branchname !== branch) return false;
                 const isDHP = (r.customername || '').toUpperCase().includes('DHP');
-                if (dhpOn && !isDHP) return false;
-                if (gspOn && isDHP) return false;
+                if (report === 'DHR' && !isDHP) return false;
+                if (report === 'GSR' && isDHP) return false;
                 if (search && !(r.customername || '').toLowerCase().includes(search)) return false;
                 return true;
             });
 
             const groupBy = document.getElementById('group_by').value;
 
-            // Table: aggregate
+            // Table: aggregate by company or branch
             const agg = {};
             filtered.forEach(r => {
                 const key = groupBy === 'branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown');
-                if (!agg[key]) agg[key] = { name: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
+                if (!agg[key]) agg[key] = { name: key, branch: r.branchname || '', revenue: 0, branches: new Set(), hours: 0 };
                 agg[key].revenue += Number(r.invoiceamount) || 0;
                 if (r.branchname) agg[key].branches.add(r.branchname);
+            });
+
+            // Merge hours data
+            rawHoursByCompany.forEach(r => {
+                const isDHP = (r.company_name || '').toUpperCase().includes('DHP');
+                if (report === 'DHR' && !isDHP) return;
+                if (report === 'GSR' && isDHP) return;
+                if (isCorporateBranch(r.branch)) return;
+                if (branch !== 'all' && r.branch !== branch) return;
+                if (search && !(r.company_name || '').toLowerCase().includes(search)) return;
+                const key = groupBy === 'branch' ? (r.branch || 'Unknown') : (r.company_name || 'Unknown');
+                if (!agg[key]) agg[key] = { name: key, branch: r.branch || '', revenue: 0, branches: new Set(), hours: 0 };
+                agg[key].hours = (agg[key].hours || 0) + (Number(r.total_hours) || 0);
+                if (r.branch) agg[key].branches.add(r.branch);
             });
 
             const tableData = Object.values(agg).map(c => ({
@@ -351,44 +385,50 @@
             });
 
             const timeSeries = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
+            const reportLabels = { GSR: 'General Staffing', DHR: 'Direct Hire' };
 
-            renderCompanyTable(tableData, groupBy);
-            renderTimeChart(timeSeries, 'Descending Revenue');
+            renderTable(report, tableData, groupBy);
+            renderTimeChart(timeSeries, reportLabels[report]);
         }
 
         // ── Render Table ──────────────────────────────────────────
-        function renderCompanyTable(data, groupBy) {
+        function renderTable(report, data, groupBy) {
             const thead = document.getElementById('table-header');
             if (groupBy === 'branch') {
-                thead.innerHTML = '<th>Branch</th><th style="text-align:right">Revenue</th>';
+                thead.innerHTML = '<th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Hours</th>';
             } else {
-                thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th>';
+                thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Hours</th>';
             }
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
-            const cols = groupBy === 'branch' ? 2 : 3;
+            const cols = (groupBy === 'branch' ? 1 : 2) + 2;
             if (!data.length) { tbody.innerHTML = `<tr><td colspan="${cols}" class="loading-indicator">No data.</td></tr>`; return; }
 
             let totalRevenue = 0;
+            let totalHours = 0;
+
             data.forEach(row => {
                 totalRevenue += row.revenue;
+                totalHours += row.hours || 0;
                 const tr = document.createElement('tr');
+                let html;
                 if (groupBy === 'branch') {
-                    tr.innerHTML = `<td>${row.name}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td>`;
+                    html = `<td>${row.name}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatNumber(row.hours || 0, 2)}</td>`;
                 } else {
-                    tr.innerHTML = `<td>${row.name}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td>`;
+                    html = `<td>${row.name}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency2(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatNumber(row.hours || 0, 2)}</td>`;
                 }
+                tr.innerHTML = html;
                 tbody.appendChild(tr);
             });
 
             const tfoot = document.getElementById('table-footer');
             tfoot.style.display = '';
             if (groupBy === 'branch') {
-                tfoot.innerHTML = `<tr><td style="font-weight:700">Total (${data.length} rows)</td><td style="text-align:right;font-weight:700">${formatCurrency2(totalRevenue)}</td></tr>`;
+                tfoot.innerHTML = `<tr><td style="font-weight:700">Total (${data.length} rows)</td><td style="text-align:right;font-weight:700">${formatCurrency2(totalRevenue)}</td><td style="text-align:right;font-weight:700">${formatNumber(totalHours, 2)}</td></tr>`;
             } else {
-                tfoot.innerHTML = `<tr><td style="font-weight:700">Total (${data.length} rows)</td><td></td><td style="text-align:right;font-weight:700">${formatCurrency2(totalRevenue)}</td></tr>`;
+                tfoot.innerHTML = `<tr><td style="font-weight:700">Total (${data.length} rows)</td><td></td><td style="text-align:right;font-weight:700">${formatCurrency2(totalRevenue)}</td><td style="text-align:right;font-weight:700">${formatNumber(totalHours, 2)}</td></tr>`;
             }
-            document.getElementById('print-total-bar').textContent = `Total Revenue: ${formatCurrency2(totalRevenue)} | ${data.length} rows`;
+            document.getElementById('print-total-bar').textContent = `Total Revenue: ${formatCurrency2(totalRevenue)} | Total Hours: ${formatNumber(totalHours, 2)} | ${data.length} rows`;
         }
 
         // ── Update Stats Bar ─────────────────────────────────────
@@ -432,7 +472,7 @@
             let forecastLabels = [];
             let forecastValues = [];
 
-            // Trendline (linear regression)
+            // Trendline
             let slope = 0, intercept = 0;
             if (values.length >= 2) {
                 const n = values.length;
@@ -547,10 +587,9 @@
         document.getElementById('apply-btn').addEventListener('click', loadData);
         document.getElementById('start_date').addEventListener('change', loadData);
         document.getElementById('end_date').addEventListener('change', loadData);
+        document.querySelectorAll('input[name="report_type"]').forEach(r => r.addEventListener('change', processData));
         document.getElementById('branch_filter').addEventListener('change', processData);
         document.getElementById('company_search').addEventListener('input', processData);
-        document.getElementById('dhp_filter').addEventListener('change', processData);
-        document.getElementById('gsp_filter').addEventListener('change', processData);
         document.getElementById('interval_select').addEventListener('change', processData);
         document.getElementById('graph_type').addEventListener('change', processData);
         document.getElementById('group_by').addEventListener('change', processData);
