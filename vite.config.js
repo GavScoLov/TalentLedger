@@ -1,21 +1,53 @@
-import { resolve } from 'path'
-import { defineConfig } from 'vite'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { defineConfig, loadEnv } from 'vite'
 
-export default defineConfig({
-  build: {
-    target: 'esnext',
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html'),
-        commission: resolve(__dirname, 'commission.html'),
-        dataVisualization: resolve(__dirname, 'data-visualization.html'),
-        profitLoss: resolve(__dirname, 'profit-loss.html'),
-        descendingRevenue: resolve(__dirname, 'descending-revenue.html'),
-        directHire: resolve(__dirname, 'direct-hire.html'),
-        generalStaffing: resolve(__dirname, 'general-staffing.html'),
-        psaProfitLoss: resolve(__dirname, 'psa-profit-loss.html'),
-        admin: resolve(__dirname, 'admin.html'),
+const __dirnameESM = dirname(fileURLToPath(import.meta.url))
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirnameESM, '')
+
+  return {
+    build: {
+      target: 'esnext',
+      rollupOptions: {
+        input: {
+          main: resolve(__dirnameESM, 'index.html'),
+          commission: resolve(__dirnameESM, 'commission.html'),
+          dataVisualization: resolve(__dirnameESM, 'data-visualization.html'),
+          profitLoss: resolve(__dirnameESM, 'profit-loss.html'),
+          descendingRevenue: resolve(__dirnameESM, 'descending-revenue.html'),
+          directHire: resolve(__dirnameESM, 'direct-hire.html'),
+          generalStaffing: resolve(__dirnameESM, 'general-staffing.html'),
+          psaProfitLoss: resolve(__dirnameESM, 'psa-profit-loss.html'),
+          admin: resolve(__dirnameESM, 'admin.html'),
+        },
       },
     },
-  },
+    server: {
+      proxy: {
+        '/api/psa': {
+          target: 'https://api.psastaffing.com',
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              // Extract endpoint from query string and rewrite the path
+              const reqUrl = new URL(req.url, 'http://localhost')
+              const endpoint = reqUrl.searchParams.get('endpoint') || ''
+              reqUrl.searchParams.delete('endpoint')
+              const remaining = reqUrl.searchParams.toString()
+              const newPath = endpoint + (remaining ? '?' + remaining : '')
+              proxyReq.path = newPath
+
+              const token = env.PSA_API_TOKEN || ''
+              if (token) {
+                proxyReq.setHeader('Authorization', `Bearer ${token}`)
+              }
+              proxyReq.setHeader('Accept', 'application/json')
+            })
+          },
+        },
+      },
+    },
+  }
 })

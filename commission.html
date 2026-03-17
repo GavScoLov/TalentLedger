@@ -10,64 +10,88 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .commission-layout {
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            grid-template-rows: auto 1fr;
-            gap: 20px;
-        }
-        .commission-filters {
-            grid-row: 1; grid-column: 1;
-            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-        }
-        .commission-filters .form-select,
-        .commission-filters .form-input { min-width: 150px; flex: 1; }
-        .commission-table-wrap {
-            grid-row: 2; grid-column: 1;
-            overflow-y: auto; max-height: calc(100vh - 260px);
-        }
-        .commission-form-panel {
-            grid-row: 1 / 3; grid-column: 2;
-            display: flex; flex-direction: column;
-        }
-        .producer-form-grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 12px; margin-bottom: 16px;
-        }
-        .producer-form-grid .form-group:first-child { grid-column: 1 / -1; }
-        #branches_container {
-            flex-grow: 1; overflow-y: auto; max-height: 400px;
-            padding-right: 8px; margin-bottom: 16px;
-            border-top: 1px solid var(--border-color); padding-top: 16px;
-        }
-        .branch-item {
-            background-color: var(--bg-default); padding: 10px; border-radius: 8px;
-            border: 1px solid var(--border-color); margin-bottom: 10px;
-        }
-        .branch-item .branch-header {
-            display: grid; grid-template-columns: auto 1fr 100px 100px auto;
-            align-items: center; gap: 10px;
-        }
-        .branch-item .branch-header label { font-weight: 600; color: var(--text-primary); cursor: pointer; }
-        .branch-item .branch-header input[type="number"] {
-            width: 70px; padding: 5px; border: 1px solid var(--border-color);
-            border-radius: 8px; text-align: center; font-size: 13px;
-        }
-        .custom-checkbox-button {
-            display: inline-block; cursor: pointer; width: 20px; height: 20px;
-            border: 2px solid var(--primary); border-radius: 4px; position: relative;
-            background-color: #fff; transition: all 0.2s; flex-shrink: 0;
-        }
-        .custom-checkbox-button.checked { background-color: var(--primary); border-color: var(--primary); }
-        .custom-checkbox-button.checked::after {
-            content: ''; position: absolute; top: 3px; left: 6px; width: 4px; height: 10px;
-            border: solid white; border-width: 0 3px 3px 0; transform: rotate(45deg);
-        }
-        .hidden-checkbox { display: none; }
-        .print-header, .total-header { display: none; }
-        .form-message { padding: 10px; margin-bottom: 15px; border-radius: 8px; text-align: center; font-weight: 600; }
+        .commission-layout { display: grid; grid-template-columns: 1fr 420px; grid-template-rows: auto 1fr; gap: 20px; }
+        .commission-filters { grid-row: 1; grid-column: 1; }
+        .commission-filters-inner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .commission-filters-inner .form-select, .commission-filters-inner .form-input { min-width: 130px; flex: 1; }
+        .commission-table-wrap { grid-row: 2; grid-column: 1; overflow-y: auto; max-height: calc(100vh - 260px); }
+        .commission-form-panel { grid-row: 1 / 3; grid-column: 2; display: flex; flex-direction: column; overflow-y: auto; max-height: calc(100vh - 140px); }
+        .print-header { display: none; }
+        .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .form-message { padding: 10px; margin-bottom: 12px; border-radius: 8px; text-align: center; font-weight: 600; font-size: 13px; }
         .form-message.success { background-color: #d4edda; color: #155724; }
         .form-message.error { background-color: #f8d7da; color: #721c24; }
+
+        /* Producer report multi-select dropdown */
+        .multi-select-wrap { position: relative; }
+        .multi-select-btn {
+            display: flex; align-items: center; justify-content: space-between;
+            width: 100%; padding: 8px 12px; border: 1px solid var(--border-color);
+            border-radius: var(--radius); background: #fff; cursor: pointer;
+            font-size: 0.875rem; color: var(--text-primary); min-height: 38px;
+        }
+        .multi-select-btn::after { content: '\25BC'; font-size: 10px; color: var(--text-secondary); }
+        .multi-select-dropdown {
+            display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+            background: var(--bg-paper); border: 1px solid var(--border-color);
+            border-radius: var(--radius); box-shadow: var(--shadow-md); max-height: 220px;
+            overflow-y: auto; margin-top: 4px;
+        }
+        .multi-select-dropdown.open { display: block; }
+        .multi-select-option {
+            display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+            cursor: pointer; font-size: 0.85rem; transition: background 0.15s;
+        }
+        .multi-select-option:hover { background: var(--bg-default); }
+        .multi-select-option input { accent-color: var(--primary); }
+
+        /* Branch group with companies */
+        .branch-group { margin-bottom: 14px; }
+        .branch-group-header {
+            display: flex; align-items: center; justify-content: space-between;
+            font-weight: 700; font-size: 13px; color: var(--primary-dark);
+            padding: 6px 10px; background: rgba(var(--primary-rgb), 0.06);
+            border-radius: 6px; margin-bottom: 6px; cursor: pointer; user-select: none;
+        }
+        .branch-group-header .toggle-icon {
+            font-size: 10px; transition: transform 0.2s; color: var(--text-secondary);
+        }
+        .branch-group-header.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .branch-group-body { overflow: hidden; transition: max-height 0.25s ease; }
+        .branch-group-body.collapsed { display: none; }
+        .branch-bulk-row {
+            display: grid; grid-template-columns: 1fr 70px 70px; gap: 6px;
+            align-items: center; padding: 5px 10px; margin-bottom: 4px;
+            background: rgba(var(--primary-rgb), 0.03); border-radius: 4px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        .branch-bulk-row span { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }
+        .bulk-apply-btn { font-size: 10px; padding: 2px 8px; margin-left: 4px; cursor: pointer; }
+        .company-row {
+            display: grid; grid-template-columns: 1fr 70px 70px; gap: 6px;
+            align-items: center; padding: 5px 10px; border-bottom: 1px solid var(--border-light);
+            font-size: 0.82rem;
+        }
+        .company-row:last-child { border-bottom: none; }
+        .company-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .company-name.dhp { color: var(--primary); font-weight: 600; }
+        .pct-input {
+            width: 100%; padding: 4px 6px; border: 1px solid var(--border-color);
+            border-radius: 6px; text-align: center; font-size: 12px; font-family: var(--font);
+        }
+        .pct-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.1); }
+        .pct-header { display: grid; grid-template-columns: 1fr 70px 70px; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .companies-scroll { max-height: calc(100vh - 460px); overflow-y: auto; padding-right: 4px; }
+
+        /* New producer modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            z-index: 1000; justify-content: center; align-items: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--bg-paper); border-radius: var(--radius-lg); padding: 28px; width: 90%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+        .modal h3 { margin: 0 0 16px; font-size: 1.1rem; }
+
         @media print {
             body { background-color: #fff !important; }
             .sidebar, .topbar, .commission-filters, .commission-form-panel { display: none !important; }
@@ -78,7 +102,7 @@
         }
         @media (max-width: 900px) {
             .commission-layout { grid-template-columns: 1fr; }
-            .commission-form-panel { grid-row: auto; grid-column: 1; }
+            .commission-form-panel { grid-row: auto; grid-column: 1; max-height: none; }
         }
     </style>
 </head>
@@ -87,22 +111,28 @@
         <div class="main-content">
             <div class="page-header">
                 <h1 class="page-title">Commission Report</h1>
-                <p class="page-subtitle">Track producer commissions by branch</p>
+                <p class="page-subtitle">Assign producer %'s and track billing by branch</p>
             </div>
             <div class="commission-layout">
-                <form id="filterForm">
-                    <div class="commission-filters">
-                        <select class="form-select" id="group_by" name="group_by">
-                            <option value="Producer" selected>Group By: Producer</option>
-                            <option value="Branch">Group By: Branch</option>
-                            <option value="Company">Group By: Company</option>
-                        </select>
-                        <input class="form-input" type="date" id="start_date" name="start_date">
-                        <input class="form-input" type="date" id="end_date" name="end_date">
-                        <button type="submit" class="btn btn-primary" id="apply_filters_button">Apply</button>
-                        <button type="button" class="btn btn-outlined" onclick="window.print()">Print</button>
+                <!-- LEFT: Filters + Table -->
+                <div class="commission-filters">
+                    <div class="card" style="padding:10px;">
+                        <div class="commission-filters-inner">
+                            <div class="multi-select-wrap" id="producer-report-wrap" style="min-width:200px;flex:1;">
+                                <div class="multi-select-btn" id="producer-report-btn">Add Producer to Report</div>
+                                <div class="multi-select-dropdown" id="producer-report-dropdown"></div>
+                            </div>
+                            <select class="form-select" id="group_by" name="group_by">
+                                <option value="Branch" selected>Group By: Branch</option>
+                                <option value="Company">Group By: Company</option>
+                            </select>
+                            <input class="form-input" type="date" id="start_date" name="start_date">
+                            <input class="form-input" type="date" id="end_date" name="end_date">
+                            <button type="button" class="btn btn-primary" id="apply-btn">Apply</button>
+                            <button type="button" class="btn btn-outlined" onclick="window.print()">Print</button>
+                        </div>
                     </div>
-                </form>
+                </div>
                 <div class="commission-table-wrap">
                     <div class="print-header" id="print-header">Commission Report</div>
                     <div class="card" style="padding:0;overflow:hidden;">
@@ -110,48 +140,60 @@
                             <thead>
                                 <tr>
                                     <th class="sortable" data-sort-type="text">Branch</th>
-                                    <th class="sortable" data-sort-type="text">Producer</th>
                                     <th class="sortable" data-sort-type="date">Weekend Bill</th>
                                     <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Billing</th>
-                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Hours</th>
-                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Commission</th>
-                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Commission</th>
+                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Billing</th>
+                                    <th class="sortable" data-sort-type="numeric" style="text-align:right">Total</th>
                                 </tr>
                             </thead>
-                            <tbody id="commission_table_body"></tbody>
+                            <tbody id="commission_table_body">
+                                <tr><td colspan="5" class="loading-indicator">Loading data...</td></tr>
+                            </tbody>
                         </table>
                     </div>
-                    <div class="total-footer" id="total-footer"></div>
+                    <div id="total-footer" style="background:var(--primary);color:#fff;padding:8px 12px;border-radius:0 0 8px 8px;text-align:center;font-weight:700;font-size:15px;"></div>
                 </div>
+
+                <!-- RIGHT: Producer Commission Panel -->
                 <div class="card commission-form-panel">
-                    <h3 style="margin:0 0 16px;color:var(--text-primary);text-align:center;">Producer Commission Settings</h3>
-                    <form id="producerCommissionForm">
-                        <div class="producer-form-grid">
-                            <div class="form-group">
-                                <label class="form-label" for="producer_name_input">Producer Name</label>
-                                <input class="form-input" type="text" id="producer_name_input" placeholder="e.g., John Doe" name="producer_name" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="commission_start_date">Start Date</label>
-                                <input class="form-input" type="date" id="commission_start_date" name="commission_start_date" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="commission_end_date">End Date</label>
-                                <input class="form-input" type="date" id="commission_end_date" name="commission_end_date">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Edit Producer?</label>
-                                <select class="form-select" id="existing_producer_select">
-                                    <option value="">-- Select Producer --</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="branches_container">
-                            <p style="color:var(--text-secondary);text-align:center;">Branch commission settings will load once a data source table is created in Supabase.</p>
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="width:100%;" name="submit_producer_commissions">Save Producer Commission</button>
-                    </form>
+                    <h3 style="margin:0 0 12px;color:var(--text-primary);text-align:center;">Producer Commission Settings</h3>
+                    <div id="form-message" class="form-message" style="display:none;"></div>
+
+                    <!-- Producer selector -->
+                    <div style="display:flex;gap:8px;margin-bottom:12px;">
+                        <select class="form-select" id="producer_select" style="flex:1;">
+                            <option value="">-- Select Producer --</option>
+                        </select>
+                        <button type="button" class="btn btn-outlined btn-sm" id="new-producer-btn" title="Add new producer">+ New</button>
+                    </div>
+
+                    <!-- Company assignments by branch -->
+                    <div class="pct-header">
+                        <span>Company</span>
+                        <span style="text-align:center;">DHP %</span>
+                        <span style="text-align:center;">GSP %</span>
+                    </div>
+                    <div class="companies-scroll" id="companies-container">
+                        <p style="color:var(--text-secondary);text-align:center;padding:20px;font-size:13px;">Select a producer or create a new one to assign commission percentages.</p>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px;" id="save-commissions-btn">Save Commissions</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Producer Modal -->
+    <div class="modal-overlay" id="new-producer-modal">
+        <div class="modal">
+            <h3>Add New Producer</h3>
+            <div class="form-group">
+                <label class="form-label" for="new_producer_name">Producer Name</label>
+                <input class="form-input" type="text" id="new_producer_name" placeholder="e.g., John Doe" required>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" class="btn btn-outlined" id="cancel-new-producer">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-new-producer">Add Producer</button>
             </div>
         </div>
     </div>
@@ -161,80 +203,545 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
+        import { fetchInvoiceRegister, fetchTotalBillingByCompany, formatCurrency, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+        import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
         await checkPageAccess('commission');
         renderNavbar();
         await renderSidebar();
         initInactivityTimer();
-    </script>
-    <script>
-        Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.color = '#6B7280';
 
-        const sampleCommissionData = [
-            { branch: 'Austell', producer: 'John Doe', weekend_bill: '2025-01-05', dhp_billing: 15000, gsp_hours: 320, dhp_commission: 750, gsp_commission: 480 },
-            { branch: 'Rome', producer: 'Jane Smith', weekend_bill: '2025-01-05', dhp_billing: 12000, gsp_hours: 280, dhp_commission: 600, gsp_commission: 420 },
-            { branch: 'Kennesaw', producer: 'Bob Wilson', weekend_bill: '2025-01-12', dhp_billing: 18000, gsp_hours: 400, dhp_commission: 900, gsp_commission: 600 },
-        ];
+        // ── State ────────────────────────────────────────────────
+        let rawData = [];
+        let producers = [];
+        let commissions = []; // { producer_id, company_name, branch, dhp_pct, gsp_pct }
+        let companiesByBranch = {}; // { branch: [{ company, isDHP }] }
+        let selectedProducerId = '';
+        let reportProducerIds = []; // producers selected for report
+        let tablesOk = false;
 
-        function renderCommissionTable(data) {
-            const tbody = document.getElementById('commission_table_body');
-            tbody.innerHTML = '';
-            data.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row.branch}</td>
-                    <td>${row.producer}</td>
-                    <td>${row.weekend_bill}</td>
-                    <td style="text-align:right;font-weight:600">${row.dhp_billing.toFixed(2)}</td>
-                    <td style="text-align:right;font-weight:600">${row.gsp_hours.toFixed(2)}</td>
-                    <td style="text-align:right;font-weight:600">${row.dhp_commission.toFixed(2)}</td>
-                    <td style="text-align:right;font-weight:600">${row.gsp_commission.toFixed(2)}</td>
-                `;
-                tbody.appendChild(tr);
+        document.getElementById('start_date').value = getDefaultStartDate();
+        document.getElementById('end_date').value = getDefaultEndDate();
+
+        // ── Supabase: ensure tables exist & load data ─────────────
+        async function ensureTables() {
+            const [r1, r2, r3] = await Promise.all([
+                supabase.from('producers').select('id').limit(1),
+                supabase.from('companies').select('id').limit(1),
+                supabase.from('producer_commissions').select('id').limit(1),
+            ]);
+            if (r1.error || r2.error || r3.error) {
+                showMessage('Supabase tables not found. Run supabase-setup.sql in the Supabase SQL Editor to create them.', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        async function loadProducers() {
+            const { data, error } = await supabase.from('producers').select('*').order('name');
+            if (error) { console.error('producers load error:', error); return; }
+            producers = data || [];
+            populateProducerDropdowns();
+        }
+
+        async function loadCommissions(producerId) {
+            if (!producerId) { commissions = []; return; }
+            const { data, error } = await supabase
+                .from('producer_commissions')
+                .select('*')
+                .eq('producer_id', producerId);
+            if (error) { console.error('commissions load error:', error); return; }
+            commissions = data || [];
+        }
+
+        async function saveProducer(name) {
+            const { data, error } = await supabase
+                .from('producers')
+                .insert({ name })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        async function saveCommissionsBatch(producerId, entries) {
+            // Delete existing for this producer, then insert new
+            await supabase.from('producer_commissions').delete().eq('producer_id', producerId);
+            if (entries.length === 0) return;
+            const rows = entries.map(e => ({
+                producer_id: producerId,
+                company_name: e.company_name,
+                branch: e.branch,
+                dhp_pct: e.dhp_pct,
+                gsp_pct: e.gsp_pct,
+            }));
+            const { error } = await supabase.from('producer_commissions').insert(rows);
+            if (error) throw error;
+        }
+
+        // ── UI Helpers ───────────────────────────────────────────
+        function showMessage(msg, type = 'success') {
+            const el = document.getElementById('form-message');
+            el.textContent = msg;
+            el.className = `form-message ${type}`;
+            el.style.display = 'block';
+            if (type === 'success') setTimeout(() => { el.style.display = 'none'; }, 3000);
+        }
+
+        function populateProducerDropdowns() {
+            // Main producer select
+            const sel = document.getElementById('producer_select');
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">-- Select Producer --</option>';
+            producers.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id; opt.textContent = p.name;
+                if (String(p.id) === cur) opt.selected = true;
+                sel.appendChild(opt);
+            });
+
+            // Report multi-select checkboxes
+            const dropdown = document.getElementById('producer-report-dropdown');
+            dropdown.innerHTML = '';
+            producers.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'multi-select-option';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = p.id;
+                cb.checked = reportProducerIds.includes(String(p.id));
+                cb.addEventListener('change', () => {
+                    if (cb.checked) { if (!reportProducerIds.includes(String(p.id))) reportProducerIds.push(String(p.id)); }
+                    else { reportProducerIds = reportProducerIds.filter(id => id !== String(p.id)); }
+                    updateReportBtn();
+                    processData();
+                });
+                const lbl = document.createElement('span');
+                lbl.textContent = p.name;
+                div.appendChild(cb);
+                div.appendChild(lbl);
+                dropdown.appendChild(div);
             });
         }
 
-        const today = new Date();
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        document.getElementById('start_date').value = lastMonth.toISOString().split('T')[0];
-        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+        function updateReportBtn() {
+            const btn = document.getElementById('producer-report-btn');
+            if (reportProducerIds.length === 0) {
+                btn.textContent = 'Add Producer to Report';
+            } else {
+                const names = producers.filter(p => reportProducerIds.includes(String(p.id))).map(p => p.name);
+                btn.textContent = names.join(', ');
+            }
+        }
 
-        renderCommissionTable(sampleCommissionData);
+        // ── Persistent company list (synced to Supabase) ─────────
+        async function syncCompaniesToSupabase() {
+            // Collect unique company+branch pairs from current API data
+            const seen = new Map();
+            rawData.forEach(r => {
+                const branch = r.branchname || 'Unknown';
+                const company = r.customername || 'Unknown';
+                const key = `${company}||${branch}`;
+                if (!seen.has(key)) {
+                    seen.set(key, {
+                        company_name: company,
+                        branch,
+                        is_dhp: company.toUpperCase().includes('DHP'),
+                    });
+                }
+            });
 
-        document.getElementById('filterForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Commission filters will be connected once a commissions table is created in Supabase.');
-        });
+            // Upsert new companies (ignore conflicts on existing ones)
+            const rows = [...seen.values()];
+            if (rows.length > 0) {
+                await supabase
+                    .from('companies')
+                    .upsert(rows, { onConflict: 'company_name,branch', ignoreDuplicates: true });
+            }
+        }
 
-        document.getElementById('producerCommissionForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Producer commission settings will be connected once a producer_commissions table is created in Supabase.');
-        });
+        async function loadCompaniesFromSupabase() {
+            const { data, error } = await supabase
+                .from('companies')
+                .select('*')
+                .order('branch')
+                .order('company_name');
+            if (error) { console.error('companies load error:', error); return; }
 
-        document.querySelectorAll('.sortable').forEach(th => {
-            th.addEventListener('click', () => {
-                const table = th.closest('table');
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr'));
-                const colIndex = Array.from(th.parentNode.children).indexOf(th);
-                const isAsc = th.classList.contains('sort-asc');
+            companiesByBranch = {};
+            (data || []).forEach(c => {
+                if (!companiesByBranch[c.branch]) companiesByBranch[c.branch] = [];
+                companiesByBranch[c.branch].push({
+                    company: c.company_name,
+                    isDHP: c.is_dhp,
+                });
+            });
+        }
 
-                table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
-                th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+        function renderCompanyPanel() {
+            const container = document.getElementById('companies-container');
+            // Filter out _Corporate branches
+            const branches = Object.keys(companiesByBranch).filter(b => !b.includes('_Corporate'));
+            if (branches.length === 0 || !selectedProducerId) {
+                container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;font-size:13px;">Select a producer and load data to assign commission percentages.</p>';
+                return;
+            }
 
-                rows.sort((a, b) => {
-                    const aVal = a.children[colIndex].textContent.trim();
-                    const bVal = b.children[colIndex].textContent.trim();
-                    const sortType = th.dataset.sortType;
-                    if (sortType === 'numeric') return (isAsc ? -1 : 1) * (parseFloat(aVal.replace(/,/g, '')) - parseFloat(bVal.replace(/,/g, '')));
-                    return (isAsc ? -1 : 1) * aVal.localeCompare(bVal);
+            // Build a lookup from current commissions
+            const lookup = {};
+            commissions.forEach(c => {
+                lookup[`${c.branch}||${c.company_name}`] = c;
+            });
+
+            container.innerHTML = '';
+            branches.forEach(branch => {
+                const group = document.createElement('div');
+                group.className = 'branch-group';
+
+                // Collapsible header
+                const header = document.createElement('div');
+                header.className = 'branch-group-header';
+                header.innerHTML = `<span>${branch} (${companiesByBranch[branch].length})</span><span class="toggle-icon">▼</span>`;
+                header.addEventListener('click', () => {
+                    header.classList.toggle('collapsed');
+                    body.classList.toggle('collapsed');
+                });
+                group.appendChild(header);
+
+                // Body (contains bulk row + company rows)
+                const body = document.createElement('div');
+                body.className = 'branch-group-body';
+
+                // Branch-wide bulk edit row
+                const bulkRow = document.createElement('div');
+                bulkRow.className = 'branch-bulk-row';
+                bulkRow.innerHTML = `
+                    <span>Set All <button type="button" class="btn btn-primary btn-sm bulk-apply-btn" data-bulk-branch="${branch}">Apply</button></span>
+                    <input type="number" class="pct-input bulk-dhp" data-bulk-branch="${branch}" min="0" max="100" step="0.5" placeholder="DHP %">
+                    <input type="number" class="pct-input bulk-gsp" data-bulk-branch="${branch}" min="0" max="100" step="0.5" placeholder="GSP %">
+                `;
+                body.appendChild(bulkRow);
+
+                // Apply bulk handler
+                bulkRow.querySelector('.bulk-apply-btn').addEventListener('click', () => {
+                    const dhpVal = bulkRow.querySelector('.bulk-dhp').value;
+                    const gspVal = bulkRow.querySelector('.bulk-gsp').value;
+                    body.querySelectorAll('.company-row .pct-input').forEach(inp => {
+                        if (dhpVal !== '' && inp.dataset.type === 'dhp') inp.value = dhpVal;
+                        if (gspVal !== '' && inp.dataset.type === 'gsp') inp.value = gspVal;
+                    });
                 });
 
-                rows.forEach(row => tbody.appendChild(row));
+                companiesByBranch[branch].forEach(({ company, isDHP }) => {
+                    const key = `${branch}||${company}`;
+                    const existing = lookup[key];
+                    const row = document.createElement('div');
+                    row.className = 'company-row';
+                    row.innerHTML = `
+                        <span class="company-name ${isDHP ? 'dhp' : ''}" title="${company}">${company}</span>
+                        <input type="number" class="pct-input" data-branch="${branch}" data-company="${company}" data-type="dhp"
+                            min="0" max="100" step="0.5" value="${existing?.dhp_pct ?? ''}" placeholder="%">
+                        <input type="number" class="pct-input" data-branch="${branch}" data-company="${company}" data-type="gsp"
+                            min="0" max="100" step="0.5" value="${existing?.gsp_pct ?? ''}" placeholder="%">
+                    `;
+                    body.appendChild(row);
+                });
+
+                group.appendChild(body);
+                container.appendChild(group);
             });
+        }
+
+        // ── Data loading ─────────────────────────────────────────
+        async function loadData() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            if (!startDate || !endDate) return;
+            document.getElementById('commission_table_body').innerHTML = '<tr><td colspan="5" class="loading-indicator">Loading data...</td></tr>';
+            try {
+                rawData = await fetchInvoiceRegister(startDate, endDate);
+                // Sync any new companies to the persistent list, then load all
+                if (tablesOk) {
+                    await syncCompaniesToSupabase();
+                    await loadCompaniesFromSupabase();
+                }
+                renderCompanyPanel();
+                processData();
+            } catch (err) {
+                document.getElementById('commission_table_body').innerHTML = `<tr><td colspan="5" class="loading-indicator" style="color:#DC2626">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function processData() {
+            const groupBy = document.getElementById('group_by').value;
+            const agg = {};
+
+            rawData.forEach(r => {
+                const key = groupBy === 'Branch'
+                    ? `${r.branchname || 'Unknown'}||${r.weekendbill || ''}`
+                    : `${r.customername || 'Unknown'}||${r.weekendbill || ''}`;
+                const isDHP = (r.customername || '').toUpperCase().includes('DHP');
+                if (!agg[key]) agg[key] = { label: groupBy === 'Branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown'), weekend: r.weekendbill || '', dhp: 0, gsp: 0 };
+                if (isDHP) agg[key].dhp += Number(r.invoiceamount) || 0;
+                else agg[key].gsp += Number(r.invoiceamount) || 0;
+            });
+
+            const rows = Object.values(agg).sort((a, b) => b.weekend.localeCompare(a.weekend) || (b.dhp + b.gsp) - (a.dhp + a.gsp));
+            renderTable(rows, groupBy);
+        }
+
+        function renderTable(rows, groupBy) {
+            const tbody = document.getElementById('commission_table_body');
+            const headers = document.querySelectorAll('#commission_table thead tr th');
+
+            // If producers are selected for report, add commission columns
+            const selectedProducers = producers.filter(p => reportProducerIds.includes(String(p.id)));
+
+            // Build header
+            const headRow = document.querySelector('#commission_table thead tr');
+            headRow.innerHTML = `
+                <th class="sortable" data-sort-type="text">${groupBy}</th>
+                <th class="sortable" data-sort-type="date">Weekend Bill</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">DHP Billing</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">GSP Billing</th>
+                <th class="sortable" data-sort-type="numeric" style="text-align:right">Total</th>
+            `;
+            selectedProducers.forEach(p => {
+                const th = document.createElement('th');
+                th.style.textAlign = 'right';
+                th.textContent = `${p.name} Commission`;
+                headRow.appendChild(th);
+            });
+
+            // Load all commissions for selected producers
+            const commissionLookups = {};
+            selectedProducers.forEach(p => { commissionLookups[p.id] = {}; });
+
+            // We need to fetch commissions for report producers
+            // For now, use in-memory data if loaded, else show $0
+            tbody.innerHTML = '';
+            let totalAll = 0;
+            const colSpan = 5 + selectedProducers.length;
+
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="loading-indicator">No data.</td></tr>`;
+            } else {
+                rows.forEach(row => {
+                    const total = row.dhp + row.gsp;
+                    totalAll += total;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.label}</td>
+                        <td>${row.weekend}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency(row.dhp)}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency(row.gsp)}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency(total)}</td>
+                    `;
+                    // Commission columns would need producer_commissions data per producer
+                    // This will be calculated once we have the data
+                    selectedProducers.forEach(() => {
+                        const td = document.createElement('td');
+                        td.style.textAlign = 'right';
+                        td.style.fontWeight = '600';
+                        td.textContent = '--';
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById('total-footer').textContent = `Total: ${formatCurrency(totalAll)}`;
+
+            // Re-attach sort listeners
+            attachSortListeners();
+
+            // Load commission data for report producers and recalculate
+            if (selectedProducers.length > 0) loadReportCommissions(rows, selectedProducers, groupBy);
+        }
+
+        async function loadReportCommissions(rows, selectedProducers, groupBy) {
+            // Fetch commissions for all selected producers
+            const ids = selectedProducers.map(p => p.id);
+            const { data, error } = await supabase
+                .from('producer_commissions')
+                .select('*')
+                .in('producer_id', ids);
+            if (error) { console.error('report commissions error:', error); return; }
+
+            // Build lookup: { producerId: { "branch||company": { dhp_pct, gsp_pct } } }
+            const lookup = {};
+            ids.forEach(id => { lookup[id] = {}; });
+            (data || []).forEach(c => {
+                if (!lookup[c.producer_id]) lookup[c.producer_id] = {};
+                lookup[c.producer_id][`${c.branch}||${c.company_name}`] = c;
+            });
+
+            // Now we need to calculate commission per row
+            // For each row (branch+weekend or company+weekend), sum up the commission
+            const tbody = document.getElementById('commission_table_body');
+            const tableRows = tbody.querySelectorAll('tr');
+
+            // We need raw data grouped the same way to calculate per-company billing
+            tableRows.forEach((tr, idx) => {
+                if (idx >= rows.length) return;
+                const row = rows[idx];
+
+                selectedProducers.forEach((producer, pIdx) => {
+                    const pLookup = lookup[producer.id] || {};
+                    let commTotal = 0;
+
+                    // Find all raw invoices matching this row
+                    rawData.forEach(r => {
+                        const matchLabel = groupBy === 'Branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown');
+                        const matchWeekend = r.weekendbill || '';
+                        if (matchLabel !== row.label || matchWeekend !== row.weekend) return;
+
+                        const branch = r.branchname || 'Unknown';
+                        const company = r.customername || 'Unknown';
+                        const isDHP = company.toUpperCase().includes('DHP');
+                        const amount = Number(r.invoiceamount) || 0;
+
+                        // Find commission % for this company
+                        const comm = pLookup[`${branch}||${company}`];
+                        if (comm) {
+                            const pct = isDHP ? (comm.dhp_pct || 0) : (comm.gsp_pct || 0);
+                            commTotal += amount * pct / 100;
+                        }
+                    });
+
+                    // Update the cell (5 base columns + producer index)
+                    const cell = tr.children[5 + pIdx];
+                    if (cell) {
+                        cell.textContent = formatCurrency(commTotal);
+                        cell.style.color = commTotal > 0 ? '#16A34A' : 'var(--text-secondary)';
+                    }
+                });
+            });
+        }
+
+        function attachSortListeners() {
+            document.querySelectorAll('#commission_table .sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const table = th.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    const colIndex = Array.from(th.parentNode.children).indexOf(th);
+                    const isAsc = th.classList.contains('sort-asc');
+                    table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                    th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+                    rows.sort((a, b) => {
+                        const aVal = a.children[colIndex]?.textContent.trim() || '';
+                        const bVal = b.children[colIndex]?.textContent.trim() || '';
+                        if (th.dataset.sortType === 'numeric') return (isAsc ? -1 : 1) * (parseFloat(aVal.replace(/[$,]/g, '')) - parseFloat(bVal.replace(/[$,]/g, '')));
+                        return (isAsc ? -1 : 1) * aVal.localeCompare(bVal);
+                    });
+                    rows.forEach(row => tbody.appendChild(row));
+                });
+            });
+        }
+
+        // ── Event listeners ──────────────────────────────────────
+        document.getElementById('apply-btn').addEventListener('click', loadData);
+        document.getElementById('group_by').addEventListener('change', processData);
+
+        // Producer select
+        document.getElementById('producer_select').addEventListener('change', async (e) => {
+            selectedProducerId = e.target.value;
+            if (selectedProducerId) {
+                await loadCommissions(selectedProducerId);
+            } else {
+                commissions = [];
+            }
+            renderCompanyPanel();
         });
+
+        // Save commissions
+        document.getElementById('save-commissions-btn').addEventListener('click', async () => {
+            if (!selectedProducerId) { showMessage('Please select a producer first.', 'error'); return; }
+
+            const inputs = document.querySelectorAll('.pct-input');
+            const entries = [];
+            const seen = new Set();
+
+            inputs.forEach(inp => {
+                const branch = inp.dataset.branch;
+                const company = inp.dataset.company;
+                const type = inp.dataset.type;
+                const key = `${branch}||${company}`;
+
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    const dhpInp = document.querySelector(`.pct-input[data-branch="${CSS.escape(branch)}"][data-company="${CSS.escape(company)}"][data-type="dhp"]`);
+                    const gspInp = document.querySelector(`.pct-input[data-branch="${CSS.escape(branch)}"][data-company="${CSS.escape(company)}"][data-type="gsp"]`);
+                    const dhpVal = parseFloat(dhpInp?.value) || 0;
+                    const gspVal = parseFloat(gspInp?.value) || 0;
+                    if (dhpVal > 0 || gspVal > 0) {
+                        entries.push({ company_name: company, branch, dhp_pct: dhpVal, gsp_pct: gspVal });
+                    }
+                }
+            });
+
+            try {
+                await saveCommissionsBatch(selectedProducerId, entries);
+                showMessage(`Saved ${entries.length} commission assignments.`, 'success');
+                await loadCommissions(selectedProducerId);
+            } catch (err) {
+                showMessage(`Error saving: ${err.message}`, 'error');
+            }
+        });
+
+        // Multi-select dropdown toggle
+        document.getElementById('producer-report-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('producer-report-dropdown').classList.toggle('open');
+        });
+        document.addEventListener('click', () => {
+            document.getElementById('producer-report-dropdown').classList.remove('open');
+        });
+        document.getElementById('producer-report-dropdown').addEventListener('click', (e) => { e.stopPropagation(); });
+
+        // New producer modal
+        document.getElementById('new-producer-btn').addEventListener('click', () => {
+            document.getElementById('new-producer-modal').classList.add('open');
+            document.getElementById('new_producer_name').value = '';
+            document.getElementById('new_producer_name').focus();
+        });
+        document.getElementById('cancel-new-producer').addEventListener('click', () => {
+            document.getElementById('new-producer-modal').classList.remove('open');
+        });
+        document.getElementById('new-producer-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+        });
+        document.getElementById('confirm-new-producer').addEventListener('click', async () => {
+            const name = document.getElementById('new_producer_name').value.trim();
+            if (!name) return;
+            try {
+                const newProducer = await saveProducer(name);
+                await loadProducers();
+                // Select the new producer
+                document.getElementById('producer_select').value = newProducer.id;
+                selectedProducerId = String(newProducer.id);
+                commissions = [];
+                renderCompanyPanel();
+                document.getElementById('new-producer-modal').classList.remove('open');
+                showMessage(`Producer "${name}" created.`, 'success');
+            } catch (err) {
+                showMessage(`Error creating producer: ${err.message}`, 'error');
+            }
+        });
+        // Allow Enter key in modal
+        document.getElementById('new_producer_name').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('confirm-new-producer').click(); }
+        });
+
+        // ── Init ─────────────────────────────────────────────────
+        tablesOk = await ensureTables();
+        if (tablesOk) {
+            await loadProducers();
+            await loadCompaniesFromSupabase();
+            renderCompanyPanel();
+        }
+        setTimeout(() => loadData(), 100);
     </script>
 </body>
 </html>

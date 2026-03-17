@@ -10,33 +10,24 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .report-layout {
-            display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto 1fr; gap: 16px;
-        }
+        .report-layout { display: grid; grid-template-columns: 35% 1fr; grid-template-rows: auto 1fr; gap: 16px; }
         .report-tabs { grid-row: 1; grid-column: 1 / 3; }
         .report-table-section { grid-row: 2; grid-column: 1; display: flex; flex-direction: column; }
         .report-chart-section { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; }
         .filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; }
         .table-scroll { overflow-y: auto; max-height: calc(100vh - 340px); }
-        .total-bar {
-            background-color: var(--primary); color: #fff; padding: 8px 12px;
-            border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px;
-        }
+        .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px; }
         .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
         .radio-group { display: flex; gap: 12px; align-items: center; padding: 4px 12px; }
         .radio-group label { color: var(--text-primary); font-weight: 500; cursor: pointer; font-size: 14px; }
-        @media (max-width: 900px) {
-            .report-layout { grid-template-columns: 1fr; }
-            .report-chart-section { grid-column: 1; }
-        }
+        .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
+        @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } .report-chart-section { grid-column: 1; } }
     </style>
 </head>
 <body>
     <div class="app-layout">
         <div class="main-content">
-            <div class="page-header">
-                <h1 class="page-title">Profit & Loss</h1>
-            </div>
+            <div class="page-header"><h1 class="page-title">Profit & Loss</h1></div>
             <div class="report-layout">
                 <div class="report-tabs">
                     <div class="card" style="padding:8px;">
@@ -48,7 +39,6 @@
                             <div style="flex:1;display:flex;gap:6px;justify-content:flex-end;align-items:center;">
                                 <input class="form-input" type="date" id="start_date" style="max-width:150px;">
                                 <input class="form-input" type="date" id="end_date" style="max-width:150px;">
-                                <input class="form-input" type="text" id="company_search" placeholder="Search company..." style="max-width:180px;">
                             </div>
                         </div>
                     </div>
@@ -56,140 +46,149 @@
                 <div class="report-table-section">
                     <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
                         <div class="filter-bar">
-                            <select class="form-select" id="table_branch_filter">
-                                <option value="all" selected>All Branches</option>
-                                <option value="Austell">Austell</option>
-                                <option value="Rome">Rome</option>
-                                <option value="Kennesaw">Kennesaw</option>
-                            </select>
-                            <span class="btn btn-outlined" style="cursor:pointer;padding:6px 12px;" onclick="applyFilters()">DHP</span>
-                            <span class="btn btn-outlined" style="cursor:pointer;padding:6px 12px;">GSP</span>
-                            <button class="btn btn-primary" type="button" onclick="applyFilters()" style="padding:6px 16px;">Apply</button>
+                            <select class="form-select" id="table_branch_filter"><option value="all" selected>All Branches</option></select>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" id="dhp_filter"> DHP</label>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" id="gsp_filter"> GSP</label>
+                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
                         </div>
                         <div class="table-scroll">
                             <table class="data-table" id="branch-table">
-                                <thead>
-                                    <tr>
-                                        <th>Branch</th>
-                                        <th style="text-align:right">Revenue</th>
-                                        <th style="text-align:right">Profit</th>
-                                        <th style="text-align:right">Overhead</th>
-                                        <th style="text-align:right">Net</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="branch-table-body"></tbody>
+                                <thead><tr><th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Gross Pay</th><th style="text-align:right">Profit</th></tr></thead>
+                                <tbody id="branch-table-body"><tr><td colspan="4" class="loading-indicator">Loading data...</td></tr></tbody>
                             </table>
                         </div>
-                        <div class="total-bar" id="total-revenue">Total Revenue: $0.00</div>
+                        <div class="total-bar" id="total-revenue">Total Revenue: $0</div>
                     </div>
                 </div>
                 <div class="report-chart-section">
                     <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
                         <div class="filter-bar">
-                            <select class="form-select" id="graph_branch_filter">
-                                <option value="all" selected>All Branches</option>
-                                <option value="Austell">Austell</option>
-                                <option value="Rome">Rome</option>
-                                <option value="Kennesaw">Kennesaw</option>
-                            </select>
-                            <select class="form-select" id="graph_type">
-                                <option value="bar" selected>Bar</option>
-                                <option value="line">Line</option>
-                            </select>
-                            <select class="form-select" id="graph_interval">
-                                <option value="weekly" selected>Weekly</option>
-                                <option value="monthly">Monthly</option>
-                            </select>
-                            <button class="btn btn-primary" type="button" onclick="applyGraphFilters()" style="padding:6px 16px;">Apply</button>
+                            <select class="form-select" id="graph_type"><option value="bar" selected>Bar</option><option value="line">Line</option></select>
+                            <select class="form-select" id="graph_interval"><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select>
                         </div>
                         <div class="radio-group">
                             <label><input type="radio" name="plg_radio" value="All" checked> All</label>
                             <label><input type="radio" name="plg_radio" value="DHP"> DHP</label>
                             <label><input type="radio" name="plg_radio" value="GSP"> GSP</label>
                         </div>
-                        <div class="chart-wrap">
-                            <canvas id="profitLossChart"></canvas>
-                        </div>
+                        <div class="chart-wrap"><canvas id="profitLossChart"></canvas></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
     <script type="module">
         import { checkAuth, checkPageAccess } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
+        import { fetchInvoiceRegister, fetchTotalBillingByBranch, formatCurrency, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
 
         await checkAuth();
         await checkPageAccess('profit-loss');
         renderNavbar();
         await renderSidebar();
         initInactivityTimer();
-    </script>
-    <script>
+
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
 
-        const sampleBranches = ['Austell', 'Rome', 'Kennesaw', 'Cartersville', 'Adairsville'];
-        const sampleRevenue = [52000, 38000, 45000, 28000, 31000];
-        const sampleProfit = [7800, 5700, 6750, 4200, 4650];
-        const sampleOverhead = [3500, 2800, 3200, 2100, 2400];
+        let rawInvoices = [];
+        let branchSummary = [];
+        let profitLossChart = null;
 
-        const today = new Date();
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        document.getElementById('start_date').value = lastMonth.toISOString().split('T')[0];
-        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+        document.getElementById('start_date').value = getDefaultStartDate();
+        document.getElementById('end_date').value = getDefaultEndDate();
 
-        function renderBranchTable() {
+        async function loadData() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            if (!startDate || !endDate) return;
+            document.getElementById('branch-table-body').innerHTML = '<tr><td colspan="4" class="loading-indicator">Loading data...</td></tr>';
+            try {
+                const [invoices, billingData] = await Promise.all([
+                    fetchInvoiceRegister(startDate, endDate),
+                    fetchTotalBillingByBranch(startDate, endDate),
+                ]);
+                rawInvoices = invoices;
+                const revenueByBranch = {};
+                invoices.forEach(r => { const b = r.branchname || 'Unknown'; revenueByBranch[b] = (revenueByBranch[b] || 0) + (Number(r.invoiceamount) || 0); });
+                const grossByBranch = {};
+                billingData.forEach(r => { const b = r.branch || 'Unknown'; grossByBranch[b] = (grossByBranch[b] || 0) + (Number(r.total_billing) || 0); });
+                const allBranches = new Set([...Object.keys(revenueByBranch), ...Object.keys(grossByBranch)]);
+                branchSummary = [...allBranches].map(b => {
+                    const revenue = revenueByBranch[b] || 0;
+                    const grossPay = grossByBranch[b] || 0;
+                    return { branch: b, revenue, grossPay, profit: revenue - grossPay };
+                }).sort((a, b) => b.revenue - a.revenue);
+                populateBranchFilter();
+                processData();
+            } catch (err) {
+                document.getElementById('branch-table-body').innerHTML = `<tr><td colspan="4" class="loading-indicator" style="color:#DC2626">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function populateBranchFilter() {
+            const sel = document.getElementById('table_branch_filter');
+            const cur = sel.value;
+            sel.innerHTML = '<option value="all">All Branches</option>';
+            branchSummary.forEach(b => { const o = document.createElement('option'); o.value = b.branch; o.textContent = b.branch; if (b.branch === cur) o.selected = true; sel.appendChild(o); });
+        }
+
+        function processData() {
+            const bf = document.getElementById('table_branch_filter').value;
+            const filtered = bf === 'all' ? branchSummary : branchSummary.filter(b => b.branch === bf);
+            renderTable(filtered);
+            renderChart();
+        }
+
+        function renderTable(data) {
             const tbody = document.getElementById('branch-table-body');
             tbody.innerHTML = '';
-            let total = 0;
-            sampleBranches.forEach((branch, i) => {
-                total += sampleRevenue[i];
-                const net = sampleProfit[i] - sampleOverhead[i];
+            let totalRev = 0;
+            if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">No data.</td></tr>'; }
+            else data.forEach(row => {
+                totalRev += row.revenue;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${branch}</td>
-                    <td style="text-align:right;font-weight:600">$${sampleRevenue[i].toLocaleString()}</td>
-                    <td style="text-align:right;font-weight:600">$${sampleProfit[i].toLocaleString()}</td>
-                    <td style="text-align:right;font-weight:600">$${sampleOverhead[i].toLocaleString()}</td>
-                    <td style="text-align:right;font-weight:600;color:${net >= 0 ? '#059669' : '#DC2626'}">$${net.toLocaleString()}</td>
-                `;
+                tr.innerHTML = `<td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.grossPay)}</td><td style="text-align:right;font-weight:600;color:${row.profit >= 0 ? '#059669' : '#DC2626'}">${formatCurrency(row.profit)}</td>`;
                 tbody.appendChild(tr);
             });
-            document.getElementById('total-revenue').textContent = `Total Revenue: $${total.toLocaleString()}`;
+            document.getElementById('total-revenue').textContent = `Total Revenue: ${formatCurrency(totalRev)}`;
         }
 
-        let profitLossChart = null;
-        function renderProfitLossChart() {
+        function renderChart() {
             const ctx = document.getElementById('profitLossChart').getContext('2d');
             if (profitLossChart) profitLossChart.destroy();
+            const type = document.getElementById('graph_type').value;
+            const interval = document.getElementById('graph_interval').value;
+            const radioFilter = document.querySelector('input[name="plg_radio"]:checked').value;
+            const bf = document.getElementById('table_branch_filter').value;
+            const timeAgg = {};
+            rawInvoices.forEach(r => {
+                if (bf !== 'all' && r.branchname !== bf) return;
+                const isDHP = (r.customername || '').toUpperCase().includes('DHP');
+                if (radioFilter === 'DHP' && !isDHP) return;
+                if (radioFilter === 'GSP' && isDHP) return;
+                const d = new Date(r.weekendbill);
+                const key = interval === 'weekly' ? r.weekendbill : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                timeAgg[key] = (timeAgg[key] || 0) + (Number(r.invoiceamount) || 0);
+            });
+            const sorted = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
             profitLossChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: sampleBranches,
-                    datasets: [
-                        { label: 'Revenue', data: sampleRevenue, backgroundColor: 'rgba(124, 58, 237, 0.7)' },
-                        { label: 'Profit', data: sampleProfit, backgroundColor: 'rgba(16, 185, 129, 0.7)' },
-                        { label: 'Overhead', data: sampleOverhead, backgroundColor: 'rgba(239, 68, 68, 0.5)' }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                type,
+                data: { labels: sorted.map(([k]) => k), datasets: [{ label: 'Revenue', data: sorted.map(([,v]) => v), backgroundColor: 'rgba(124,58,237,0.7)', borderColor: 'rgb(124,58,237)', borderWidth: 2, fill: false, tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } } } },
             });
         }
 
-        function applyFilters() {
-            alert('Profit & Loss filters will be connected once a data source table is created in Supabase.');
-        }
-
-        function applyGraphFilters() {
-            alert('Graph filters will be connected once a data source table is created in Supabase.');
-        }
-
-        renderBranchTable();
-        renderProfitLossChart();
+        document.getElementById('apply-btn').addEventListener('click', loadData);
+        document.getElementById('start_date').addEventListener('change', loadData);
+        document.getElementById('end_date').addEventListener('change', loadData);
+        document.getElementById('table_branch_filter').addEventListener('change', processData);
+        document.getElementById('graph_type').addEventListener('change', renderChart);
+        document.getElementById('graph_interval').addEventListener('change', renderChart);
+        document.querySelectorAll('input[name="plg_radio"]').forEach(r => r.addEventListener('change', renderChart));
+        await loadData();
     </script>
 </body>
 </html>

@@ -23,6 +23,7 @@
             border-radius: 0 0 8px 8px; text-align: center; font-weight: 700; font-size: 15px;
         }
         .chart-wrap { position: relative; flex: 1; min-height: 300px; padding: 12px; }
+        .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
         @media (max-width: 900px) {
             .report-layout { grid-template-columns: 1fr; }
             .report-chart-section { grid-column: 1; }
@@ -56,42 +57,40 @@
                         <div class="filter-bar">
                             <select class="form-select" id="table_branch_filter">
                                 <option value="all" selected>All Branches</option>
-                                <option value="Austell">Austell</option>
-                                <option value="Rome">Rome</option>
-                                <option value="Kennesaw">Kennesaw</option>
                             </select>
-                            <button class="btn btn-primary" type="button" onclick="applyFilters()" style="padding:6px 16px;">Apply</button>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+                                <input type="checkbox" id="dhp_filter"> DHP
+                            </label>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+                                <input type="checkbox" id="gsp_filter"> GSP
+                            </label>
+                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
                         </div>
                         <div class="table-scroll">
                             <table class="data-table" id="revenue-table">
                                 <thead>
                                     <tr>
-                                        <th>Company</th>
-                                        <th>Branch</th>
-                                        <th style="text-align:right">Revenue</th>
-                                        <th style="text-align:right">Hours</th>
+                                        <th class="sortable" data-col="company">Company</th>
+                                        <th class="sortable" data-col="branch">Branch</th>
+                                        <th class="sortable" data-col="revenue" style="text-align:right">Revenue</th>
                                     </tr>
                                 </thead>
-                                <tbody id="revenue-table-body"></tbody>
+                                <tbody id="revenue-table-body">
+                                    <tr><td colspan="3" class="loading-indicator">Loading data...</td></tr>
+                                </tbody>
                             </table>
                         </div>
-                        <div class="total-bar" id="total-revenue">Total: $0.00</div>
+                        <div class="total-bar" id="total-revenue">Total: $0</div>
                     </div>
                 </div>
                 <div class="report-chart-section">
                     <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
                         <div class="filter-bar">
-                            <select class="form-select" id="graph_branch_filter">
-                                <option value="all" selected>All Branches</option>
-                                <option value="Austell">Austell</option>
-                                <option value="Rome">Rome</option>
-                                <option value="Kennesaw">Kennesaw</option>
-                            </select>
                             <select class="form-select" id="graph_type">
                                 <option value="bar" selected>Bar</option>
                                 <option value="line">Line</option>
+                                <option value="pie">Pie</option>
                             </select>
-                            <button class="btn btn-primary" type="button" onclick="applyGraphFilters()" style="padding:6px 16px;">Apply</button>
                         </div>
                         <div class="chart-wrap">
                             <canvas id="revenueChart"></canvas>
@@ -107,69 +106,242 @@
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
+        import { fetchInvoiceRegister, formatCurrency, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
 
         await checkAuth();
         await checkPageAccess('descending-revenue');
         renderNavbar();
         await renderSidebar();
         initInactivityTimer();
-    </script>
-    <script>
+
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
 
-        const sampleCompanies = [
-            { company: 'Acme Corp', branch: 'Austell', revenue: 18500, hours: 450 },
-            { company: 'Beta Industries', branch: 'Rome', revenue: 15200, hours: 380 },
-            { company: 'Gamma LLC', branch: 'Kennesaw', revenue: 12800, hours: 320 },
-            { company: 'Delta Services', branch: 'Austell', revenue: 11000, hours: 290 },
-            { company: 'Epsilon Inc', branch: 'Rome', revenue: 9500, hours: 240 },
-            { company: 'Zeta Corp', branch: 'Kennesaw', revenue: 8200, hours: 210 },
-        ];
+        // ── State ─────────────────────────────────────────────────
+        let rawData = [];
+        let aggregated = [];
+        let timeSeriesData = [];
+        let uniqueBranches = [];
+        let revenueChart = null;
+        let sortCol = 'revenue';
+        let sortDir = 'desc';
 
-        const today = new Date();
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        document.getElementById('start_date').value = lastMonth.toISOString().split('T')[0];
-        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+        // ── Init dates ────────────────────────────────────────────
+        document.getElementById('start_date').value = getDefaultStartDate();
+        document.getElementById('end_date').value = getDefaultEndDate();
 
+        // ── Fetch & process ───────────────────────────────────────
+        async function loadData() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            if (!startDate || !endDate) return;
+
+            document.getElementById('revenue-table-body').innerHTML =
+                '<tr><td colspan="3" class="loading-indicator">Loading data...</td></tr>';
+
+            try {
+                rawData = await fetchInvoiceRegister(startDate, endDate);
+                processData();
+            } catch (err) {
+                document.getElementById('revenue-table-body').innerHTML =
+                    `<tr><td colspan="3" class="loading-indicator" style="color:#DC2626">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function processData() {
+            const branchFilter = document.getElementById('table_branch_filter').value;
+            const dhpOn = document.getElementById('dhp_filter').checked;
+            const gspOn = document.getElementById('gsp_filter').checked;
+            const search = document.getElementById('company_search').value.trim().toLowerCase();
+
+            const branchSet = new Set();
+            rawData.forEach(r => { if (r.branchname) branchSet.add(r.branchname); });
+            uniqueBranches = [...branchSet].sort();
+            populateBranchDropdowns();
+
+            let filtered = rawData.filter(r => {
+                if (branchFilter !== 'all' && r.branchname !== branchFilter) return false;
+                const isDHP = r.customername && r.customername.toUpperCase().includes('DHP');
+                if (dhpOn && !isDHP) return false;
+                if (gspOn && isDHP) return false;
+                if (search && !(r.customername || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            // Aggregate by company (for table)
+            const agg = {};
+            filtered.forEach(r => {
+                const key = r.customername || 'Unknown';
+                if (!agg[key]) agg[key] = { company: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
+                agg[key].revenue += Number(r.invoiceamount) || 0;
+                if (r.branchname) agg[key].branches.add(r.branchname);
+            });
+            aggregated = Object.values(agg).map(a => ({
+                company: a.company, branch: [...a.branches].join(', '), revenue: a.revenue,
+            }));
+
+            // Aggregate by week for time-series chart
+            const weekMap = {};
+            filtered.forEach(r => {
+                const week = r.weekendbill || 'Unknown';
+                if (!weekMap[week]) weekMap[week] = 0;
+                weekMap[week] += Number(r.invoiceamount) || 0;
+            });
+            timeSeriesData = Object.entries(weekMap)
+                .map(([week, revenue]) => ({ week, revenue }))
+                .sort((a, b) => a.week.localeCompare(b.week));
+
+            sortData();
+            renderTable();
+            renderChart();
+        }
+
+        function sortData() {
+            aggregated.sort((a, b) => {
+                let cmp = 0;
+                if (sortCol === 'revenue') cmp = a.revenue - b.revenue;
+                else cmp = (a[sortCol] || '').localeCompare(b[sortCol] || '');
+                return sortDir === 'asc' ? cmp : -cmp;
+            });
+        }
+
+        // ── Render table ──────────────────────────────────────────
         function renderTable() {
             const tbody = document.getElementById('revenue-table-body');
             tbody.innerHTML = '';
             let total = 0;
-            const sorted = [...sampleCompanies].sort((a, b) => b.revenue - a.revenue);
-            sorted.forEach(row => {
-                total += row.revenue;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${row.company}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">$${row.revenue.toLocaleString()}</td><td style="text-align:right;font-weight:600">${row.hours}</td>`;
-                tbody.appendChild(tr);
-            });
-            document.getElementById('total-revenue').textContent = `Total: $${total.toLocaleString()}`;
+            if (aggregated.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="loading-indicator">No data for selected filters.</td></tr>';
+            } else {
+                aggregated.forEach(row => {
+                    total += row.revenue;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.company}</td>
+                        <td>${row.branch}</td>
+                        <td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById('total-revenue').textContent = `Total: ${formatCurrency(total)}`;
         }
 
-        let revenueChart = null;
+        // ── Linear regression for trendline ───────────────────────
+        function linearRegression(data) {
+            const n = data.length;
+            if (n < 2) return null;
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+            data.forEach((y, i) => { sumX += i; sumY += y; sumXY += i * y; sumX2 += i * i; });
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+            return data.map((_, i) => slope * i + intercept);
+        }
+
+        // ── Render chart (time-series) ────────────────────────────
         function renderChart() {
             const ctx = document.getElementById('revenueChart').getContext('2d');
             if (revenueChart) revenueChart.destroy();
-            const sorted = [...sampleCompanies].sort((a, b) => b.revenue - a.revenue);
-            revenueChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: sorted.map(c => c.company),
-                    datasets: [{ label: 'Revenue ($)', data: sorted.map(c => c.revenue), backgroundColor: 'rgba(124, 58, 237, 0.7)', borderColor: 'rgb(124, 58, 237)', borderWidth: 1 }]
-                },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } } }
+
+            const type = document.getElementById('graph_type').value;
+
+            if (type === 'pie') {
+                // Pie: show top companies
+                const top = aggregated.slice(0, 15);
+                const colors = top.map((_, i) => `hsl(${260 + i * 18}, 60%, ${55 + (i % 3) * 8}%)`);
+                revenueChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: top.map(c => c.company),
+                        datasets: [{ data: top.map(c => c.revenue), backgroundColor: colors }],
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } },
+                    },
+                });
+            } else {
+                // Bar/Line: time-series by week
+                const labels = timeSeriesData.map(d => d.week);
+                const values = timeSeriesData.map(d => d.revenue);
+                const datasets = [{
+                    label: 'Descending Revenue',
+                    data: values,
+                    backgroundColor: 'rgba(124,58,237,0.7)',
+                    borderColor: 'rgb(124,58,237)',
+                    borderWidth: 2,
+                    fill: type === 'line' ? false : undefined,
+                    tension: 0.3,
+                }];
+
+                // Add trendline
+                const trend = linearRegression(values);
+                if (trend) {
+                    datasets.push({
+                        label: 'Trend',
+                        data: trend,
+                        type: 'line',
+                        borderColor: 'rgba(239,68,68,0.7)',
+                        borderWidth: 2,
+                        borderDash: [6, 3],
+                        pointRadius: 0,
+                        fill: false,
+                    });
+                }
+
+                revenueChart = new Chart(ctx, {
+                    type: type,
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: {
+                            x: { ticks: { maxRotation: 45, font: { size: 10 } } },
+                            y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } },
+                        },
+                        plugins: { legend: { labels: { font: { size: 11 } } } },
+                    },
+                });
+            }
+        }
+
+        // ── Populate branch dropdowns from API data ───────────────
+        function populateBranchDropdowns() {
+            const sel = document.getElementById('table_branch_filter');
+            const current = sel.value;
+            sel.innerHTML = '<option value="all">All Branches</option>';
+            uniqueBranches.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b; opt.textContent = b;
+                if (b === current) opt.selected = true;
+                sel.appendChild(opt);
             });
         }
 
-        function applyFilters() {
-            alert('Table filters will be connected once a data source table is created in Supabase.');
-        }
-        function applyGraphFilters() {
-            alert('Graph filters will be connected once a data source table is created in Supabase.');
-        }
+        // ── Column sorting ────────────────────────────────────────
+        document.querySelectorAll('.sortable').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.col;
+                if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+                else { sortCol = col; sortDir = col === 'revenue' ? 'desc' : 'asc'; }
+                document.querySelectorAll('.sortable').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+                sortData();
+                renderTable();
+            });
+        });
 
-        renderTable();
-        renderChart();
+        // ── Event listeners ───────────────────────────────────────
+        document.getElementById('apply-btn').addEventListener('click', loadData);
+        document.getElementById('start_date').addEventListener('change', loadData);
+        document.getElementById('end_date').addEventListener('change', loadData);
+        document.getElementById('company_search').addEventListener('input', processData);
+        document.getElementById('table_branch_filter').addEventListener('change', processData);
+        document.getElementById('dhp_filter').addEventListener('change', processData);
+        document.getElementById('gsp_filter').addEventListener('change', processData);
+        document.getElementById('graph_type').addEventListener('change', renderChart);
+
+        // ── Initial load ──────────────────────────────────────────
+        await loadData();
     </script>
 </body>
 </html>

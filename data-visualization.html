@@ -10,61 +10,33 @@
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/9352/9352254.png">
     <link rel="stylesheet" href="./src/design-system.css">
     <style>
-        .viz-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-        .viz-nav-btn {
-            padding: 10px 20px; border-radius: 8px; border: 2px solid var(--border-color);
-            background-color: var(--bg-paper); color: var(--text-primary);
-            font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.2s;
-            position: relative;
-        }
-        .viz-nav-btn:hover { border-color: var(--primary); background-color: rgba(var(--primary-rgb), 0.05); }
-        .viz-nav-btn .dropdown-content {
-            visibility: hidden; opacity: 0; position: absolute; top: 100%; left: 0;
-            background-color: var(--bg-paper); min-width: 160px; box-shadow: var(--shadow-md);
-            z-index: 10; border-radius: 8px; transition: opacity 0.15s; margin-top: 4px;
-        }
-        .viz-nav-btn:hover .dropdown-content { visibility: visible; opacity: 1; }
-        .viz-nav-btn .dropdown-content a {
-            color: var(--text-primary); padding: 10px 16px; text-decoration: none; display: block;
-            border-bottom: 1px solid var(--border-color); font-size: 14px; font-weight: 400;
-        }
-        .viz-nav-btn .dropdown-content a:last-child { border-bottom: none; }
-        .viz-nav-btn .dropdown-content a:hover { background-color: var(--bg-default); }
-        .viz-layout {
-            display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 16px;
-        }
+        .viz-layout { display: grid; grid-template-columns: 38% 1fr; grid-template-rows: auto auto 1fr; gap: 16px; }
         .viz-filters { grid-row: 1; grid-column: 1 / 3; }
-        .viz-table-section { grid-row: 2; grid-column: 1; }
-        .viz-chart-section { grid-row: 2; grid-column: 2; }
-        .table-scroll { overflow-y: auto; max-height: calc(100vh - 380px); }
-        .chart-wrap { position: relative; min-height: 350px; padding: 12px; }
-        @media (max-width: 900px) {
-            .viz-layout { grid-template-columns: 1fr; }
-            .viz-chart-section { grid-column: 1; }
+        .viz-total-bar { grid-row: 2; grid-column: 1 / 3; }
+        .viz-table-section { grid-row: 3; grid-column: 1; }
+        .viz-chart-section { grid-row: 3; grid-column: 2; }
+        .filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .filter-row + .filter-row { margin-top: 8px; }
+        .filter-row .form-select, .filter-row .form-input { min-width: 120px; }
+        .filter-row label { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+        .table-scroll { overflow-y: auto; max-height: calc(100vh - 420px); }
+        .total-bar { background-color: var(--primary); color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-weight: 700; font-size: 15px; }
+        .chart-wrap { position: relative; min-height: 350px; padding: 12px; flex: 1; }
+        .chart-wrap canvas { max-height: 500px; }
+        .loading-indicator { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .btn-icon { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; display: flex; align-items: center; transition: background-color 0.2s; }
+        .btn-icon:hover { background-color: var(--bg-default); }
+        @media (max-width: 900px) { .viz-layout { grid-template-columns: 1fr; } .viz-chart-section, .viz-table-section { grid-column: 1; } }
+        @media print {
+            body { background: #fff !important; }
+            .sidebar, .topbar, .viz-filters { display: none !important; }
+            .main-content { margin: 0 !important; padding: 10px !important; }
+            .viz-layout { display: block !important; }
+            .card { box-shadow: none !important; border: 1px solid #ccc !important; margin-bottom: 16px; }
+            .data-table th, .data-table td { border: 1px solid #000 !important; color: #000 !important; }
+            .data-table th { background: #ddd !important; }
+            .print-header { display: block !important; font-size: 20px; text-align: center; font-weight: 700; padding: 10px 0; }
         }
-        /* Branch Goal Modal */
-        .goal-modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center;
-        }
-        .goal-modal-overlay.open { display: flex; }
-        .goal-modal {
-            background: var(--bg-paper); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
-            padding: 28px 32px; width: 100%; max-width: 420px; position: relative;
-        }
-        .goal-modal h3 { margin: 0 0 20px 0; font-size: 1.125rem; font-weight: 700; color: var(--text-primary); }
-        .goal-modal .form-group { margin-bottom: 16px; }
-        .goal-modal .form-group label { display: block; margin-bottom: 6px; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); }
-        .goal-modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-        .goal-modal .btn-cancel {
-            padding: 8px 16px; border-radius: var(--radius); border: 1px solid var(--border-color);
-            background: var(--bg-paper); color: var(--text-primary); font-weight: 600; font-size: 0.875rem;
-            cursor: pointer; transition: all 0.2s;
-        }
-        .goal-modal .btn-cancel:hover { background: var(--bg-default); }
-        .notice { padding: 10px 14px; border-radius: var(--radius); font-size: 0.875rem; margin-top: 12px; }
-        .notice-success { background: #d4edda; color: #155724; }
-        .notice-error { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -74,84 +46,63 @@
                 <h1 class="page-title">Data Visualization</h1>
                 <p class="page-subtitle">Revenue and performance analytics</p>
             </div>
-            <div class="viz-nav">
-                <div class="viz-nav-btn">
-                    THC
-                    <div class="dropdown-content">
-                        <a href="#" onclick="switchView('Pie Graph')">Pie Graph</a>
-                        <a href="#" onclick="switchView('Bar Graph')">Bar Graph</a>
-                        <a href="#" onclick="switchView('Master')">Master</a>
-                    </div>
-                </div>
-                <div class="viz-nav-btn">
-                    WRO
-                    <div class="dropdown-content">
-                        <a href="#" onclick="switchView('WRO')">Weekly Revenue</a>
-                    </div>
-                </div>
-                <div class="viz-nav-btn">
-                    MRO
-                    <div class="dropdown-content">
-                        <a href="#" onclick="switchView('MRO')">Monthly Revenue</a>
-                    </div>
-                </div>
-                <div class="viz-nav-btn">
-                    DHP
-                    <div class="dropdown-content">
-                        <a href="#" onclick="switchView('DHP Hours')">DHP Hours</a>
-                        <a href="#" onclick="switchView('DHP Billing')">DHP Billing</a>
-                    </div>
-                </div>
-                <div class="viz-nav-btn">
-                    GSP
-                    <div class="dropdown-content">
-                        <a href="#" onclick="switchView('GSP Hours')">GSP Hours</a>
-                    </div>
-                </div>
-                <div class="viz-nav-btn">
-                    RPT
-                    <div class="dropdown-content">
-                        <a href="#" onclick="switchView('Report')">Report</a>
-                    </div>
-                </div>
-            </div>
+            <div class="print-header" style="display:none;" id="print-header"></div>
             <div class="viz-layout">
                 <div class="viz-filters">
-                    <div class="card" style="padding:10px;">
-                        <form id="filter-table-form" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                            <input class="form-input" type="date" id="start_date" style="max-width:160px;">
-                            <input class="form-input" type="date" id="end_date" style="max-width:160px;">
+                    <div class="card" style="padding:12px;">
+                        <div class="filter-row">
+                            <select class="form-select" id="report_type" style="min-width:200px;">
+                                <option value="DRR" selected>DRR - Descending Revenue</option>
+                                <option value="GSR">GSR - General Staffing</option>
+                                <option value="DHR">DHR - Direct Hire</option>
+                                <option value="PLR">PLR - Profit & Loss</option>
+                            </select>
                             <select class="form-select" id="branch_filter">
                                 <option value="all" selected>All Branches</option>
-                                <option value="Austell">Austell</option>
-                                <option value="Rome">Rome</option>
-                                <option value="Kennesaw">Kennesaw</option>
                             </select>
-                            <button class="btn btn-primary" type="submit" style="padding:8px 16px;">Apply</button>
-                            <button class="btn btn-primary" type="button" id="open-goal-modal" style="padding:8px 16px;margin-left:auto;">+ Branch Goal</button>
-                        </form>
+                            <input class="form-input" type="date" id="start_date" style="max-width:150px;">
+                            <input class="form-input" type="date" id="end_date" style="max-width:150px;">
+                            <input class="form-input" type="text" id="company_search" placeholder="Search company..." style="max-width:180px;">
+                            <button class="btn btn-primary" type="button" id="apply-btn" style="padding:6px 16px;">Apply</button>
+                        </div>
+                        <div class="filter-row">
+                            <label><input type="checkbox" id="dhp_filter"> DHP</label>
+                            <label><input type="checkbox" id="gsp_filter"> GSP</label>
+                            <select class="form-select" id="interval_select" style="max-width:120px;">
+                                <option value="weekly" selected>Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                            <select class="form-select" id="graph_type" style="max-width:100px;">
+                                <option value="bar" selected>Bar</option>
+                                <option value="line">Line</option>
+                                <option value="pie">Pie</option>
+                            </select>
+                            <label><input type="checkbox" id="forecast_check"> Forecast</label>
+                            <input class="form-input" type="date" id="forecast_end" style="max-width:150px;display:none;">
+                            <button class="btn-icon" type="button" id="print-btn" title="Print" style="margin-left:auto;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            </button>
+                        </div>
                     </div>
+                </div>
+                <div class="viz-total-bar">
+                    <div class="total-bar" id="total-bar">Total: $0</div>
                 </div>
                 <div class="viz-table-section">
                     <div class="card" style="padding:0;overflow:hidden;">
                         <div class="table-scroll">
                             <table class="data-table" id="data-table">
-                                <thead>
-                                    <tr>
-                                        <th class="sortable">Branch</th>
-                                        <th class="sortable">Company</th>
-                                        <th class="sortable" style="text-align:right">Revenue</th>
-                                        <th class="sortable" style="text-align:right">Hours</th>
-                                        <th class="sortable" style="text-align:right">Billing</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="data-table-body"></tbody>
+                                <thead><tr id="table-header"></tr></thead>
+                                <tbody id="data-table-body">
+                                    <tr><td colspan="4" class="loading-indicator">Loading data...</td></tr>
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
                 <div class="viz-chart-section">
-                    <div class="card">
+                    <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
                         <div class="chart-wrap">
                             <canvas id="mainChart"></canvas>
                         </div>
@@ -161,156 +112,420 @@
         </div>
     </div>
 
-    <!-- Branch Goal Modal -->
-    <div class="goal-modal-overlay" id="goal-modal-overlay">
-        <div class="goal-modal">
-            <h3>Add Branch Goal</h3>
-            <form id="goal-form">
-                <div class="form-group">
-                    <label for="branch_name">Branch Name</label>
-                    <input class="form-input" type="text" id="branch_name" name="branch_name" required placeholder="e.g., Rome">
-                </div>
-                <div class="form-group">
-                    <label for="goal_amount">Monthly Goal ($)</label>
-                    <input class="form-input" type="number" id="goal_amount" name="goal_amount" required step="0.01" placeholder="e.g., 50000">
-                </div>
-                <div class="form-group">
-                    <label for="goal_year">Year</label>
-                    <input class="form-input" type="number" id="goal_year" name="goal_year" required min="2000" max="2099" placeholder="YYYY">
-                </div>
-                <div id="form-message"></div>
-                <div class="modal-actions">
-                    <button type="button" class="btn-cancel" id="close-goal-modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary" style="padding:8px 16px;">Save Goal</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script type="module">
         import { checkAuth, checkPageAccess } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
+        import {
+            fetchInvoiceRegister, fetchTotalHoursByBranch, fetchTotalBillingByBranch,
+            fetchTotalHoursByCompany, fetchTotalBillingByCompany,
+            formatCurrency, formatCurrency2, formatNumber, getDefaultStartDate, getDefaultEndDate
+        } from './src/apiClient.js';
 
         await checkAuth();
         await checkPageAccess('data-visualization');
         renderNavbar();
         await renderSidebar();
         initInactivityTimer();
-    </script>
-    <script>
+
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
 
-        const sampleData = {
-            labels: ['Austell', 'Rome', 'Kennesaw', 'Cartersville', 'Adairsville'],
-            revenues: [45000, 38000, 52000, 28000, 31000],
-            hours: [1200, 980, 1400, 750, 820],
-        };
+        // ── State ─────────────────────────────────────────────────
+        let rawInvoices = [];
+        let rawBillingByBranch = [];
+        let rawHoursByCompany = [];
+        let rawBillingByCompany = [];
+        let mainChart = null;
 
-        let currentChart = null;
-        let currentView = 'Pie Graph';
+        // ── Init ──────────────────────────────────────────────────
+        document.getElementById('start_date').value = getDefaultStartDate();
+        document.getElementById('end_date').value = getDefaultEndDate();
+        // Default forecast end: 3 months from now
+        const fEnd = new Date(); fEnd.setMonth(fEnd.getMonth() + 3);
+        document.getElementById('forecast_end').value = fEnd.toISOString().split('T')[0];
 
-        function switchView(view) {
-            currentView = view;
-            renderChart();
-        }
+        // ── Fetch Data ────────────────────────────────────────────
+        async function loadData() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            if (!startDate || !endDate) return;
 
-        function renderChart() {
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            if (currentChart) currentChart.destroy();
+            document.getElementById('data-table-body').innerHTML = '<tr><td colspan="6" class="loading-indicator">Loading data...</td></tr>';
 
-            const colors = ['rgba(124,58,237,0.7)', 'rgba(16,185,129,0.7)', 'rgba(245,158,11,0.7)', 'rgba(59,130,246,0.7)', 'rgba(239,68,68,0.7)'];
+            try {
+                const [invoices, billingBranch, hoursCo, billingCo] = await Promise.all([
+                    fetchInvoiceRegister(startDate, endDate),
+                    fetchTotalBillingByBranch(startDate, endDate),
+                    fetchTotalHoursByCompany(startDate, endDate),
+                    fetchTotalBillingByCompany(startDate, endDate),
+                ]);
 
-            if (currentView === 'Pie Graph') {
-                currentChart = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: sampleData.labels,
-                        datasets: [{ data: sampleData.revenues, backgroundColor: colors }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-                });
-            } else {
-                currentChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: sampleData.labels,
-                        datasets: [{ label: 'Revenue ($)', data: sampleData.revenues, backgroundColor: colors }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
-                });
+                rawInvoices = invoices;
+                rawBillingByBranch = billingBranch;
+                rawHoursByCompany = hoursCo;
+                rawBillingByCompany = billingCo;
+
+                populateBranchFilter();
+                processData();
+            } catch (err) {
+                document.getElementById('data-table-body').innerHTML = `<tr><td colspan="6" class="loading-indicator" style="color:#DC2626">Error: ${err.message}</td></tr>`;
             }
         }
 
-        function renderTable() {
+        function populateBranchFilter() {
+            const branchSet = new Set();
+            rawInvoices.forEach(r => { if (r.branchname) branchSet.add(r.branchname); });
+            rawBillingByBranch.forEach(r => { if (r.branch) branchSet.add(r.branch); });
+            const sel = document.getElementById('branch_filter');
+            const cur = sel.value;
+            sel.innerHTML = '<option value="all">All Branches</option>';
+            [...branchSet].sort().forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b; opt.textContent = b;
+                if (b === cur) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        // ── Process Data Based on Report Type ─────────────────────
+        function processData() {
+            const report = document.getElementById('report_type').value;
+            const branch = document.getElementById('branch_filter').value;
+            const search = (document.getElementById('company_search').value || '').toLowerCase();
+            const dhpOn = document.getElementById('dhp_filter').checked;
+            const gspOn = document.getElementById('gsp_filter').checked;
+
+            if (report === 'PLR') {
+                processPLR(branch, search, dhpOn, gspOn);
+            } else {
+                processCompanyReport(report, branch, search, dhpOn, gspOn);
+            }
+        }
+
+        // ── DRR / GSR / DHR ───────────────────────────────────────
+        function processCompanyReport(report, branch, search, dhpOn, gspOn) {
+            let filtered = rawInvoices.filter(r => {
+                if (branch !== 'all' && r.branchname !== branch) return false;
+                const isDHP = (r.customername || '').toUpperCase().includes('DHP');
+                if (report === 'DHR' && !isDHP) return false;
+                if (report === 'GSR' && isDHP) return false;
+                if (dhpOn && !isDHP) return false;
+                if (gspOn && isDHP) return false;
+                if (search && !(r.customername || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            // Table: aggregate by company
+            const companyAgg = {};
+            filtered.forEach(r => {
+                const key = r.customername || 'Unknown';
+                if (!companyAgg[key]) companyAgg[key] = { company: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
+                companyAgg[key].revenue += Number(r.invoiceamount) || 0;
+                if (r.branchname) companyAgg[key].branches.add(r.branchname);
+            });
+
+            // Merge hours data for DHR/GSR
+            if (report === 'DHR' || report === 'GSR') {
+                rawHoursByCompany.forEach(r => {
+                    const isDHP = (r.company_name || '').toUpperCase().includes('DHP');
+                    if (report === 'DHR' && !isDHP) return;
+                    if (report === 'GSR' && isDHP) return;
+                    if (branch !== 'all' && r.branch !== branch) return;
+                    if (search && !(r.company_name || '').toLowerCase().includes(search)) return;
+                    const key = r.company_name || 'Unknown';
+                    if (!companyAgg[key]) companyAgg[key] = { company: key, branch: r.branch || '', revenue: 0, branches: new Set() };
+                    companyAgg[key].hours = (companyAgg[key].hours || 0) + (Number(r.total_hours) || 0);
+                    if (r.branch) companyAgg[key].branches.add(r.branch);
+                });
+            }
+
+            const tableData = Object.values(companyAgg).map(c => ({
+                ...c, branch: [...c.branches].join(', ')
+            })).sort((a, b) => b.revenue - a.revenue);
+
+            // Time-series: aggregate by interval
+            const interval = document.getElementById('interval_select').value;
+            const timeAgg = {};
+            filtered.forEach(r => {
+                const weekend = r.weekendbill || '';
+                if (!weekend) return;
+                let key;
+                if (interval === 'weekly') key = weekend;
+                else if (interval === 'monthly') key = weekend.substring(0, 7);
+                else key = weekend.substring(0, 4);
+                timeAgg[key] = (timeAgg[key] || 0) + (Number(r.invoiceamount) || 0);
+            });
+
+            const timeSeries = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
+            const total = tableData.reduce((s, r) => s + r.revenue, 0);
+
+            // Render
+            const reportLabels = { DRR: 'Descending Revenue', GSR: 'General Staffing', DHR: 'Direct Hire' };
+            document.getElementById('total-bar').textContent = `Total ${reportLabels[report]}: ${formatCurrency(total)}`;
+            document.getElementById('print-header').textContent = `${reportLabels[report]} Report`;
+
+            renderCompanyTable(report, tableData);
+            renderTimeChart(timeSeries, reportLabels[report]);
+        }
+
+        // ── PLR ───────────────────────────────────────────────────
+        function processPLR(branch, search, dhpOn, gspOn) {
+            const grossPayMap = {};
+            rawBillingByBranch.forEach(r => {
+                const b = r.branch || 'Unknown';
+                grossPayMap[b] = (grossPayMap[b] || 0) + (Number(r.total_billing) || 0);
+            });
+
+            const branchAgg = {};
+            const timeAgg = {};
+            rawInvoices.forEach(r => {
+                const b = r.branchname || 'Unknown';
+                const isDHP = (r.customername || '').toUpperCase().includes('DHP');
+                const amount = Number(r.invoiceamount) || 0;
+                if (branch !== 'all' && b !== branch) return;
+                if (dhpOn && !isDHP) return;
+                if (gspOn && isDHP) return;
+                if (search && !(r.customername || '').toLowerCase().includes(search)) return;
+
+                if (!branchAgg[b]) branchAgg[b] = { branch: b, revenue: 0 };
+                branchAgg[b].revenue += amount;
+
+                const weekend = r.weekendbill || '';
+                if (weekend) {
+                    const interval = document.getElementById('interval_select').value;
+                    let key;
+                    if (interval === 'weekly') key = weekend;
+                    else if (interval === 'monthly') key = weekend.substring(0, 7);
+                    else key = weekend.substring(0, 4);
+                    timeAgg[key] = (timeAgg[key] || 0) + amount;
+                }
+            });
+
+            const tableData = Object.values(branchAgg).map(b => {
+                const grossPay = grossPayMap[b.branch] || 0;
+                return { branch: b.branch, revenue: b.revenue, grossPay, profit: b.revenue - grossPay };
+            }).sort((a, b) => b.profit - a.profit);
+
+            const totalProfit = tableData.reduce((s, r) => s + r.profit, 0);
+            document.getElementById('total-bar').textContent = `Total Profit: ${formatCurrency2(totalProfit)}`;
+            document.getElementById('print-header').textContent = 'Profit & Loss Report';
+
+            // Render table
+            const thead = document.getElementById('table-header');
+            thead.innerHTML = '<th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Gross Pay</th><th style="text-align:right">Profit</th>';
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
-            sampleData.labels.forEach((branch, i) => {
+            if (!tableData.length) { tbody.innerHTML = '<tr><td colspan="4" class="loading-indicator">No data.</td></tr>'; }
+            else tableData.forEach(row => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${branch}</td>
-                    <td>Sample Co.</td>
-                    <td style="text-align:right;font-weight:600">$${sampleData.revenues[i].toLocaleString()}</td>
-                    <td style="text-align:right;font-weight:600">${sampleData.hours[i]}</td>
-                    <td style="text-align:right;font-weight:600">$${(sampleData.revenues[i] * 1.15).toFixed(2)}</td>
-                `;
+                tr.innerHTML = `<td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.grossPay)}</td><td style="text-align:right;font-weight:600;color:${row.profit >= 0 ? '#10B981' : '#DC2626'}">${formatCurrency2(row.profit)}</td>`;
+                tbody.appendChild(tr);
+            });
+
+            // Time-series for profit chart: subtract proportional gross pay
+            const totalRevenue = Object.values(timeAgg).reduce((s, v) => s + v, 0);
+            const totalGrossPay = rawBillingByBranch.reduce((s, r) => s + (Number(r.total_billing) || 0), 0);
+            const timeSeries = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0])).map(([k, rev]) => {
+                const proportion = totalRevenue > 0 ? rev / totalRevenue : 0;
+                return [k, rev - (totalGrossPay * proportion)];
+            });
+
+            renderTimeChart(timeSeries, 'Profit');
+        }
+
+        // ── Render Company Table ──────────────────────────────────
+        function renderCompanyTable(report, data) {
+            const thead = document.getElementById('table-header');
+            if (report === 'DHR' || report === 'GSR') {
+                thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th><th style="text-align:right">Hours</th>';
+            } else {
+                thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th>';
+            }
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+            const cols = (report === 'DHR' || report === 'GSR') ? 4 : 3;
+            if (!data.length) { tbody.innerHTML = `<tr><td colspan="${cols}" class="loading-indicator">No data.</td></tr>`; return; }
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                let html = `<td>${row.company}</td><td>${row.branch}</td><td style="text-align:right;font-weight:600">${formatCurrency(row.revenue)}</td>`;
+                if (report === 'DHR' || report === 'GSR') html += `<td style="text-align:right;font-weight:600">${formatNumber(row.hours || 0, 2)}</td>`;
+                tr.innerHTML = html;
                 tbody.appendChild(tr);
             });
         }
 
-        const today = new Date();
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        document.getElementById('start_date').value = lastMonth.toISOString().split('T')[0];
-        document.getElementById('end_date').value = today.toISOString().split('T')[0];
+        // ── Render Time-Series Chart ──────────────────────────────
+        function renderTimeChart(timeSeries, label) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            if (mainChart) mainChart.destroy();
 
-        renderChart();
-        renderTable();
+            const graphType = document.getElementById('graph_type').value;
+            const forecastOn = document.getElementById('forecast_check').checked;
+            const forecastEnd = document.getElementById('forecast_end').value;
+            const interval = document.getElementById('interval_select').value;
 
-        document.getElementById('filter-table-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('Data visualization filters will be connected once a data source table is created in Supabase.');
-        });
+            let labels = timeSeries.map(([k]) => k);
+            let values = timeSeries.map(([, v]) => v);
+            let forecastLabels = [];
+            let forecastValues = [];
 
-        // Branch Goal Modal
-        const goalOverlay = document.getElementById('goal-modal-overlay');
-        document.getElementById('goal_year').value = new Date().getFullYear();
+            // ── Forecast ──────────────────────────────────────────
+            if (forecastOn && forecastEnd && values.length >= 2) {
+                // Calculate average growth between intervals
+                const growths = [];
+                for (let i = 1; i < values.length; i++) {
+                    growths.push(values[i] - values[i - 1]);
+                }
+                const avgGrowth = growths.reduce((s, g) => s + g, 0) / growths.length;
+                const lastValue = values[values.length - 1];
+                const lastDate = new Date(labels[labels.length - 1] + (interval === 'yearly' ? '-01-01' : interval === 'monthly' ? '-01' : ''));
 
-        document.getElementById('open-goal-modal').addEventListener('click', () => {
-            goalOverlay.classList.add('open');
-        });
-        document.getElementById('close-goal-modal').addEventListener('click', () => {
-            goalOverlay.classList.remove('open');
-            document.getElementById('form-message').innerHTML = '';
-        });
-        goalOverlay.addEventListener('click', (e) => {
-            if (e.target === goalOverlay) {
-                goalOverlay.classList.remove('open');
-                document.getElementById('form-message').innerHTML = '';
+                // Generate forecast intervals
+                let current = new Date(lastDate);
+                let currentVal = lastValue;
+                const endDate = new Date(forecastEnd);
+                let maxForecast = 52; // safety limit
+
+                while (current < endDate && maxForecast-- > 0) {
+                    if (interval === 'weekly') current.setDate(current.getDate() + 7);
+                    else if (interval === 'monthly') current.setMonth(current.getMonth() + 1);
+                    else current.setFullYear(current.getFullYear() + 1);
+
+                    if (current > endDate) break;
+                    currentVal += avgGrowth;
+                    let key;
+                    if (interval === 'weekly') key = current.toISOString().split('T')[0];
+                    else if (interval === 'monthly') key = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+                    else key = String(current.getFullYear());
+                    forecastLabels.push(key);
+                    forecastValues.push(currentVal);
+                }
             }
-        });
 
-        document.getElementById('goal-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const messageEl = document.getElementById('form-message');
-            const branchName = document.getElementById('branch_name').value;
-            const goalAmount = document.getElementById('goal_amount').value;
-            const goalYear = document.getElementById('goal_year').value;
+            const allLabels = [...labels, ...forecastLabels];
+            const actualData = [...values, ...forecastValues.map(() => null)];
+            const forecastData = [...values.map(() => null), ...(forecastValues.length ? [values[values.length - 1], ...forecastValues.slice(0, -1)] : [])];
+            // Connect forecast: start from last actual point
+            const forecastDataFull = values.map((_, i) => i === values.length - 1 ? values[i] : null);
+            forecastValues.forEach(v => forecastDataFull.push(v));
 
-            if (!branchName || !goalYear) {
-                messageEl.innerHTML = '<div class="notice notice-error">Error: Branch name, goal amount, and year are required.</div>';
+            const segColors = values.map(v => v >= 0 ? 'rgba(124,58,237,0.7)' : 'rgba(255,99,132,0.7)');
+            const forecastColors = forecastValues.map(() => 'rgba(124,58,237,0.3)');
+            const allColors = [...segColors, ...forecastColors];
+
+            if (graphType === 'pie') {
+                // Pie: show only actual data aggregated
+                const pieColors = allLabels.map((_, i) => `hsl(${260 + i * 18}, 60%, ${50 + (i % 4) * 8}%)`);
+                mainChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: { labels: allLabels, datasets: [{ data: [...values, ...forecastValues].map(Math.abs), backgroundColor: pieColors }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } }, datalabels: { display: false } } },
+                });
                 return;
             }
 
-            try {
-                messageEl.innerHTML = `<div class="notice notice-success">Monthly Goal for ${branchName} in ${goalYear} saved successfully!</div>`;
-                e.target.reset();
-                document.getElementById('goal_year').value = new Date().getFullYear();
-            } catch (err) {
-                messageEl.innerHTML = `<div class="notice notice-error">An unexpected error occurred: ${err.message}</div>`;
+            // Bar or Line with trendline
+            const datasets = [{
+                label: label,
+                data: actualData,
+                backgroundColor: graphType === 'bar' ? segColors.concat(forecastValues.map(() => null)) : 'rgba(0,0,0,0)',
+                borderColor: 'rgb(124,58,237)',
+                borderWidth: 2,
+                tension: 0.3,
+                pointRadius: 4,
+                pointBackgroundColor: 'rgb(124,58,237)',
+                spanGaps: false,
+            }];
+
+            if (forecastValues.length > 0) {
+                datasets.push({
+                    label: 'Forecast',
+                    data: forecastDataFull,
+                    backgroundColor: graphType === 'bar' ? forecastColors.map(() => 'rgba(124,58,237,0.3)') : 'rgba(0,0,0,0)',
+                    borderColor: 'rgba(124,58,237,0.4)',
+                    borderWidth: 2,
+                    borderDash: [6, 4],
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(124,58,237,0.4)',
+                    spanGaps: true,
+                });
+                // Adjust actual data to not include null fill for bar
+                if (graphType === 'bar') {
+                    datasets[0].data = [...values, ...forecastValues.map(() => 0)];
+                    datasets[1].data = [...values.map(() => 0), ...forecastValues];
+                }
             }
+
+            // ── Trendline dataset (linear regression) ─────────────
+            if ((graphType === 'bar' || graphType === 'line') && values.length >= 2) {
+                const n = values.length;
+                let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                for (let i = 0; i < n; i++) {
+                    sumX += i; sumY += values[i]; sumXY += i * values[i]; sumX2 += i * i;
+                }
+                const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                const intercept = (sumY - slope * sumX) / n;
+                const totalPoints = allLabels.length;
+                const trendData = Array.from({ length: totalPoints }, (_, i) => slope * i + intercept);
+
+                datasets.push({
+                    label: 'Trend',
+                    data: trendData,
+                    borderColor: slope >= 0 ? 'rgba(50,205,50,0.7)' : 'rgba(220,38,38,0.7)',
+                    borderWidth: 2,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    type: 'line',
+                });
+            }
+
+            mainChart = new Chart(ctx, {
+                type: graphType,
+                data: { labels: allLabels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + formatCurrency2(ctx.parsed.y) } },
+                        datalabels: { display: false },
+                    },
+                    scales: {
+                        x: { ticks: { color: '#6B7280', maxRotation: 45 }, grid: { color: '#E8E8E8' } },
+                        y: {
+                            beginAtZero: false,
+                            ticks: { callback: v => formatCurrency(v), color: '#6B7280' },
+                            grid: { color: '#E8E8E8' },
+                        },
+                    },
+                },
+            });
+        }
+
+        // ── Event Listeners ───────────────────────────────────────
+        document.getElementById('apply-btn').addEventListener('click', loadData);
+        document.getElementById('start_date').addEventListener('change', loadData);
+        document.getElementById('end_date').addEventListener('change', loadData);
+        document.getElementById('report_type').addEventListener('change', processData);
+        document.getElementById('branch_filter').addEventListener('change', processData);
+        document.getElementById('company_search').addEventListener('input', processData);
+        document.getElementById('dhp_filter').addEventListener('change', processData);
+        document.getElementById('gsp_filter').addEventListener('change', processData);
+        document.getElementById('interval_select').addEventListener('change', processData);
+        document.getElementById('graph_type').addEventListener('change', processData);
+        document.getElementById('forecast_check').addEventListener('change', () => {
+            document.getElementById('forecast_end').style.display = document.getElementById('forecast_check').checked ? '' : 'none';
+            processData();
         });
+        document.getElementById('forecast_end').addEventListener('change', processData);
+        document.getElementById('print-btn').addEventListener('click', () => window.print());
+
+        // ── Initial load (deferred to avoid Vite HMR race) ────────
+        setTimeout(() => loadData(), 100);
     </script>
 </body>
 </html>

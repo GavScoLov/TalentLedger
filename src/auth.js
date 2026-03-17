@@ -1,10 +1,32 @@
-// Auth module — Supabase Auth
+// Auth module — Supabase Auth (with caching to avoid redundant API calls)
 
 import { supabase } from './supabaseClient.js';
 
+// Cache to avoid multiple round-trips per page load
+let _cachedUser = undefined;   // undefined = not fetched, null = no user
+let _cachedProfile = undefined;
+
+// Internal: get user (cached)
+async function _getUser() {
+  if (_cachedUser !== undefined) return _cachedUser;
+  const { data: { user } } = await supabase.auth.getUser();
+  _cachedUser = user || null;
+  return _cachedUser;
+}
+
+// Internal: get profile (cached)
+async function _getProfile() {
+  if (_cachedProfile !== undefined) return _cachedProfile;
+  const user = await _getUser();
+  if (!user) { _cachedProfile = null; return null; }
+  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  _cachedProfile = data || null;
+  return _cachedProfile;
+}
+
 // Check if user is authenticated, redirect to login if not
 export async function checkAuth() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await _getUser();
   if (!user) {
     window.location.href = './index.html';
     return null;
@@ -28,22 +50,20 @@ export async function loginWithGoogle() {
 
 // Sign out
 export async function logout() {
+  _cachedUser = undefined;
+  _cachedProfile = undefined;
   await supabase.auth.signOut();
   window.location.href = './index.html';
 }
 
 // Get current user (returns null if not logged in)
 export async function getUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  return _getUser();
 }
 
 // Get user profile from profiles table
 export async function getProfile() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  return data;
+  return _getProfile();
 }
 
 // Listen for auth state changes
@@ -55,7 +75,7 @@ export function onAuthStateChange(callback) {
 
 // Get current user's role from profiles table
 export async function getUserRole() {
-  const profile = await getProfile();
+  const profile = await _getProfile();
   return profile?.role || 'viewer';
 }
 
@@ -67,10 +87,10 @@ export async function isAdmin() {
 
 // Get the list of pages the current user can access
 export async function getAllowedPages() {
-  const profile = await getProfile();
+  const profile = await _getProfile();
   if (!profile) return null; // no profile = allow all (graceful fallback)
   if (profile.role === 'admin') return null; // null = all pages
-  if (!profile.allowed_pages || !Array.isArray(profile.allowed_pages) || profile.allowed_pages.length === 0) return null; // no restrictions configured = allow all
+  if (!profile.allowed_pages || !Array.isArray(profile.allowed_pages) || profile.allowed_pages.length === 0) return null;
   return profile.allowed_pages;
 }
 
