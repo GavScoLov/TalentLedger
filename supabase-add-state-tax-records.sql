@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS state_tax_records (
     county_name TEXT DEFAULT '',
     county_code TEXT DEFAULT '',
     jurisdiction_code TEXT DEFAULT '',
+    total_sales NUMERIC(12,2) DEFAULT 0,
+    net_sales NUMERIC(12,2) DEFAULT 0,
+    taxes NUMERIC(12,2) DEFAULT 0,
+    shipping_charges NUMERIC(12,2) DEFAULT 0,
     extra_data JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

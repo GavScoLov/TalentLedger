@@ -291,6 +291,10 @@
             { key: 'city', label: 'City', required: true },
             { key: 'state', label: 'State', required: true },
             { key: 'zip', label: 'Zip Code', required: true },
+            { key: 'total_sales', label: 'Total Sales', required: false, numeric: true },
+            { key: 'net_sales', label: 'Net Sales', required: false, numeric: true },
+            { key: 'taxes', label: 'Taxes', required: false, numeric: true },
+            { key: 'shipping_charges', label: 'Shipping Charges', required: false, numeric: true },
         ];
 
         // ── Step Navigation ─────────────────────────────────
@@ -345,6 +349,7 @@
             let headerHTML = '<tr>';
             headerHTML += '<th style="width:30px;">#</th>';
             headerHTML += '<th>Company</th><th>Address</th><th>City</th><th>State</th><th>Zip</th>';
+            headerHTML += '<th>Total Sales</th><th>Net Sales</th><th>Taxes</th><th>Shipping</th>';
             headerHTML += '<th>County Name</th><th>County Code</th><th>Jurisdiction Code</th>';
             headerHTML += '</tr>';
             thead.innerHTML = headerHTML;
@@ -352,7 +357,7 @@
             tbody.innerHTML = '';
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-secondary);">No records found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--text-secondary);">No records found.</td></tr>';
                 document.getElementById('saved-row-count').textContent = '0 rows';
                 return;
             }
@@ -379,7 +384,7 @@
                         const groupCount = rows.filter(r => (r.county_code || '(No Code)') === groupKey).length;
                         const gtr = document.createElement('tr');
                         gtr.className = 'group-header-row';
-                        gtr.innerHTML = `<td colspan="9">County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount} records)</td>`;
+                        gtr.innerHTML = `<td colspan="13">County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount} records)</td>`;
                         tbody.appendChild(gtr);
                     }
                 }
@@ -391,6 +396,8 @@
                 const ccVal = edited?.county_code ?? row.county_code ?? '';
                 const jcVal = edited?.jurisdiction_code ?? row.jurisdiction_code ?? '';
 
+                const fmtNum = (v) => v != null && v !== '' ? parseFloat(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+
                 tr.innerHTML = `
                     <td style="color:var(--text-disabled);font-size:11px;">${counter}</td>
                     <td>${row.company || ''}</td>
@@ -398,6 +405,10 @@
                     <td>${row.city || ''}</td>
                     <td>${row.state || ''}</td>
                     <td>${row.zip || ''}</td>
+                    <td style="text-align:right;">${fmtNum(row.total_sales)}</td>
+                    <td style="text-align:right;">${fmtNum(row.net_sales)}</td>
+                    <td style="text-align:right;">${fmtNum(row.taxes)}</td>
+                    <td style="text-align:right;">${fmtNum(row.shipping_charges)}</td>
                     <td class="editable-cell ${edited?.county_name !== undefined ? 'edited' : ''}">
                         <input type="text" value="${cnVal}" data-id="${row.id}" data-field="county_name">
                     </td>
@@ -549,6 +560,10 @@
                     city: ['city', 'town', 'municipality'],
                     state: ['state', 'st', 'statecode', 'stateabbr'],
                     zip: ['zip', 'zipcode', 'postal', 'postalcode', 'zip5'],
+                    total_sales: ['totalsales', 'grosssales', 'total', 'gross'],
+                    net_sales: ['netsales', 'net'],
+                    taxes: ['tax', 'taxes', 'salestax', 'taxamount'],
+                    shipping_charges: ['shipping', 'shippingcharges', 'freight', 'shippingcost'],
                 };
                 const fieldPatterns = patterns[field.key] || [field.key];
                 for (const h of lowerHeaders) {
@@ -800,6 +815,8 @@
                 });
 
                 const batchId = `batch_${Date.now()}`;
+                const toNum = (v) => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+
                 const records = mappedData.map(row => ({
                     batch_id: batchId,
                     company: row.company || '',
@@ -810,6 +827,10 @@
                     county_name: row.county_name || '',
                     county_code: row.county_code || '',
                     jurisdiction_code: row.jurisdiction_code || '',
+                    total_sales: toNum(row.total_sales),
+                    net_sales: toNum(row.net_sales),
+                    taxes: toNum(row.taxes),
+                    shipping_charges: toNum(row.shipping_charges),
                     extra_data: row._extras || {},
                 }));
 
