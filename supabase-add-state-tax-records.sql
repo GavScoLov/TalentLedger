@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS state_tax_records (
     id BIGSERIAL PRIMARY KEY,
     batch_id TEXT NOT NULL,
+    batch_name TEXT DEFAULT '',
     uploaded_by TEXT DEFAULT '',
     company TEXT DEFAULT '',
     country TEXT DEFAULT '',
@@ -43,3 +44,4 @@ CREATE POLICY "Allow all for authenticated users" ON state_tax_records
 -- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS net_sales NUMERIC(12,2) DEFAULT 0;
 -- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS taxes NUMERIC(12,2) DEFAULT 0;
 -- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS shipping_charges NUMERIC(12,2) DEFAULT 0;
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS batch_name TEXT DEFAULT '';

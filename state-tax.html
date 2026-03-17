@@ -120,6 +120,43 @@
         }
         .batch-actions .btn-danger:hover { background: #fef2f2; border-color: #DC2626; }
 
+        /* ── Batch name (inline editable) ──────────────── */
+        .batch-name {
+            font-size: 16px; font-weight: 700; color: var(--text-primary);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .batch-name .name-text { cursor: pointer; }
+        .batch-name .name-text:hover { color: var(--primary); }
+        .batch-name .edit-icon {
+            opacity: 0; transition: opacity 0.15s; cursor: pointer; color: var(--text-secondary);
+        }
+        .batch-item:hover .edit-icon { opacity: 1; }
+        .batch-name .edit-icon:hover { color: var(--primary); }
+        .batch-name-input {
+            font-size: 16px; font-weight: 700; color: var(--text-primary);
+            border: 1px solid var(--primary); border-radius: 6px;
+            padding: 2px 8px; outline: none; background: var(--bg-default);
+            font-family: inherit; width: 250px;
+        }
+
+        /* ── Name modal (save dialog) ─────────────────── */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal {
+            background: var(--bg-paper); border-radius: var(--radius-lg);
+            padding: 28px 32px; max-width: 420px; width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text-primary); }
+        .modal .form-group { margin-bottom: 16px; }
+        .modal .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
+        .modal .form-group input { width: 100%; }
+        .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
         /* ── Custom checkbox (Group by County Code) ─────── */
         .custom-checkbox {
             display: flex; align-items: center; gap: 8px; cursor: pointer;
@@ -188,6 +225,7 @@
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                                 Back to Batches
                             </button>
+                            <span id="batch-detail-title" style="font-size:15px;font-weight:700;color:var(--text-primary);"></span>
                             <label class="custom-checkbox">
                                 <input type="checkbox" id="group-by-county">
                                 <span class="check-box">
@@ -281,6 +319,21 @@
         </div>
     </div>
 
+    <!-- Save Name Modal -->
+    <div class="modal-overlay" id="save-modal">
+        <div class="modal">
+            <h3>Name This Upload</h3>
+            <div class="form-group">
+                <label for="batch-name-input">Upload Name</label>
+                <input type="text" class="form-input" id="batch-name-input" placeholder="e.g., Q1 2026 Texas Sales Tax" maxlength="100">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" id="save-modal-cancel" style="padding:8px 18px;">Cancel</button>
+                <button class="btn btn-primary" id="save-modal-confirm" style="padding:8px 18px;">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { checkAuth, checkPageAccess, getUser } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
@@ -368,6 +421,7 @@
                 if (!batches[r.batch_id]) {
                     batches[r.batch_id] = {
                         batch_id: r.batch_id,
+                        batch_name: r.batch_name || '',
                         created_at: r.created_at,
                         uploaded_by: r.uploaded_by || '',
                         records: [],
@@ -377,7 +431,6 @@
                 batches[r.batch_id].records.push(r);
                 if (r.state) batches[r.batch_id].states.add(r.state);
             });
-            // Sort by date descending
             return Object.values(batches).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         }
 
@@ -400,12 +453,20 @@
             container.innerHTML = '';
             batches.forEach(batch => {
                 const statesList = [...batch.states].sort().join(', ') || 'N/A';
+                const displayName = batch.batch_name || 'Untitled Upload';
                 const div = document.createElement('div');
                 div.className = 'batch-item';
                 div.innerHTML = `
                     <div class="batch-info">
-                        <div class="batch-date">${formatDate(batch.created_at)}</div>
+                        <div class="batch-name" data-batch="${batch.batch_id}">
+                            <span class="name-text" title="Click to rename">${displayName}</span>
+                            <svg class="edit-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        </div>
                         <div class="batch-meta">
+                            <span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+                                ${formatDate(batch.created_at)}
+                            </span>
                             <span>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 ${batch.uploaded_by || 'Unknown'}
@@ -434,6 +495,51 @@
             container.querySelectorAll('.delete-batch-btn').forEach(btn => {
                 btn.addEventListener('click', () => deleteBatch(btn.dataset.batch));
             });
+            // Inline rename on click
+            container.querySelectorAll('.batch-name').forEach(el => {
+                const nameText = el.querySelector('.name-text');
+                const editIcon = el.querySelector('.edit-icon');
+                const startRename = () => {
+                    const batchId = el.dataset.batch;
+                    const currentName = nameText.textContent === 'Untitled Upload' ? '' : nameText.textContent;
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'batch-name-input';
+                    input.value = currentName;
+                    input.placeholder = 'Enter upload name...';
+                    input.maxLength = 100;
+                    el.innerHTML = '';
+                    el.appendChild(input);
+                    input.focus();
+                    input.select();
+
+                    const finishRename = async () => {
+                        const newName = input.value.trim();
+                        input.replaceWith(nameText);
+                        el.appendChild(editIcon);
+                        nameText.textContent = newName || 'Untitled Upload';
+                        // Update in Supabase
+                        const { error } = await supabase
+                            .from('state_tax_records')
+                            .update({ batch_name: newName })
+                            .eq('batch_id', batchId);
+                        if (error) { console.error('Rename error:', error); return; }
+                        // Update local data
+                        allRecords.forEach(r => { if (r.batch_id === batchId) r.batch_name = newName; });
+                    };
+
+                    input.addEventListener('blur', finishRename);
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') input.blur();
+                        if (e.key === 'Escape') {
+                            input.value = currentName;
+                            input.blur();
+                        }
+                    });
+                };
+                nameText.addEventListener('click', startRename);
+                editIcon.addEventListener('click', startRename);
+            });
         }
 
         function viewBatch(batchId) {
@@ -442,6 +548,8 @@
             editedRecords = {};
             updateSaveEditsBtn();
             document.getElementById('group-by-county').checked = false;
+            const batchName = savedRecords[0]?.batch_name || 'Untitled Upload';
+            document.getElementById('batch-detail-title').textContent = batchName;
             renderSavedTable();
             showStep('step-batch-detail');
         }
@@ -936,7 +1044,39 @@
         }
 
         // ── Save Data to Supabase ───────────────────────────
+        function promptSaveName() {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('save-modal');
+                const input = document.getElementById('batch-name-input');
+                input.value = '';
+                modal.classList.add('active');
+                input.focus();
+
+                const confirmBtn = document.getElementById('save-modal-confirm');
+                const cancelBtn = document.getElementById('save-modal-cancel');
+
+                const cleanup = () => {
+                    modal.classList.remove('active');
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    input.removeEventListener('keydown', onKey);
+                };
+
+                const onConfirm = () => { cleanup(); resolve(input.value.trim()); };
+                const onCancel = () => { cleanup(); resolve(null); };
+                const onKey = (e) => { if (e.key === 'Enter') onConfirm(); if (e.key === 'Escape') onCancel(); };
+
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+                input.addEventListener('keydown', onKey);
+            });
+        }
+
         async function saveDataToSupabase() {
+            // Prompt for name first
+            const batchName = await promptSaveName();
+            if (batchName === null) return; // User cancelled
+
             const btn = document.getElementById('save-data-btn');
             const statusEl = document.getElementById('status-msg');
             btn.disabled = true;
@@ -964,6 +1104,7 @@
 
                 const records = mappedData.map(row => ({
                     batch_id: batchId,
+                    batch_name: batchName,
                     uploaded_by: uploadedBy,
                     company: row.company || '',
                     country: row.country || '',
