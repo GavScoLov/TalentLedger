@@ -77,6 +77,14 @@
             .viz-layout { display: block !important; }
             .card { box-shadow: none !important; border: none !important; margin-bottom: 0; }
             .viz-chart-section { display: none !important; }
+            .print-chart-page {
+                display: block !important; page-break-before: always; padding: 20px 0;
+            }
+            .print-chart-page h2 {
+                font-size: 18px; text-align: center; font-weight: 700; color: #000;
+                border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;
+            }
+            .print-chart-page img { width: 100%; max-height: 600px; object-fit: contain; }
             .print-header {
                 display: block !important; font-size: 22px; text-align: center; font-weight: 700;
                 padding: 12px 0 4px; color: #000; border-bottom: 2px solid #333; margin-bottom: 8px;
@@ -121,7 +129,7 @@
         }
 
         /* Hidden elements only shown in print */
-        .print-header, .print-sub-header, .print-total-bar { display: none; }
+        .print-header, .print-sub-header, .print-total-bar, .print-chart-page { display: none; }
     </style>
 </head>
 <body>
@@ -183,8 +191,8 @@
                 <div class="viz-stats-bar">
                     <div class="stats-bar">
                         <div class="stat-card">
-                            <div class="stat-label">Average Revenue</div>
-                            <div class="stat-value" id="stat-avg-revenue">$0</div>
+                            <div class="stat-label">Average Hours</div>
+                            <div class="stat-value" id="stat-avg-revenue">0</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-label">Trend % Change</div>
@@ -196,8 +204,8 @@
                             <div class="stat-sub" id="stat-intervals-detail">0 actual / 0 forecast</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-label">Total</div>
-                            <div class="stat-value" id="stat-total">$0</div>
+                            <div class="stat-label">Total Hours</div>
+                            <div class="stat-value" id="stat-total">0</div>
                         </div>
                     </div>
                 </div>
@@ -222,6 +230,10 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="print-chart-page" id="print-chart-page">
+                <h2 id="print-chart-title"></h2>
+                <img id="print-chart-img" src="" alt="Chart">
             </div>
         </div>
     </div>
@@ -269,7 +281,8 @@
         }
 
         function isCorporateBranch(name) {
-            return (name || '').toLowerCase().includes('corporate');
+            const n = (name || '').toLowerCase();
+            return n.includes('corporate') || n.includes('_corp');
         }
 
         // ── Fetch Data ────────────────────────────────────────────
@@ -371,21 +384,30 @@
                 ...c, branch: [...c.branches].join(', ')
             })).sort((a, b) => b.revenue - a.revenue);
 
-            // Time-series
+            // Time-series: aggregate HOURS (not revenue) per interval
             const interval = document.getElementById('interval_select').value;
             const timeAgg = {};
-            filtered.forEach(r => {
-                const weekend = r.weekendbill || '';
+
+            // Use rawHoursByCompany for time-series hours data
+            rawHoursByCompany.forEach(r => {
+                const isDHP = (r.company_name || '').toUpperCase().includes('DHP');
+                if (report === 'DHR' && !isDHP) return;
+                if (report === 'GSR' && isDHP) return;
+                if (isCorporateBranch(r.branch)) return;
+                if (branch !== 'all' && r.branch !== branch) return;
+                if (search && !(r.company_name || '').toLowerCase().includes(search)) return;
+
+                const weekend = r.weekend_bill || '';
                 if (!weekend) return;
                 let key;
                 if (interval === 'weekly') key = weekend;
                 else if (interval === 'monthly') key = weekend.substring(0, 7);
                 else key = weekend.substring(0, 4);
-                timeAgg[key] = (timeAgg[key] || 0) + (Number(r.invoiceamount) || 0);
+                timeAgg[key] = (timeAgg[key] || 0) + (Number(r.total_hours) || 0);
             });
 
             const timeSeries = Object.entries(timeAgg).sort((a, b) => a[0].localeCompare(b[0]));
-            const reportLabels = { GSR: 'General Staffing', DHR: 'Direct Hire' };
+            const reportLabels = { GSR: 'General Staffing Hours', DHR: 'Direct Hire Hours' };
 
             renderTable(report, tableData, groupBy);
             renderTimeChart(timeSeries, reportLabels[report]);
@@ -448,13 +470,13 @@
                 }
             }
 
-            document.getElementById('stat-avg-revenue').textContent = formatCurrency2(avg);
+            document.getElementById('stat-avg-revenue').textContent = formatNumber(avg, 2) + ' hrs';
             const pctEl = document.getElementById('stat-pct-change');
             pctEl.textContent = (pctChange >= 0 ? '+' : '') + pctChange.toFixed(2) + '%';
             pctEl.className = 'stat-value ' + (pctChange >= 0 ? 'stat-positive' : 'stat-negative');
             document.getElementById('stat-intervals').textContent = totalIntervals;
             document.getElementById('stat-intervals-detail').textContent = `${actualCount} actual / ${forecastCount} forecast`;
-            document.getElementById('stat-total').textContent = formatCurrency2(total);
+            document.getElementById('stat-total').textContent = formatNumber(total, 2) + ' hrs';
         }
 
         // ── Render Time-Series Chart ──────────────────────────────
@@ -568,17 +590,31 @@
             mainChart = new Chart(ctx, {
                 type: graphType,
                 data: { labels: allLabels, datasets },
+                plugins: [ChartDataLabels],
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'bottom' },
-                        tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + formatCurrency2(ctx.parsed.y) } },
-                        datalabels: { display: false },
+                        tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + formatNumber(ctx.parsed.y, 2) + ' hrs' } },
+                        datalabels: {
+                            display: function(context) {
+                                if (context.dataset.label === 'Trend') return false;
+                                return context.parsed.y !== null && context.parsed.y !== 0;
+                            },
+                            anchor: graphType === 'bar' ? 'end' : 'end',
+                            align: graphType === 'bar' ? 'top' : 'top',
+                            color: '#333',
+                            font: { size: 10, weight: '600' },
+                            formatter: (value) => formatNumber(value, 1),
+                            rotation: graphType === 'bar' ? -45 : 0,
+                            offset: 2,
+                        },
                     },
                     scales: {
                         x: { ticks: { color: '#6B7280', maxRotation: 45 }, grid: { color: '#E8E8E8' } },
-                        y: { beginAtZero: false, ticks: { callback: v => formatCurrency(v), color: '#6B7280' }, grid: { color: '#E8E8E8' } },
+                        y: { beginAtZero: false, ticks: { callback: v => formatNumber(v, 0), color: '#6B7280' }, grid: { color: '#E8E8E8' } },
                     },
+                    layout: { padding: { top: 30 } },
                 },
             });
         }
@@ -598,7 +634,15 @@
             processData();
         });
         document.getElementById('forecast_end').addEventListener('change', processData);
-        document.getElementById('print-btn').addEventListener('click', () => window.print());
+        document.getElementById('print-btn').addEventListener('click', () => {
+            if (mainChart) {
+                const imgData = mainChart.toBase64Image();
+                document.getElementById('print-chart-img').src = imgData;
+                const report = getReportType();
+                document.getElementById('print-chart-title').textContent = reportTitles[report] || 'Hours Breakdown';
+            }
+            setTimeout(() => window.print(), 100);
+        });
 
         setTimeout(() => loadData(), 100);
     </script>

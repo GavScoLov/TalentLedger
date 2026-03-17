@@ -62,6 +62,15 @@
             .viz-layout { display: block !important; }
             .card { box-shadow: none !important; border: none !important; margin-bottom: 0; }
             .viz-chart-section { display: none !important; }
+            /* Print chart page */
+            .print-chart-page {
+                display: block !important; page-break-before: always; padding: 20px 0;
+            }
+            .print-chart-page h2 {
+                font-size: 18px; text-align: center; font-weight: 700; color: #000;
+                border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;
+            }
+            .print-chart-page img { width: 100%; max-height: 600px; object-fit: contain; }
             .print-header {
                 display: block !important; font-size: 22px; text-align: center; font-weight: 700;
                 padding: 12px 0 4px; color: #000; border-bottom: 2px solid #333; margin-bottom: 8px;
@@ -106,7 +115,7 @@
         }
 
         /* Hidden elements only shown in print */
-        .print-header, .print-sub-header, .print-total-bar { display: none; }
+        .print-header, .print-sub-header, .print-total-bar, .print-chart-page { display: none; }
     </style>
 </head>
 <body>
@@ -210,6 +219,10 @@
                     </div>
                 </div>
             </div>
+            <div class="print-chart-page" id="print-chart-page">
+                <h2 id="print-chart-title"></h2>
+                <img id="print-chart-img" src="" alt="Chart">
+            </div>
         </div>
     </div>
 
@@ -248,7 +261,8 @@
 
         // ── Helper: filter Corporate branches ────────────────────
         function isCorporateBranch(name) {
-            return (name || '').toLowerCase().includes('corporate');
+            const n = (name || '').toLowerCase();
+            return n.includes('corporate') || n.includes('_corp');
         }
 
         // ── Fetch Data ────────────────────────────────────────────
@@ -528,17 +542,32 @@
             mainChart = new Chart(ctx, {
                 type: graphType,
                 data: { labels: allLabels, datasets },
+                plugins: [ChartDataLabels],
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'bottom' },
                         tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => (ctx.dataset.label || '') + ': ' + formatCurrency2(ctx.parsed.y) } },
-                        datalabels: { display: false },
+                        datalabels: {
+                            display: function(context) {
+                                // Hide labels for Trend dataset and null values
+                                if (context.dataset.label === 'Trend') return false;
+                                return context.parsed.y !== null && context.parsed.y !== 0;
+                            },
+                            anchor: graphType === 'bar' ? 'end' : 'end',
+                            align: graphType === 'bar' ? 'top' : 'top',
+                            color: '#333',
+                            font: { size: 10, weight: '600' },
+                            formatter: (value) => formatCurrency(value),
+                            rotation: graphType === 'bar' ? -45 : 0,
+                            offset: 2,
+                        },
                     },
                     scales: {
                         x: { ticks: { color: '#6B7280', maxRotation: 45 }, grid: { color: '#E8E8E8' } },
                         y: { beginAtZero: false, ticks: { callback: v => formatCurrency(v), color: '#6B7280' }, grid: { color: '#E8E8E8' } },
                     },
+                    layout: { padding: { top: 30 } },
                 },
             });
         }
@@ -559,7 +588,15 @@
             processData();
         });
         document.getElementById('forecast_end').addEventListener('change', processData);
-        document.getElementById('print-btn').addEventListener('click', () => window.print());
+        document.getElementById('print-btn').addEventListener('click', () => {
+            // Snapshot chart to print page
+            if (mainChart) {
+                const imgData = mainChart.toBase64Image();
+                document.getElementById('print-chart-img').src = imgData;
+                document.getElementById('print-chart-title').textContent = REPORT_TITLE;
+            }
+            setTimeout(() => window.print(), 100);
+        });
 
         setTimeout(() => loadData(), 100);
     </script>
