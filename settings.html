@@ -391,19 +391,19 @@
         }
 
         // ── CSV Tax Code Parser ─────────────────────────────
-        // Supports two formats:
+        // Supports formats:
         //   1) Header-based: county_name, city_name, county_code, jurisdiction_code
-        //   2) Zip-based:    county name, county code, zip1, zip2, zip3, ...
+        //   2) Zip-based:    County, Code, "zip1; zip2; zip3" (semicolon-separated in one column)
+        //                    or County, Code, zip1, zip2, zip3 (one per column)
         function parseCSVTaxCodes(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim());
             if (lines.length < 2) return [];
 
             const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim().replace(/[\s_-]+/g, '_'));
 
-            // Detect zip-based format: first two cols are county name & county code, rest are zips
+            // Detect zip-based format: headers like "county, code, zip codes" or no city/jurisdiction cols
             const isZipFormat = headers.length >= 3 && (
-                (/county.?name/.test(headers[0]) && /county.?code/.test(headers[1]) && /zip/.test(headers[2])) ||
-                // Or no recognizable city/jurisdiction headers and 3+ columns
+                (/county/.test(headers[0]) && /code/.test(headers[1]) && /zip/.test(headers[2])) ||
                 (!headers.some(h => /city|jurisdiction|juris/.test(h)) && headers.length >= 3)
             );
 
@@ -416,8 +416,10 @@
                     const county_code = (cols[1] || '').trim();
                     if (!county_name && !county_code) continue;
 
-                    // Each remaining column is a zip code — create one row per zip
-                    const zips = cols.slice(2).map(z => z.trim()).filter(z => z);
+                    // Zips may be semicolon-separated in one column or spread across columns
+                    const rawZips = cols.slice(2).join(';');
+                    const zips = rawZips.split(/[;]/).map(z => z.trim()).filter(z => z && /\d/.test(z));
+
                     if (zips.length === 0) {
                         results.push({ county_name, city_name: '', county_code, jurisdiction_code: '', zip: '' });
                     } else {
