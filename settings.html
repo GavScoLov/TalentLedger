@@ -129,7 +129,8 @@
                         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
                             <h4 style="font-size:13px;font-weight:600;margin:0;" id="view-codes-title">Tax Codes</h4>
                             <span class="status-message info" id="view-codes-count" style="display:inline-block;padding:4px 10px;font-size:11px;"></span>
-                            <button class="btn" id="close-view-codes-btn" style="margin-left:auto;font-size:12px;padding:4px 12px;">Close</button>
+                            <input type="text" class="form-input" id="view-codes-search" placeholder="Search county name, code, zip..." style="margin-left:auto;max-width:250px;padding:4px 10px;font-size:12px;">
+                            <button class="btn" id="close-view-codes-btn" style="font-size:12px;padding:4px 12px;">Close</button>
                         </div>
                         <div class="settings-table-wrap" style="max-height:400px;">
                             <table class="data-table" id="view-codes-table">
@@ -376,16 +377,39 @@
         renderSavedStates();
 
         // ── View State Codes ────────────────────────────────
+        let viewCodesData = []; // store fetched codes for search filtering
+
+        function renderViewCodesTable(codes) {
+            const tbody = document.getElementById('view-codes-body');
+            const countEl = document.getElementById('view-codes-count');
+            countEl.textContent = `${codes.length} codes`;
+
+            if (codes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No codes match your search.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = codes.map(tc => `
+                <tr>
+                    <td>${tc.county_name || ''}</td>
+                    <td>${tc.city_name || ''}</td>
+                    <td>${tc.county_code || ''}</td>
+                    <td>${tc.jurisdiction_code || ''}</td>
+                    <td>${tc.zip || ''}</td>
+                </tr>
+            `).join('');
+        }
+
         async function viewStateCodes(stateName) {
             const section = document.getElementById('view-codes-section');
             const tbody = document.getElementById('view-codes-body');
             const title = document.getElementById('view-codes-title');
-            const countEl = document.getElementById('view-codes-count');
+            const searchInput = document.getElementById('view-codes-search');
 
             section.style.display = 'block';
             title.textContent = `${stateName} Tax Codes`;
+            searchInput.value = '';
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">Loading...</td></tr>';
-            countEl.textContent = '';
 
             // Paginate to fetch all codes (Supabase default limit is 1000)
             let codes = [];
@@ -408,25 +432,24 @@
                 if (page.length < pageSize) break;
                 from += pageSize;
             }
-            countEl.textContent = `${codes.length} codes`;
 
-            if (codes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No codes found.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = codes.map(tc => `
-                <tr>
-                    <td>${tc.county_name || ''}</td>
-                    <td>${tc.city_name || ''}</td>
-                    <td>${tc.county_code || ''}</td>
-                    <td>${tc.jurisdiction_code || ''}</td>
-                    <td>${tc.zip || ''}</td>
-                </tr>
-            `).join('');
-
+            viewCodesData = codes;
+            renderViewCodesTable(codes);
             section.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+
+        document.getElementById('view-codes-search').addEventListener('input', (e) => {
+            const q = e.target.value.toLowerCase().trim();
+            if (!q) { renderViewCodesTable(viewCodesData); return; }
+            const filtered = viewCodesData.filter(tc =>
+                (tc.county_name || '').toLowerCase().includes(q) ||
+                (tc.city_name || '').toLowerCase().includes(q) ||
+                (tc.county_code || '').toLowerCase().includes(q) ||
+                (tc.jurisdiction_code || '').toLowerCase().includes(q) ||
+                (tc.zip || '').toLowerCase().includes(q)
+            );
+            renderViewCodesTable(filtered);
+        });
 
         document.getElementById('close-view-codes-btn').addEventListener('click', () => {
             document.getElementById('view-codes-section').style.display = 'none';
