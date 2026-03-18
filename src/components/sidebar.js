@@ -86,7 +86,7 @@ export async function renderSidebar() {
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <img src="./assets/TalentLedger-Icon.png" alt="TalentLedger" style="width:32px;height:32px;border-radius:6px;object-fit:cover;">
+        <img src="./assets/TalentLedger-SidebarIcon.png" alt="TalentLedger" style="width:32px;height:32px;border-radius:6px;object-fit:cover;">
         <span class="sidebar-app-name">TalentLedger</span>
       </div>
       <nav class="sidebar-nav">${navHTML}</nav>
