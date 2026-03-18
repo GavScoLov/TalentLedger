@@ -7,12 +7,17 @@ CREATE TABLE IF NOT EXISTS state_tax_codes (
     city_name TEXT NOT NULL DEFAULT '',
     county_code TEXT NOT NULL DEFAULT '',
     jurisdiction_code TEXT NOT NULL DEFAULT '',
+    zip TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Index for fast lookups by state + county name
 CREATE INDEX IF NOT EXISTS idx_state_tax_codes_state ON state_tax_codes (state);
 CREATE INDEX IF NOT EXISTS idx_state_tax_codes_county ON state_tax_codes (state, county_name);
+CREATE INDEX IF NOT EXISTS idx_state_tax_codes_zip ON state_tax_codes (state, zip);
+
+-- If table already exists, run:
+-- ALTER TABLE state_tax_codes ADD COLUMN IF NOT EXISTS zip TEXT NOT NULL DEFAULT '';
 
 -- Enable Row Level Security
 ALTER TABLE state_tax_codes ENABLE ROW LEVEL SECURITY;

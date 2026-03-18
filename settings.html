@@ -113,7 +113,7 @@
                 <div class="card" style="padding: 16px;">
                     <h3 style="font-size:14px;font-weight:700;margin-bottom:4px;">State Tax Codes</h3>
                     <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
-                        Upload state tax code PDFs or CSVs. PDFs (like Georgia's County &amp; City Sales Tax ID Codes) will be auto-parsed. CSVs should have columns for county_name, city_name, county_code, and jurisdiction_code.
+                        Upload state tax code PDFs or CSVs. PDFs (like Georgia's County &amp; City Sales Tax ID Codes) will be auto-parsed. CSVs can use header format (county_name, city_name, county_code, jurisdiction_code) or zip format (county_name, county_code, zip1, zip2, zip3...).
                     </p>
 
                     <!-- Saved states -->
@@ -150,7 +150,7 @@
                         </div>
                         <div class="settings-table-wrap" style="max-height:300px;">
                             <table class="data-table" id="tax-preview-table">
-                                <thead><tr><th>County Name</th><th>City Name</th><th>County Code</th><th>Jurisdiction Code</th></tr></thead>
+                                <thead><tr><th>County Name</th><th>City Name</th><th>County Code</th><th>Jurisdiction Code</th><th>Zip</th></tr></thead>
                                 <tbody id="tax-preview-body"></tbody>
                             </table>
                         </div>
@@ -377,7 +377,7 @@
                 }
 
                 if (taxCodes.length === 0) {
-                    parseStatus.innerHTML = `<span style="color:#DC2626;font-size:13px;">No tax codes found. ${isPDF ? 'Ensure the PDF has columns like County Name, City Name, County Code, Jurisdiction Code.' : 'Ensure the CSV has headers like county_name, city_name, county_code, jurisdiction_code.'}</span>`;
+                    parseStatus.innerHTML = `<span style="color:#DC2626;font-size:13px;">No tax codes found. ${isPDF ? 'Ensure the PDF has columns like County Name, City Name, County Code, Jurisdiction Code.' : 'Ensure the CSV has headers. Supported formats: (1) county_name, city_name, county_code, jurisdiction_code or (2) county_name, county_code, zip1, zip2, zip3...'}</span>`;
                     return;
                 }
 
@@ -391,23 +391,54 @@
         }
 
         // ── CSV Tax Code Parser ─────────────────────────────
+        // Supports two formats:
+        //   1) Header-based: county_name, city_name, county_code, jurisdiction_code
+        //   2) Zip-based:    county name, county code, zip1, zip2, zip3, ...
         function parseCSVTaxCodes(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim());
             if (lines.length < 2) return [];
 
-            // Parse header row
             const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim().replace(/[\s_-]+/g, '_'));
 
-            // Map header names flexibly
+            // Detect zip-based format: first two cols are county name & county code, rest are zips
+            const isZipFormat = headers.length >= 3 && (
+                (/county.?name/.test(headers[0]) && /county.?code/.test(headers[1]) && /zip/.test(headers[2])) ||
+                // Or no recognizable city/jurisdiction headers and 3+ columns
+                (!headers.some(h => /city|jurisdiction|juris/.test(h)) && headers.length >= 3)
+            );
+
+            if (isZipFormat) {
+                const results = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = parseCSVLine(lines[i]);
+                    if (cols.length < 2) continue;
+                    const county_name = (cols[0] || '').trim();
+                    const county_code = (cols[1] || '').trim();
+                    if (!county_name && !county_code) continue;
+
+                    // Each remaining column is a zip code — create one row per zip
+                    const zips = cols.slice(2).map(z => z.trim()).filter(z => z);
+                    if (zips.length === 0) {
+                        results.push({ county_name, city_name: '', county_code, jurisdiction_code: '', zip: '' });
+                    } else {
+                        zips.forEach(zip => {
+                            results.push({ county_name, city_name: '', county_code, jurisdiction_code: '', zip });
+                        });
+                    }
+                }
+                return results;
+            }
+
+            // Header-based format
             const colMap = {};
             headers.forEach((h, i) => {
                 if (/county.?name/.test(h)) colMap.county_name = i;
                 else if (/city.?name|city/.test(h) && colMap.city_name === undefined) colMap.city_name = i;
                 else if (/county.?code/.test(h)) colMap.county_code = i;
                 else if (/jurisdiction.?code|juris/.test(h)) colMap.jurisdiction_code = i;
+                else if (/^zip/.test(h) && colMap.zip === undefined) colMap.zip = i;
             });
 
-            // Fallback: if we have exactly 4 columns and no matches, assume order
             if (Object.keys(colMap).length < 2 && headers.length >= 4) {
                 colMap.county_name = 0;
                 colMap.city_name = 1;
@@ -426,10 +457,11 @@
                 const city_name = (cols[colMap.city_name] || '').trim();
                 const county_code = (cols[colMap.county_code] || '').trim();
                 const jurisdiction_code = (cols[colMap.jurisdiction_code] || '').trim();
+                const zip = colMap.zip !== undefined ? (cols[colMap.zip] || '').trim() : '';
 
                 if (!county_name && !city_name) continue;
 
-                results.push({ county_name, city_name, county_code, jurisdiction_code });
+                results.push({ county_name, city_name, county_code, jurisdiction_code, zip });
             }
             return results;
         }
@@ -561,9 +593,10 @@
             tbody.innerHTML = parsedTaxCodes.map(tc => `
                 <tr>
                     <td>${tc.county_name}</td>
-                    <td>${tc.city_name}</td>
+                    <td>${tc.city_name || ''}</td>
                     <td>${tc.county_code}</td>
-                    <td>${tc.jurisdiction_code}</td>
+                    <td>${tc.jurisdiction_code || ''}</td>
+                    <td>${tc.zip || ''}</td>
                 </tr>
             `).join('');
         }
@@ -589,9 +622,10 @@
                     const batch = parsedTaxCodes.slice(i, i + batchSize).map(tc => ({
                         state: tc.state,
                         county_name: tc.county_name,
-                        city_name: tc.city_name,
+                        city_name: tc.city_name || '',
                         county_code: tc.county_code,
-                        jurisdiction_code: tc.jurisdiction_code,
+                        jurisdiction_code: tc.jurisdiction_code || '',
+                        zip: tc.zip || '',
                     }));
                     const { error } = await supabase.from('state_tax_codes').insert(batch);
                     if (error) throw error;

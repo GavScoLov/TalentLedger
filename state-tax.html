@@ -365,7 +365,7 @@
             if (taxCodeCache[key]) return taxCodeCache[key];
             const { data, error } = await supabase
                 .from('state_tax_codes')
-                .select('county_name, city_name, county_code, jurisdiction_code')
+                .select('county_name, city_name, county_code, jurisdiction_code, zip')
                 .ilike('state', stateName.trim());
             if (error) { console.error('Error loading tax codes for', stateName, error); return []; }
             taxCodeCache[key] = data || [];
@@ -375,13 +375,25 @@
         function findTaxCodeByCity(taxCodes, cityName) {
             if (!taxCodes.length || !cityName) return null;
             const city = cityName.toUpperCase().trim();
-            const exact = taxCodes.find(tc => tc.city_name.toUpperCase().trim() === city);
+            const exact = taxCodes.find(tc => tc.city_name && tc.city_name.toUpperCase().trim() === city);
             if (exact) return exact;
             const partial = taxCodes.find(tc => {
-                const tcCity = tc.city_name.toUpperCase().trim();
+                const tcCity = (tc.city_name || '').toUpperCase().trim();
+                if (!tcCity) return false;
                 return tcCity.includes(city) || city.includes(tcCity);
             });
             return partial || null;
+        }
+
+        function findTaxCodeByZip(taxCodes, zipCode) {
+            if (!taxCodes.length || !zipCode) return null;
+            const zip = zipCode.trim().replace(/\D/g, '');
+            if (!zip) return null;
+            // Try exact match on the zip field
+            return taxCodes.find(tc => {
+                const tcZip = (tc.zip || '').trim().replace(/\D/g, '');
+                return tcZip && tcZip === zip;
+            }) || null;
         }
 
         // ── State ───────────────────────────────────────────
@@ -1092,18 +1104,23 @@
                 progress.textContent = `Processing ${i + 1} / ${total}...`;
 
                 const cityName = (row.city || '').trim();
+                const zipCode = (row.zip || '').trim();
                 const stateKey = (row.state || '').toLowerCase().trim();
                 const taxCodes = taxCodeCache[stateKey] || [];
 
-                if (!cityName || taxCodes.length === 0) {
+                if ((!cityName && !zipCode) || taxCodes.length === 0) {
                     row._countyStatus = 'error';
                     notFound++;
                 } else {
-                    const match = findTaxCodeByCity(taxCodes, cityName);
+                    // Try city match first, then fall back to zip match
+                    let match = findTaxCodeByCity(taxCodes, cityName);
+                    if (!match && zipCode) {
+                        match = findTaxCodeByZip(taxCodes, zipCode);
+                    }
                     if (match) {
                         row.county_name = match.county_name;
                         row.county_code = match.county_code;
-                        row.jurisdiction_code = match.jurisdiction_code;
+                        row.jurisdiction_code = match.jurisdiction_code || '';
                         row._countyStatus = 'found';
                         found++;
                     } else {
