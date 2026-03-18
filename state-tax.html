@@ -93,8 +93,15 @@
         .group-header-row td {
             background: var(--bg-default) !important; font-weight: 700 !important;
             font-size: 13px; color: var(--text-primary); padding: 10px 12px !important;
-            border-top: 2px solid var(--border-color);
+            border-top: 2px solid var(--border-color); cursor: pointer; user-select: none;
         }
+        .group-header-row:hover td { background: var(--bg-sidebar) !important; }
+        .group-header-row .group-toggle {
+            display: inline-block; width: 16px; font-size: 11px; margin-right: 6px;
+            transition: transform 0.2s ease; color: var(--text-secondary);
+        }
+        .group-header-row.collapsed .group-toggle { transform: rotate(-90deg); }
+        .group-row-hidden { display: none; }
         .group-total-row td {
             background: var(--bg-default) !important; font-weight: 700 !important;
             font-size: 12px; color: var(--text-primary); padding: 8px 12px !important;
@@ -692,6 +699,7 @@
                 });
             }
 
+            let groupIndex = 0;
             rows.forEach((row, rowIdx) => {
                 if (groupBy) {
                     const groupKey = row.county_code || '(No Code)';
@@ -701,6 +709,7 @@
                             const t = groupTotals[currentGroup];
                             const totalTr = document.createElement('tr');
                             totalTr.className = 'group-total-row';
+                            totalTr.dataset.group = `group-${groupIndex}`;
                             totalTr.innerHTML = `
                                 <td></td>
                                 <td colspan="5" style="text-align:right;font-weight:700;">Group Total:</td>
@@ -711,17 +720,20 @@
                                 <td colspan="3"></td>`;
                             tbody.appendChild(totalTr);
                         }
+                        groupIndex++;
                         currentGroup = groupKey;
                         const groupCount = rows.filter(r => (r.county_code || '(No Code)') === groupKey).length;
                         const gtr = document.createElement('tr');
                         gtr.className = 'group-header-row';
-                        gtr.innerHTML = `<td colspan="13">County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount} records)</td>`;
+                        gtr.dataset.groupToggle = `group-${groupIndex}`;
+                        gtr.innerHTML = `<td colspan="13"><span class="group-toggle">▼</span>County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount} records)</td>`;
                         tbody.appendChild(gtr);
                     }
                 }
 
                 counter++;
                 const tr = document.createElement('tr');
+                if (groupBy) tr.dataset.group = `group-${groupIndex}`;
                 const edited = editedRecords[row.id];
                 const cnVal = edited?.county_name ?? row.county_name ?? '';
                 const ccVal = edited?.county_code ?? row.county_code ?? '';
@@ -755,6 +767,7 @@
                 const t = groupTotals[currentGroup];
                 const totalTr = document.createElement('tr');
                 totalTr.className = 'group-total-row';
+                totalTr.dataset.group = `group-${groupIndex}`;
                 totalTr.innerHTML = `
                     <td></td>
                     <td colspan="5" style="text-align:right;font-weight:700;">Group Total:</td>
@@ -787,6 +800,19 @@
             tbody.appendChild(batchTr);
 
             document.getElementById('saved-row-count').textContent = `${filtered.length} rows`;
+
+            // Attach group toggle listeners
+            tbody.querySelectorAll('.group-header-row').forEach(header => {
+                header.addEventListener('click', () => {
+                    const groupId = header.dataset.groupToggle;
+                    const isCollapsed = header.classList.toggle('collapsed');
+                    tbody.querySelectorAll(`tr[data-group="${groupId}"]`).forEach(row => {
+                        // Keep group-total-row visible when collapsed
+                        if (row.classList.contains('group-total-row')) return;
+                        row.classList.toggle('group-row-hidden', isCollapsed);
+                    });
+                });
+            });
 
             // Attach edit listeners
             tbody.querySelectorAll('.editable-cell input').forEach(input => {
