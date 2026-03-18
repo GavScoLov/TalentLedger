@@ -110,7 +110,7 @@
         .card-speedometer { grid-column: 1 / 3; text-align: center; height: 340px; }
         .card-distribution { grid-column: 3; height: 340px; }
         .card-mini-pie { grid-column: 1 / 3; display: flex; flex-direction: column; }
-        .card-bonuses { grid-column: 3; overflow-y: auto; }
+        .card-bonuses { grid-column: 3; overflow: hidden; padding: 0 !important; }
         .card-weekly { grid-column: 1 / -1; height: 320px; }
 
         .card-title {
@@ -380,8 +380,7 @@
                     </div>
                 </div>
                 <div class="card card-bonuses">
-                    <div class="card-title">Bonus Programs</div>
-                    <img src="./assets/PSA-Bonus-Programs.png" alt="PSA Bonus Programs" style="width:100%;border-radius:8px;object-fit:contain;">
+                    <img src="./assets/PSA-Bonus-Programs.png" alt="PSA Bonus Programs" style="width:100%;height:100%;border-radius:8px;object-fit:cover;">
                 </div>
                 <div class="card card-weekly">
                     <div class="card-title">Weekly Activity</div>
