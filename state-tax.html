@@ -461,6 +461,7 @@
         let savedRecords = [];
         let allRecords = [];
         let editedRecords = {};
+        const padCode = (v) => { if (!v) return v; const s = String(v).trim(); return /^\d+$/.test(s) ? s.padStart(3, '0') : s; };
         let currentBatchId = null;
 
         const EXPECTED_FIELDS = [
@@ -753,8 +754,8 @@
             let rows = filtered;
             if (groupBy) {
                 rows = [...filtered].sort((a, b) => {
-                    const codeA = a.county_code || 'zzz';
-                    const codeB = b.county_code || 'zzz';
+                    const codeA = padCode(a.county_code) || 'zzz';
+                    const codeB = padCode(b.county_code) || 'zzz';
                     if (codeA !== codeB) return codeA.localeCompare(codeB);
                     return (a.county_name || '').localeCompare(b.county_name || '');
                 });
@@ -769,7 +770,7 @@
             let groupTotals = {};
             if (groupBy) {
                 rows.forEach(r => {
-                    const key = r.county_code || '(No Code)';
+                    const key = padCode(r.county_code) || '(No Code)';
                     if (!groupTotals[key]) groupTotals[key] = { total_sales: 0, net_sales: 0, taxes: 0, shipping_charges: 0 };
                     groupTotals[key].total_sales += toNum(r.total_sales);
                     groupTotals[key].net_sales += toNum(r.net_sales);
@@ -790,11 +791,11 @@
             let groupIndex = 0;
             rows.forEach((row, rowIdx) => {
                 if (groupBy) {
-                    const groupKey = row.county_code || '(No Code)';
+                    const groupKey = padCode(row.county_code) || '(No Code)';
                     if (groupKey !== currentGroup) {
                         groupIndex++;
                         currentGroup = groupKey;
-                        const groupCount = rows.filter(r => (r.county_code || '(No Code)') === groupKey).length;
+                        const groupCount = rows.filter(r => (padCode(r.county_code) || '(No Code)') === groupKey).length;
                         const t = groupTotals[groupKey];
                         const gtr = document.createElement('tr');
                         gtr.className = 'group-header-row';
@@ -816,7 +817,7 @@
                 if (groupBy) tr.dataset.group = `group-${groupIndex}`;
                 const edited = editedRecords[row.id];
                 const cnVal = edited?.county_name ?? row.county_name ?? '';
-                const ccVal = edited?.county_code ?? row.county_code ?? '';
+                const ccVal = padCode(edited?.county_code ?? row.county_code) ?? '';
                 const jcVal = edited?.jurisdiction_code ?? row.jurisdiction_code ?? '';
 
                 tr.innerHTML = `
@@ -1283,7 +1284,7 @@
                     html += `<td class="county-pending">--</td><td class="county-pending">--</td><td class="county-pending">--</td>`;
                 } else if (row._countyStatus === 'found') {
                     html += `<td class="editable-cell"><input type="text" value="${row.county_name}" data-idx="${idx}" data-field="county_name"></td>`;
-                    html += `<td class="editable-cell"><input type="text" value="${row.county_code}" data-idx="${idx}" data-field="county_code"></td>`;
+                    html += `<td class="editable-cell"><input type="text" value="${padCode(row.county_code) || ''}" data-idx="${idx}" data-field="county_code"></td>`;
                     html += `<td class="editable-cell"><input type="text" value="${row.jurisdiction_code || ''}" data-idx="${idx}" data-field="jurisdiction_code"></td>`;
                 } else {
                     html += `<td class="editable-cell"><input type="text" value="" data-idx="${idx}" data-field="county_name" placeholder="Enter county"></td>`;
