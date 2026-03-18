@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS state_tax_records (
     taxes NUMERIC(12,2) DEFAULT 0,
     shipping_charges NUMERIC(12,2) DEFAULT 0,
     extra_data JSONB DEFAULT '{}',
+    archived BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -45,3 +46,4 @@ CREATE POLICY "Allow all for authenticated users" ON state_tax_records
 -- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS taxes NUMERIC(12,2) DEFAULT 0;
 -- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS shipping_charges NUMERIC(12,2) DEFAULT 0;
 -- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS batch_name TEXT DEFAULT '';
+-- ALTER TABLE state_tax_records ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;

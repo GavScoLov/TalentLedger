@@ -261,6 +261,12 @@
                             <option value="name-desc">Name Z–A</option>
                         </select>
                     </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;cursor:pointer;" for="show-archived">
+                            <input type="checkbox" id="show-archived" style="margin-right:4px;vertical-align:middle;">
+                            Show Archived
+                        </label>
+                    </div>
                 </div>
                 <div class="card" style="padding:0;overflow:hidden;">
                     <div class="batch-list" id="batch-list"></div>
@@ -515,6 +521,7 @@
                         batch_name: r.batch_name || '',
                         created_at: r.created_at,
                         uploaded_by: r.uploaded_by || '',
+                        archived: r.archived || false,
                         records: [],
                         states: new Set(),
                     };
@@ -560,9 +567,13 @@
             const stateFilter = document.getElementById('batch-filter-state').value;
             const monthFilter = document.getElementById('batch-filter-month').value;
             const sortBy = document.getElementById('batch-sort').value;
+            const showArchived = document.getElementById('show-archived').checked;
 
             let batches = allBatches;
 
+            if (!showArchived) {
+                batches = batches.filter(b => !b.archived);
+            }
             if (stateFilter) {
                 batches = batches.filter(b => b.states.has(stateFilter));
             }
@@ -598,9 +609,12 @@
                 const displayName = batch.batch_name || 'Untitled Upload';
                 const div = document.createElement('div');
                 div.className = 'batch-item';
+                if (batch.archived) div.style.opacity = '0.6';
+                const archiveLabel = batch.archived ? 'Unarchive' : 'Archive';
                 div.innerHTML = `
                     <div class="batch-info">
                         <div class="batch-name" data-batch="${batch.batch_id}">
+                            ${batch.archived ? '<span style="font-size:10px;font-weight:700;color:var(--text-secondary);background:var(--bg-default);padding:2px 6px;border-radius:4px;margin-right:6px;">ARCHIVED</span>' : ''}
                             <span class="name-text" title="Click to rename">${displayName}</span>
                             <svg class="edit-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                         </div>
@@ -625,6 +639,7 @@
                     </div>
                     <div class="batch-actions">
                         <button class="btn btn-primary view-batch-btn" data-batch="${batch.batch_id}">View</button>
+                        <button class="btn archive-batch-btn" data-batch="${batch.batch_id}" data-archived="${batch.archived}" style="font-size:12px;">${archiveLabel}</button>
                         <button class="btn btn-danger delete-batch-btn" data-batch="${batch.batch_id}">Delete</button>
                     </div>`;
                 container.appendChild(div);
@@ -636,6 +651,9 @@
             });
             container.querySelectorAll('.delete-batch-btn').forEach(btn => {
                 btn.addEventListener('click', () => deleteBatch(btn.dataset.batch));
+            });
+            container.querySelectorAll('.archive-batch-btn').forEach(btn => {
+                btn.addEventListener('click', () => toggleArchiveBatch(btn.dataset.batch, btn.dataset.archived === 'true'));
             });
             // Inline rename on click
             container.querySelectorAll('.batch-name').forEach(el => {
@@ -720,6 +738,29 @@
             } catch (err) {
                 console.error('Delete error:', err);
                 statusEl.textContent = 'Error deleting: ' + err.message;
+                statusEl.className = 'status-msg error';
+            }
+        }
+
+        async function toggleArchiveBatch(batchId, currentlyArchived) {
+            const newArchived = !currentlyArchived;
+            const statusEl = document.getElementById('batch-status-msg');
+            try {
+                const { error } = await supabase
+                    .from('state_tax_records')
+                    .update({ archived: newArchived })
+                    .eq('batch_id', batchId);
+                if (error) throw error;
+
+                allRecords.forEach(r => { if (r.batch_id === batchId) r.archived = newArchived; });
+                renderBatchList();
+
+                statusEl.textContent = newArchived ? 'Batch archived.' : 'Batch unarchived.';
+                statusEl.className = 'status-msg success';
+                setTimeout(() => { statusEl.className = 'status-msg'; }, 3000);
+            } catch (err) {
+                console.error('Archive error:', err);
+                statusEl.textContent = 'Error: ' + err.message;
                 statusEl.className = 'status-msg error';
             }
         }
@@ -964,6 +1005,7 @@
         document.getElementById('batch-filter-state').addEventListener('change', renderBatchList);
         document.getElementById('batch-filter-month').addEventListener('change', renderBatchList);
         document.getElementById('batch-sort').addEventListener('change', renderBatchList);
+        document.getElementById('show-archived').addEventListener('change', renderBatchList);
 
         // Batch detail event listeners
         document.getElementById('back-to-batches').addEventListener('click', () => {
