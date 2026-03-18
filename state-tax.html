@@ -227,6 +227,41 @@
                         </div>
                     </div>
                 </div>
+                <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;">State:</label>
+                        <select class="form-input" id="batch-filter-state" style="min-width:140px;padding:4px 8px;font-size:12px;">
+                            <option value="">All States</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;">Month:</label>
+                        <select class="form-input" id="batch-filter-month" style="min-width:140px;padding:4px 8px;font-size:12px;">
+                            <option value="">All Months</option>
+                            <option value="january">January</option>
+                            <option value="february">February</option>
+                            <option value="march">March</option>
+                            <option value="april">April</option>
+                            <option value="may">May</option>
+                            <option value="june">June</option>
+                            <option value="july">July</option>
+                            <option value="august">August</option>
+                            <option value="september">September</option>
+                            <option value="october">October</option>
+                            <option value="november">November</option>
+                            <option value="december">December</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap;">Sort:</label>
+                        <select class="form-input" id="batch-sort" style="min-width:140px;padding:4px 8px;font-size:12px;">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="name-asc">Name A–Z</option>
+                            <option value="name-desc">Name Z–A</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="card" style="padding:0;overflow:hidden;">
                     <div class="batch-list" id="batch-list"></div>
                 </div>
@@ -494,14 +529,65 @@
             return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
         }
 
+        const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+
+        function extractMonthFromName(name) {
+            if (!name) return null;
+            const lower = name.toLowerCase();
+            return MONTHS.find(m => lower.includes(m)) || null;
+        }
+
+        function populateBatchFilterStates(batches) {
+            const select = document.getElementById('batch-filter-state');
+            const current = select.value;
+            const allStates = new Set();
+            batches.forEach(b => b.states.forEach(s => allStates.add(s)));
+            const sorted = [...allStates].sort();
+            // Keep "All States" option, rebuild rest
+            select.innerHTML = '<option value="">All States</option>' +
+                sorted.map(s => `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`).join('');
+        }
+
         function renderBatchList() {
             const container = document.getElementById('batch-list');
-            const batches = groupIntoBatches(allRecords);
+            const allBatches = groupIntoBatches(allRecords);
+
+            // Populate state filter options
+            populateBatchFilterStates(allBatches);
+
+            // Apply filters
+            const stateFilter = document.getElementById('batch-filter-state').value;
+            const monthFilter = document.getElementById('batch-filter-month').value;
+            const sortBy = document.getElementById('batch-sort').value;
+
+            let batches = allBatches;
+
+            if (stateFilter) {
+                batches = batches.filter(b => b.states.has(stateFilter));
+            }
+            if (monthFilter) {
+                batches = batches.filter(b => extractMonthFromName(b.batch_name) === monthFilter);
+            }
+
+            // Sort
+            switch (sortBy) {
+                case 'oldest':
+                    batches.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    break;
+                case 'name-asc':
+                    batches.sort((a, b) => (a.batch_name || '').localeCompare(b.batch_name || ''));
+                    break;
+                case 'name-desc':
+                    batches.sort((a, b) => (b.batch_name || '').localeCompare(a.batch_name || ''));
+                    break;
+                default: // newest
+                    batches.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }
 
             document.getElementById('batch-count').textContent = `${batches.length} batch${batches.length !== 1 ? 'es' : ''}`;
 
             if (batches.length === 0) {
-                container.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-secondary);font-size:14px;">No uploads yet. Click "New Upload" to get started.</div>';
+                container.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-secondary);font-size:14px;">No uploads match your filters.</div>';
                 return;
             }
 
@@ -874,6 +960,9 @@
 
         // Batch list event listeners
         document.getElementById('new-upload-from-saved').addEventListener('click', () => showStep('step-upload'));
+        document.getElementById('batch-filter-state').addEventListener('change', renderBatchList);
+        document.getElementById('batch-filter-month').addEventListener('change', renderBatchList);
+        document.getElementById('batch-sort').addEventListener('change', renderBatchList);
 
         // Batch detail event listeners
         document.getElementById('back-to-batches').addEventListener('click', () => {
