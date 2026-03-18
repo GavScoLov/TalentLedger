@@ -250,6 +250,7 @@
                                 </span>
                                 Group by County Code
                             </label>
+                            <button class="btn" id="collapse-all-btn" style="padding:4px 12px;font-size:12px;display:none;">Collapse All</button>
                             <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
                                 <button class="btn btn-primary" id="save-edits-btn" style="padding:6px 14px;display:none;">Save Edits</button>
                                 <button class="btn-icon" id="print-saved-btn" title="Print">
@@ -704,29 +705,21 @@
                 if (groupBy) {
                     const groupKey = row.county_code || '(No Code)';
                     if (groupKey !== currentGroup) {
-                        // Insert total for previous group
-                        if (currentGroup !== null) {
-                            const t = groupTotals[currentGroup];
-                            const totalTr = document.createElement('tr');
-                            totalTr.className = 'group-total-row';
-                            totalTr.dataset.group = `group-${groupIndex}`;
-                            totalTr.innerHTML = `
-                                <td></td>
-                                <td colspan="5" style="text-align:right;font-weight:700;">Group Total:</td>
-                                <td style="text-align:right;">${fmtNum(t.total_sales)}</td>
-                                <td style="text-align:right;">${fmtNum(t.net_sales)}</td>
-                                <td style="text-align:right;">${fmtNum(t.taxes)}</td>
-                                <td style="text-align:right;">${fmtNum(t.shipping_charges)}</td>
-                                <td colspan="3"></td>`;
-                            tbody.appendChild(totalTr);
-                        }
                         groupIndex++;
                         currentGroup = groupKey;
                         const groupCount = rows.filter(r => (r.county_code || '(No Code)') === groupKey).length;
+                        const t = groupTotals[groupKey];
                         const gtr = document.createElement('tr');
                         gtr.className = 'group-header-row';
                         gtr.dataset.groupToggle = `group-${groupIndex}`;
-                        gtr.innerHTML = `<td colspan="13"><span class="group-toggle">▼</span>County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount} records)</td>`;
+                        gtr.innerHTML = `
+                            <td><span class="group-toggle">▼</span></td>
+                            <td colspan="5">County Code: ${groupKey} — ${row.county_name || 'Unknown'} (${groupCount})</td>
+                            <td style="text-align:right;">${fmtNum(t.total_sales)}</td>
+                            <td style="text-align:right;">${fmtNum(t.net_sales)}</td>
+                            <td style="text-align:right;">${fmtNum(t.taxes)}</td>
+                            <td style="text-align:right;">${fmtNum(t.shipping_charges)}</td>
+                            <td colspan="3"></td>`;
                         tbody.appendChild(gtr);
                     }
                 }
@@ -762,23 +755,6 @@
                 tbody.appendChild(tr);
             });
 
-            // Insert total for the last group
-            if (groupBy && currentGroup !== null) {
-                const t = groupTotals[currentGroup];
-                const totalTr = document.createElement('tr');
-                totalTr.className = 'group-total-row';
-                totalTr.dataset.group = `group-${groupIndex}`;
-                totalTr.innerHTML = `
-                    <td></td>
-                    <td colspan="5" style="text-align:right;font-weight:700;">Group Total:</td>
-                    <td style="text-align:right;">${fmtNum(t.total_sales)}</td>
-                    <td style="text-align:right;">${fmtNum(t.net_sales)}</td>
-                    <td style="text-align:right;">${fmtNum(t.taxes)}</td>
-                    <td style="text-align:right;">${fmtNum(t.shipping_charges)}</td>
-                    <td colspan="3"></td>`;
-                tbody.appendChild(totalTr);
-            }
-
             // Batch total row
             const batchTotal = { total_sales: 0, net_sales: 0, taxes: 0, shipping_charges: 0 };
             rows.forEach(r => {
@@ -807,8 +783,6 @@
                     const groupId = header.dataset.groupToggle;
                     const isCollapsed = header.classList.toggle('collapsed');
                     tbody.querySelectorAll(`tr[data-group="${groupId}"]`).forEach(row => {
-                        // Keep group-total-row visible when collapsed
-                        if (row.classList.contains('group-total-row')) return;
                         row.classList.toggle('group-row-hidden', isCollapsed);
                     });
                 });
@@ -899,7 +873,30 @@
             editedRecords = {};
             showStep('step-saved');
         });
-        document.getElementById('group-by-county').addEventListener('change', renderSavedTable);
+        document.getElementById('group-by-county').addEventListener('change', () => {
+            const groupBy = document.getElementById('group-by-county').checked;
+            const collapseBtn = document.getElementById('collapse-all-btn');
+            collapseBtn.style.display = groupBy ? 'inline-flex' : 'none';
+            collapseBtn.textContent = 'Collapse All';
+            collapseBtn._collapsed = false;
+            renderSavedTable();
+        });
+
+        document.getElementById('collapse-all-btn').addEventListener('click', () => {
+            const btn = document.getElementById('collapse-all-btn');
+            const tbody = document.getElementById('saved-tbody');
+            const isCollapsing = !btn._collapsed;
+            btn._collapsed = isCollapsing;
+            btn.textContent = isCollapsing ? 'Expand All' : 'Collapse All';
+
+            tbody.querySelectorAll('.group-header-row').forEach(header => {
+                const groupId = header.dataset.groupToggle;
+                header.classList.toggle('collapsed', isCollapsing);
+                tbody.querySelectorAll(`tr[data-group="${groupId}"]`).forEach(row => {
+                    row.classList.toggle('group-row-hidden', isCollapsing);
+                });
+            });
+        });
         document.getElementById('save-edits-btn').addEventListener('click', saveEdits);
         document.getElementById('print-saved-btn').addEventListener('click', () => window.print());
 
