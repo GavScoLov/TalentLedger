@@ -496,7 +496,7 @@
 
         // ── Data fetching with optional company filter ──
         async function fetchCompanyTotals(company) {
-            let query = supabase.from('company_data')
+            let query = supabase.from('roster_company_data')
                 .select('open_order, scheduled, interviewed, accepted, rom, car, aus');
             if (company && company !== 'all') query = query.eq('company', company);
 
@@ -517,7 +517,7 @@
         }
 
         async function fetchWeeklyData(company) {
-            let query = supabase.from('company_data')
+            let query = supabase.from('roster_company_data')
                 .select('week, date, open_order, scheduled, interviewed, accepted')
                 .order('date', { ascending: true });
             if (company && company !== 'all') query = query.eq('company', company);
@@ -538,7 +538,7 @@
         }
 
         async function fetchDistinctCompanies() {
-            const { data, error } = await supabase.from('company_data').select('company');
+            const { data, error } = await supabase.from('roster_company_data').select('company');
             if (error) return [];
             return [...new Set(data.map(r => r.company))].sort();
         }
@@ -754,7 +754,7 @@
             if (!dateInput.value) { msgContainer.innerHTML = '<div class="notice notice-error">Please select a date.</div>'; return; }
 
             try {
-                const { error } = await supabase.from('company_data').insert({
+                const { error } = await supabase.from('roster_company_data').insert({
                     company,
                     week: parseInt(hiddenWeek.value),
                     date: dateInput.value,

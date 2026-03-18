@@ -1,7 +1,7 @@
--- Insert company_data from CSV export
--- Run this in the Supabase SQL Editor after creating the company_data table
+-- Insert roster_company_data from CSV export
+-- Run this in the Supabase SQL Editor after creating the roster_company_data table
 
-INSERT INTO company_data (company, week, date, open_order, scheduled, interviewed, accepted, rom, car, aus) VALUES
+INSERT INTO roster_company_data (company, week, date, open_order, scheduled, interviewed, accepted, rom, car, aus) VALUES
 ('TRC', 1, '2025-05-23', 21, 18, 14, 10, 8, 1, 1),
 ('TRC', 2, '2025-05-30', 61, 19, 16, 8, 5, 2, 1),
 ('TRC', 3, '2025-06-06', 72, 39, 38, 17, 10, 3, 4),

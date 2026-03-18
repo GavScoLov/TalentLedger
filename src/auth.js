@@ -147,7 +147,7 @@ export async function deleteUserProfile(userId) {
 // Get all companies
 export async function getAllCompanies() {
   const { data, error } = await supabase
-    .from('companies')
+    .from('roster_companies')
     .select('*')
     .order('name');
   if (error) throw error;
@@ -157,7 +157,7 @@ export async function getAllCompanies() {
 // Create a new company
 export async function createCompany(name, slug) {
   const { data, error } = await supabase
-    .from('companies')
+    .from('roster_companies')
     .insert({ name, slug })
     .select()
     .single();
@@ -168,7 +168,7 @@ export async function createCompany(name, slug) {
 // Delete a company
 export async function deleteCompany(companyId) {
   const { error } = await supabase
-    .from('companies')
+    .from('roster_companies')
     .delete()
     .eq('id', companyId);
   if (error) throw error;
@@ -179,7 +179,7 @@ export async function deleteCompany(companyId) {
 // Get all user-company assignments
 export async function getAllUserCompanies() {
   const { data, error } = await supabase
-    .from('user_companies')
+    .from('roster_user_companies')
     .select('*');
   if (error) throw error;
   return data || [];
@@ -189,7 +189,7 @@ export async function getAllUserCompanies() {
 export async function setUserCompanies(userId, companyIds) {
   // Delete existing assignments
   const { error: delError } = await supabase
-    .from('user_companies')
+    .from('roster_user_companies')
     .delete()
     .eq('user_id', userId);
   if (delError) throw delError;
@@ -198,7 +198,7 @@ export async function setUserCompanies(userId, companyIds) {
   if (companyIds.length > 0) {
     const rows = companyIds.map(cid => ({ user_id: userId, company_id: cid }));
     const { error: insError } = await supabase
-      .from('user_companies')
+      .from('roster_user_companies')
       .insert(rows);
     if (insError) throw insError;
   }
