@@ -363,12 +363,25 @@
         async function loadTaxCodesForState(stateName) {
             const key = stateName.toLowerCase().trim();
             if (taxCodeCache[key]) return taxCodeCache[key];
-            const { data, error } = await supabase
-                .from('state_tax_codes')
-                .select('county_name, city_name, county_code, jurisdiction_code, zip')
-                .ilike('state', stateName.trim());
-            if (error) { console.error('Error loading tax codes for', stateName, error); return []; }
-            taxCodeCache[key] = data || [];
+
+            // Paginate to fetch all codes (Supabase default limit is 1000)
+            let allCodes = [];
+            let from = 0;
+            const pageSize = 1000;
+            while (true) {
+                const { data: page, error } = await supabase
+                    .from('state_tax_codes')
+                    .select('county_name, city_name, county_code, jurisdiction_code, zip')
+                    .ilike('state', stateName.trim())
+                    .range(from, from + pageSize - 1);
+                if (error) { console.error('Error loading tax codes for', stateName, error); return []; }
+                if (!page || page.length === 0) break;
+                allCodes = allCodes.concat(page);
+                if (page.length < pageSize) break;
+                from += pageSize;
+            }
+
+            taxCodeCache[key] = allCodes;
             return taxCodeCache[key];
         }
 
@@ -429,12 +442,23 @@
         // ══════════════════════════════════════════════════════
 
         async function loadAllRecords() {
-            const { data, error } = await supabase
-                .from('state_tax_records')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) { console.error('Error loading records:', error); return []; }
-            return data || [];
+            // Paginate to fetch all records (Supabase default limit is 1000)
+            let allData = [];
+            let from = 0;
+            const pageSize = 1000;
+            while (true) {
+                const { data: page, error } = await supabase
+                    .from('state_tax_records')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .range(from, from + pageSize - 1);
+                if (error) { console.error('Error loading records:', error); return []; }
+                if (!page || page.length === 0) break;
+                allData = allData.concat(page);
+                if (page.length < pageSize) break;
+                from += pageSize;
+            }
+            return allData;
         }
 
         function groupIntoBatches(records) {

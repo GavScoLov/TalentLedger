@@ -124,6 +124,21 @@
                         </div>
                     </div>
 
+                    <!-- View saved codes -->
+                    <div id="view-codes-section" style="display:none;margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                            <h4 style="font-size:13px;font-weight:600;margin:0;" id="view-codes-title">Tax Codes</h4>
+                            <span class="status-message info" id="view-codes-count" style="display:inline-block;padding:4px 10px;font-size:11px;"></span>
+                            <button class="btn" id="close-view-codes-btn" style="margin-left:auto;font-size:12px;padding:4px 12px;">Close</button>
+                        </div>
+                        <div class="settings-table-wrap" style="max-height:400px;">
+                            <table class="data-table" id="view-codes-table">
+                                <thead><tr><th>County Name</th><th>City Name</th><th>County Code</th><th>Jurisdiction Code</th><th>Zip</th></tr></thead>
+                                <tbody id="view-codes-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- Upload -->
                     <div class="tax-controls">
                         <label style="font-size:13px;font-weight:600;">State:</label>
@@ -296,14 +311,31 @@
 
         // ── Load saved states ───────────────────────────────
         async function loadSavedStates() {
-            const { data, error } = await supabase
+            // Use RPC or distinct query to get states, then count each
+            // First get distinct states
+            const { data: allRows, error } = await supabase
                 .from('state_tax_codes')
-                .select('state')
-                .order('state');
+                .select('state');
             if (error) { console.error('Error loading states:', error); return []; }
-            // Count per state
+
+            // Supabase default limit is 1000 — fetch all rows with pagination
+            let allData = [];
+            let from = 0;
+            const pageSize = 1000;
+            while (true) {
+                const { data: page, error: pageErr } = await supabase
+                    .from('state_tax_codes')
+                    .select('state')
+                    .range(from, from + pageSize - 1);
+                if (pageErr) { console.error('Error loading states:', pageErr); break; }
+                if (!page || page.length === 0) break;
+                allData = allData.concat(page);
+                if (page.length < pageSize) break;
+                from += pageSize;
+            }
+
             const counts = {};
-            (data || []).forEach(r => { counts[r.state] = (counts[r.state] || 0) + 1; });
+            allData.forEach(r => { counts[r.state] = (counts[r.state] || 0) + 1; });
             return Object.entries(counts).map(([state, count]) => ({ state, count }));
         }
 
@@ -318,9 +350,15 @@
                 <span class="state-chip">
                     ${s.state}
                     <span class="chip-count">(${s.count} codes)</span>
+                    <span class="chip-view" data-state="${s.state}" title="View ${s.state} tax codes" style="cursor:pointer;color:var(--primary);font-size:12px;font-weight:600;">View</span>
                     <span class="chip-delete" data-state="${s.state}" title="Delete ${s.state} tax codes">&times;</span>
                 </span>
             `).join('');
+
+            // View handlers
+            list.querySelectorAll('.chip-view').forEach(btn => {
+                btn.addEventListener('click', (e) => viewStateCodes(e.target.dataset.state));
+            });
 
             // Delete handlers
             list.querySelectorAll('.chip-delete').forEach(btn => {
@@ -329,12 +367,70 @@
                     if (!confirm(`Delete all tax codes for ${state}?`)) return;
                     const { error } = await supabase.from('state_tax_codes').delete().eq('state', state);
                     if (error) { alert('Error deleting: ' + error.message); return; }
+                    document.getElementById('view-codes-section').style.display = 'none';
                     renderSavedStates();
                 });
             });
         }
 
         renderSavedStates();
+
+        // ── View State Codes ────────────────────────────────
+        async function viewStateCodes(stateName) {
+            const section = document.getElementById('view-codes-section');
+            const tbody = document.getElementById('view-codes-body');
+            const title = document.getElementById('view-codes-title');
+            const countEl = document.getElementById('view-codes-count');
+
+            section.style.display = 'block';
+            title.textContent = `${stateName} Tax Codes`;
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">Loading...</td></tr>';
+            countEl.textContent = '';
+
+            // Paginate to fetch all codes (Supabase default limit is 1000)
+            let codes = [];
+            let from = 0;
+            const pageSize = 1000;
+            while (true) {
+                const { data: page, error: pageErr } = await supabase
+                    .from('state_tax_codes')
+                    .select('county_name, city_name, county_code, jurisdiction_code, zip')
+                    .eq('state', stateName)
+                    .order('county_name')
+                    .order('zip')
+                    .range(from, from + pageSize - 1);
+                if (pageErr) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="color:#DC2626;">Error: ${pageErr.message}</td></tr>`;
+                    return;
+                }
+                if (!page || page.length === 0) break;
+                codes = codes.concat(page);
+                if (page.length < pageSize) break;
+                from += pageSize;
+            }
+            countEl.textContent = `${codes.length} codes`;
+
+            if (codes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);">No codes found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = codes.map(tc => `
+                <tr>
+                    <td>${tc.county_name || ''}</td>
+                    <td>${tc.city_name || ''}</td>
+                    <td>${tc.county_code || ''}</td>
+                    <td>${tc.jurisdiction_code || ''}</td>
+                    <td>${tc.zip || ''}</td>
+                </tr>
+            `).join('');
+
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        document.getElementById('close-view-codes-btn').addEventListener('click', () => {
+            document.getElementById('view-codes-section').style.display = 'none';
+        });
 
         // ── PDF Upload ──────────────────────────────────────
         const pdfUploadZone = document.getElementById('pdf-upload-zone');
