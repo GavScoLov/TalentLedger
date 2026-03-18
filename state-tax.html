@@ -252,6 +252,7 @@
                             </label>
                             <button class="btn" id="collapse-all-btn" style="padding:4px 12px;font-size:12px;display:none;">Collapse All</button>
                             <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+                                <button class="btn" id="save-to-tax-codes-btn" style="padding:6px 14px;display:none;font-size:12px;" title="Save edited county info to Tax Codes reference table for future lookups">Save to Tax Codes</button>
                                 <button class="btn btn-primary" id="save-edits-btn" style="padding:6px 14px;display:none;">Save Edits</button>
                                 <button class="btn-icon" id="print-saved-btn" title="Print">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -812,9 +813,16 @@
 
         function updateSaveEditsBtn() {
             const btn = document.getElementById('save-edits-btn');
+            const taxBtn = document.getElementById('save-to-tax-codes-btn');
             const count = Object.keys(editedRecords).length;
             btn.style.display = count > 0 ? 'inline-flex' : 'none';
             btn.textContent = `Save Edits (${count})`;
+
+            // Show "Save to Tax Codes" if any edits touch county fields
+            const hasCountyEdits = Object.values(editedRecords).some(e =>
+                e.county_name !== undefined || e.county_code !== undefined || e.jurisdiction_code !== undefined
+            );
+            taxBtn.style.display = hasCountyEdits ? 'inline-flex' : 'none';
         }
 
         async function saveEdits() {
@@ -898,6 +906,100 @@
             });
         });
         document.getElementById('save-edits-btn').addEventListener('click', saveEdits);
+
+        document.getElementById('save-to-tax-codes-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('save-to-tax-codes-btn');
+            const statusEl = document.getElementById('saved-status-msg');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                // Collect unique city→county mappings from edited records
+                const mappings = new Map(); // key: "state|city" → { state, city, county_name, county_code, jurisdiction_code, zip }
+                const editedIds = Object.keys(editedRecords).map(Number);
+
+                for (const id of editedIds) {
+                    const edits = editedRecords[id];
+                    if (!edits.county_name && !edits.county_code && !edits.jurisdiction_code) continue;
+
+                    const rec = savedRecords.find(r => r.id === id);
+                    if (!rec) continue;
+
+                    const city = (rec.city || '').trim();
+                    const state = (rec.state || '').trim();
+                    const zip = (rec.zip || '').trim();
+                    if (!city && !zip) continue;
+
+                    const key = `${state}|${city}|${zip}`;
+                    if (!mappings.has(key)) {
+                        mappings.set(key, {
+                            state,
+                            city_name: city,
+                            zip: zip,
+                            county_name: edits.county_name ?? rec.county_name ?? '',
+                            county_code: edits.county_code ?? rec.county_code ?? '',
+                            jurisdiction_code: edits.jurisdiction_code ?? rec.jurisdiction_code ?? '',
+                        });
+                    }
+                }
+
+                if (mappings.size === 0) {
+                    statusEl.style.display = 'inline-block';
+                    statusEl.className = 'status-msg error';
+                    statusEl.textContent = 'No county edits with city/zip to save.';
+                    btn.disabled = false;
+                    btn.textContent = 'Save to Tax Codes';
+                    return;
+                }
+
+                // Insert new tax code entries (upsert-style: check if exists first)
+                let saved = 0, skipped = 0;
+                for (const [, m] of mappings) {
+                    // Check if this city/zip + state combo already exists
+                    let query = supabase.from('state_tax_codes').select('id').ilike('state', m.state);
+                    if (m.city_name) query = query.ilike('city_name', m.city_name);
+                    if (m.zip) query = query.eq('zip', m.zip);
+                    const { data: existing } = await query.limit(1);
+
+                    if (existing && existing.length > 0) {
+                        // Update existing record
+                        await supabase.from('state_tax_codes').update({
+                            county_name: m.county_name,
+                            county_code: m.county_code,
+                            jurisdiction_code: m.jurisdiction_code,
+                        }).eq('id', existing[0].id);
+                        saved++;
+                    } else {
+                        // Insert new record
+                        const { error } = await supabase.from('state_tax_codes').insert({
+                            state: m.state,
+                            city_name: m.city_name,
+                            zip: m.zip,
+                            county_name: m.county_name,
+                            county_code: m.county_code,
+                            jurisdiction_code: m.jurisdiction_code,
+                        });
+                        if (error) throw error;
+                        saved++;
+                    }
+                }
+
+                // Clear tax code cache so next lookup picks up new codes
+                Object.keys(taxCodeCache).forEach(k => delete taxCodeCache[k]);
+
+                statusEl.style.display = 'inline-block';
+                statusEl.className = 'status-msg success';
+                statusEl.textContent = `Saved ${saved} tax code${saved !== 1 ? 's' : ''} for future lookups.`;
+            } catch (err) {
+                console.error('Save to tax codes error:', err);
+                statusEl.style.display = 'inline-block';
+                statusEl.className = 'status-msg error';
+                statusEl.textContent = 'Error saving tax codes: ' + err.message;
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Save to Tax Codes';
+        });
         document.getElementById('print-saved-btn').addEventListener('click', () => window.print());
 
         // ══════════════════════════════════════════════════════
