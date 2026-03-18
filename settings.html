@@ -80,6 +80,64 @@
             transition: color 0.15s;
         }
         .state-chip .chip-delete:hover { color: #DC2626; }
+
+        /* ── Company/User Management Styles ── */
+        .mgmt-table { width: 100%; border-collapse: collapse; }
+        .mgmt-table th, .mgmt-table td {
+            padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border-color);
+        }
+        .mgmt-table th {
+            font-weight: 600; color: var(--text-secondary); font-size: 0.75rem;
+            text-transform: uppercase; letter-spacing: 0.05em; background: #F8F9FA;
+        }
+        .mgmt-table tr:hover td { background: #FAFAFA; }
+        .inline-form {
+            display: flex; gap: 12px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap;
+        }
+        .inline-form .form-group { margin-bottom: 0; flex: 1; min-width: 180px; }
+        .user-avatar-sm {
+            width: 32px; height: 32px; border-radius: 50%; background: var(--primary);
+            color: white; display: inline-flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 0.8rem; flex-shrink: 0;
+        }
+        .user-info-cell { display: flex; align-items: center; gap: 10px; }
+        .role-select {
+            padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--border-color);
+            background: #fff; font-size: 0.875rem; cursor: pointer; font-family: var(--font);
+        }
+        .page-toggles, .company-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+        .page-toggle, .company-toggle {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 99px; font-size: 0.75rem;
+            border: 1px solid var(--border-color); background: #fff;
+            cursor: pointer; transition: all 0.15s; user-select: none;
+        }
+        .page-toggle.active, .company-toggle.active {
+            background: rgba(234,137,56,0.1); border-color: var(--primary); color: var(--primary);
+        }
+        .page-toggle input, .company-toggle input { display: none; }
+        .mgmt-delete-btn {
+            padding: 6px 10px; border-radius: var(--radius); border: 1px solid #FCA5A5;
+            background: #FEF2F2; color: #DC2626; font-size: 0.75rem; cursor: pointer;
+            transition: all 0.15s; font-family: var(--font); font-weight: 500;
+        }
+        .mgmt-delete-btn:hover { background: #FEE2E2; }
+        .mgmt-save-btn {
+            padding: 6px 14px; border-radius: var(--radius); border: none;
+            background: var(--primary); color: #fff; font-size: 0.8rem;
+            cursor: pointer; transition: background 0.15s; font-family: var(--font); font-weight: 500;
+        }
+        .mgmt-save-btn:hover { background: var(--primary-dark); }
+        .mgmt-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .row-actions { display: flex; gap: 8px; align-items: center; }
+        .mgmt-empty { text-align: center; padding: 48px 24px; color: var(--text-secondary); }
+        .section-desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 20px; }
+        .mgmt-status {
+            padding: 10px 16px; border-radius: var(--radius); margin-bottom: 16px;
+            font-size: 0.875rem; display: none; font-weight: 500;
+        }
+        .mgmt-status.success { display: block; background: #DCFCE7; color: #16A34A; }
+        .mgmt-status.error { display: block; background: #FEE2E2; color: #DC2626; }
     </style>
 </head>
 <body>
@@ -93,6 +151,9 @@
             <div class="tab-bar" id="tab-bar">
                 <div class="tab active" data-tab="branch">Branch</div>
                 <div class="tab" data-tab="tax-codes">Tax Codes</div>
+                <div class="tab" data-tab="companies">Companies</div>
+                <div class="tab" data-tab="users">Users</div>
+                <div class="tab" data-tab="assignments">Assignments</div>
             </div>
 
             <!-- Branch Tab -->
@@ -178,11 +239,85 @@
                     </div>
                 </div>
             </div>
+            <!-- Companies Tab -->
+            <div class="tab-content" id="tab-companies">
+                <div class="card" style="padding: 16px;">
+                    <div id="mgmt-status" class="mgmt-status"></div>
+                    <p class="section-desc">Create and manage companies. Users can be assigned to companies to control data access.</p>
+                    <div class="inline-form">
+                        <div class="form-group">
+                            <label class="form-label">Company Name</label>
+                            <input type="text" class="form-input" id="company-name" placeholder="e.g. Acme Corp">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Slug</label>
+                            <input type="text" class="form-input" id="company-slug" placeholder="e.g. acme-corp">
+                        </div>
+                        <button class="btn btn-primary" id="add-company-btn">Add Company</button>
+                    </div>
+                    <div id="companies-loading" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading companies...</div>
+                    <div id="companies-empty" class="mgmt-empty" style="display:none;">No companies yet. Add one above.</div>
+                    <div style="overflow-x:auto;">
+                        <table class="mgmt-table" id="companies-table" style="display:none;">
+                            <thead><tr><th>Name</th><th>Slug</th><th>Created</th><th>Actions</th></tr></thead>
+                            <tbody id="companies-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div class="tab-content" id="tab-users">
+                <div class="card" style="padding: 16px;">
+                    <p class="section-desc">Invite new users and manage roles and page access for existing users.</p>
+                    <div class="inline-form">
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-input" id="invite-email" placeholder="user@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Temporary Password</label>
+                            <input type="text" class="form-input" id="invite-password" placeholder="min 6 characters">
+                        </div>
+                        <button class="btn btn-primary" id="invite-user-btn">Invite User</button>
+                    </div>
+                    <div id="users-loading" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading users...</div>
+                    <div id="users-empty" class="mgmt-empty" style="display:none;">No users found.</div>
+                    <div style="overflow-x:auto;">
+                        <table class="mgmt-table" id="users-table" style="display:none;">
+                            <thead><tr><th>User</th><th>Role</th><th>Page Access</th><th>Actions</th></tr></thead>
+                            <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignments Tab -->
+            <div class="tab-content" id="tab-assignments">
+                <div class="card" style="padding: 16px;">
+                    <p class="section-desc">Assign users to companies. Each user can belong to multiple companies.</p>
+                    <div id="assignments-loading" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading...</div>
+                    <div id="assignments-empty" class="mgmt-empty" style="display:none;">No users or companies found.</div>
+                    <div style="overflow-x:auto;">
+                        <table class="mgmt-table" id="assignments-table" style="display:none;">
+                            <thead><tr><th>User</th><th>Assigned Companies</th><th>Actions</th></tr></thead>
+                            <tbody id="assignments-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <script type="module">
-        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import {
+            checkAuth, checkPageAccess, isAdmin, getUser,
+            getAllUsers, updateUserRole, updateUserPages, deleteUserProfile,
+            getAllCompanies, createCompany, deleteCompany,
+            getAllUserCompanies, setUserCompanies,
+            createUserWithEmail
+        } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
@@ -783,6 +918,327 @@
             document.getElementById('pdf-file-info').style.display = 'none';
             pdfInput.value = '';
         });
+
+        // ═══════════════════════════════════════════════════
+        // ── COMPANIES / USERS / ASSIGNMENTS TABS ─────────
+        // ═══════════════════════════════════════════════════
+
+        const currentUser = await getUser();
+        let mgmtUsers = [];
+        let mgmtCompanies = [];
+        let mgmtUserCompanies = [];
+
+        const SITE_PAGES = [
+            { slug: 'commission', label: 'Commission' },
+            { slug: 'data-visualization', label: 'Descending Revenue' },
+            { slug: 'hours-breakdown', label: 'Hours Breakdown' },
+            { slug: 'profit-loss', label: 'Profit & Loss' },
+            { slug: 'state-tax', label: 'State Tax' },
+            { slug: 'roster-tracker', label: 'Roster Tracker' },
+            { slug: 'settings', label: 'Settings' },
+        ];
+
+        function showMgmtStatus(msg, type) {
+            const el = document.getElementById('mgmt-status');
+            el.textContent = msg;
+            el.className = 'mgmt-status ' + type;
+            setTimeout(() => { el.className = 'mgmt-status'; }, 4000);
+        }
+
+        // ── COMPANIES ────────────────────────────
+        function renderCompanies() {
+            const loading = document.getElementById('companies-loading');
+            const empty = document.getElementById('companies-empty');
+            const table = document.getElementById('companies-table');
+            const tbody = document.getElementById('companies-tbody');
+            loading.style.display = 'none';
+
+            if (!mgmtCompanies.length) {
+                empty.style.display = 'block'; table.style.display = 'none'; return;
+            }
+            empty.style.display = 'none'; table.style.display = 'table';
+
+            tbody.innerHTML = mgmtCompanies.map(c => `
+                <tr>
+                    <td><strong>${c.name}</strong></td>
+                    <td><code style="background:#F3F4F6;padding:2px 8px;border-radius:4px;font-size:0.8rem;">${c.slug}</code></td>
+                    <td style="color:var(--text-secondary);font-size:0.8rem;">${new Date(c.created_at).toLocaleDateString()}</td>
+                    <td><button class="mgmt-delete-btn" data-company-id="${c.id}">Delete</button></td>
+                </tr>
+            `).join('');
+
+            tbody.querySelectorAll('.mgmt-delete-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = parseInt(btn.dataset.companyId);
+                    const company = mgmtCompanies.find(c => c.id === id);
+                    if (!confirm(`Delete "${company?.name}"?`)) return;
+                    try {
+                        await deleteCompany(id);
+                        mgmtCompanies = mgmtCompanies.filter(c => c.id !== id);
+                        mgmtUserCompanies = mgmtUserCompanies.filter(uc => uc.company_id !== id);
+                        renderCompanies(); renderAssignments();
+                        showMgmtStatus('Company deleted.', 'success');
+                    } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+                });
+            });
+        }
+
+        document.getElementById('company-name').addEventListener('input', (e) => {
+            const slugField = document.getElementById('company-slug');
+            if (!slugField.dataset.manual) {
+                slugField.value = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+            }
+        });
+        document.getElementById('company-slug').addEventListener('input', function () { this.dataset.manual = 'true'; });
+
+        document.getElementById('add-company-btn').addEventListener('click', async () => {
+            const nameInput = document.getElementById('company-name');
+            const slugInput = document.getElementById('company-slug');
+            const name = nameInput.value.trim();
+            const slug = slugInput.value.trim();
+            if (!name || !slug) { showMgmtStatus('Please enter both name and slug.', 'error'); return; }
+            try {
+                const newCompany = await createCompany(name, slug);
+                mgmtCompanies.push(newCompany);
+                renderCompanies(); renderAssignments();
+                nameInput.value = ''; slugInput.value = ''; slugInput.dataset.manual = '';
+                showMgmtStatus(`Company "${name}" created.`, 'success');
+            } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+        });
+
+        // ── USERS ────────────────────────────────
+        function renderUsers() {
+            const loading = document.getElementById('users-loading');
+            const empty = document.getElementById('users-empty');
+            const table = document.getElementById('users-table');
+            const tbody = document.getElementById('users-tbody');
+            loading.style.display = 'none';
+
+            if (!mgmtUsers.length) {
+                empty.style.display = 'block'; table.style.display = 'none'; return;
+            }
+            empty.style.display = 'none'; table.style.display = 'table';
+
+            const currentUserId = currentUser?.user?.id || currentUser?.id;
+
+            tbody.innerHTML = mgmtUsers.map(user => {
+                const name = user.username || user.email || 'Unknown';
+                const initial = name.charAt(0).toUpperCase();
+                const allowedPages = user.allowed_pages || [];
+                const isCurrentUser = user.id === currentUserId;
+
+                return `
+                <tr data-user-id="${user.id}">
+                    <td>
+                        <div class="user-info-cell">
+                            <div class="user-avatar-sm">${initial}</div>
+                            <div>
+                                <div>${name}${isCurrentUser ? ' <span style="color:var(--text-secondary);font-size:0.75rem;">(you)</span>' : ''}</div>
+                                <div style="color:var(--text-secondary);font-size:0.8rem;">${user.email || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <select class="role-select" data-user-id="${user.id}" ${isCurrentUser ? 'disabled title="Cannot change your own role"' : ''}>
+                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
+                            <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                        </select>
+                    </td>
+                    <td>
+                        <div class="page-toggles" data-user-id="${user.id}">
+                            ${user.role === 'admin'
+                                ? '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (admin)</span>'
+                                : SITE_PAGES.map(p => `
+                                    <label class="page-toggle ${allowedPages.includes(p.slug) ? 'active' : ''}">
+                                        <input type="checkbox" value="${p.slug}" ${allowedPages.includes(p.slug) ? 'checked' : ''}>
+                                        ${p.label}
+                                    </label>
+                                `).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="row-actions">
+                            <button class="mgmt-save-btn" data-user-id="${user.id}" ${isCurrentUser ? 'disabled' : ''}>Save</button>
+                            ${!isCurrentUser ? `<button class="mgmt-delete-btn" data-user-id="${user.id}">Remove</button>` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            // Toggle page chips
+            tbody.querySelectorAll('.page-toggle input').forEach(input => {
+                input.addEventListener('change', () => input.parentElement.classList.toggle('active', input.checked));
+            });
+
+            // Role change → update page toggles
+            tbody.querySelectorAll('.role-select').forEach(select => {
+                select.addEventListener('change', () => {
+                    const userId = select.dataset.userId;
+                    const tc = tbody.querySelector(`.page-toggles[data-user-id="${userId}"]`);
+                    if (select.value === 'admin') {
+                        tc.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (admin)</span>';
+                    } else {
+                        const user = mgmtUsers.find(u => u.id === userId);
+                        const ap = user?.allowed_pages || [];
+                        tc.innerHTML = SITE_PAGES.map(p => `
+                            <label class="page-toggle ${ap.includes(p.slug) ? 'active' : ''}">
+                                <input type="checkbox" value="${p.slug}" ${ap.includes(p.slug) ? 'checked' : ''}>
+                                ${p.label}
+                            </label>
+                        `).join('');
+                        tc.querySelectorAll('.page-toggle input').forEach(i => {
+                            i.addEventListener('change', () => i.parentElement.classList.toggle('active', i.checked));
+                        });
+                    }
+                });
+            });
+
+            // Save button
+            tbody.querySelectorAll('.mgmt-save-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const userId = btn.dataset.userId;
+                    btn.disabled = true; btn.textContent = 'Saving...';
+                    try {
+                        const row = btn.closest('tr');
+                        const role = row.querySelector('.role-select').value;
+                        await updateUserRole(userId, role);
+                        if (role !== 'admin') {
+                            const cbs = row.querySelectorAll('.page-toggle input');
+                            const pages = Array.from(cbs).filter(cb => cb.checked).map(cb => cb.value);
+                            await updateUserPages(userId, pages);
+                        }
+                        showMgmtStatus('User updated.', 'success');
+                        const user = mgmtUsers.find(u => u.id === userId);
+                        if (user) {
+                            user.role = role;
+                            if (role !== 'admin') {
+                                user.allowed_pages = Array.from(row.querySelectorAll('.page-toggle input')).filter(cb => cb.checked).map(cb => cb.value);
+                            }
+                        }
+                    } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+                    btn.disabled = false; btn.textContent = 'Save';
+                });
+            });
+
+            // Delete button
+            tbody.querySelectorAll('.mgmt-delete-btn').forEach(btn => {
+                if (!btn.dataset.userId) return; // skip company delete btns
+                btn.addEventListener('click', async () => {
+                    const userId = btn.dataset.userId;
+                    const user = mgmtUsers.find(u => u.id === userId);
+                    if (!confirm(`Remove ${user?.username || user?.email || 'this user'}?`)) return;
+                    try {
+                        await deleteUserProfile(userId);
+                        mgmtUsers = mgmtUsers.filter(u => u.id !== userId);
+                        renderUsers(); renderAssignments();
+                        showMgmtStatus('User removed.', 'success');
+                    } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+                });
+            });
+        }
+
+        document.getElementById('invite-user-btn').addEventListener('click', async () => {
+            const emailInput = document.getElementById('invite-email');
+            const passInput = document.getElementById('invite-password');
+            const email = emailInput.value.trim();
+            const password = passInput.value.trim();
+            if (!email || !password) { showMgmtStatus('Please enter email and password.', 'error'); return; }
+            if (password.length < 6) { showMgmtStatus('Password must be at least 6 characters.', 'error'); return; }
+            const btn = document.getElementById('invite-user-btn');
+            btn.disabled = true; btn.textContent = 'Inviting...';
+            try {
+                await createUserWithEmail(email, password);
+                showMgmtStatus(`Invitation sent to ${email}.`, 'success');
+                emailInput.value = ''; passInput.value = '';
+                setTimeout(async () => {
+                    try { mgmtUsers = await getAllUsers(); renderUsers(); renderAssignments(); } catch (e) {}
+                }, 2000);
+            } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+            btn.disabled = false; btn.textContent = 'Invite User';
+        });
+
+        // ── ASSIGNMENTS ──────────────────────────
+        function renderAssignments() {
+            const loading = document.getElementById('assignments-loading');
+            const empty = document.getElementById('assignments-empty');
+            const table = document.getElementById('assignments-table');
+            const tbody = document.getElementById('assignments-tbody');
+            loading.style.display = 'none';
+
+            if (!mgmtUsers.length || !mgmtCompanies.length) {
+                empty.style.display = 'block';
+                empty.textContent = !mgmtCompanies.length ? 'No companies created yet.' : 'No users found.';
+                table.style.display = 'none'; return;
+            }
+            empty.style.display = 'none'; table.style.display = 'table';
+
+            tbody.innerHTML = mgmtUsers.map(user => {
+                const name = user.username || user.email || 'Unknown';
+                const initial = name.charAt(0).toUpperCase();
+                const assignedIds = mgmtUserCompanies.filter(uc => uc.user_id === user.id).map(uc => uc.company_id);
+
+                return `
+                <tr data-user-id="${user.id}">
+                    <td>
+                        <div class="user-info-cell">
+                            <div class="user-avatar-sm">${initial}</div>
+                            <div>
+                                <div>${name}</div>
+                                <div style="color:var(--text-secondary);font-size:0.8rem;">${user.email || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="company-toggles" data-user-id="${user.id}">
+                            ${mgmtCompanies.map(c => `
+                                <label class="company-toggle ${assignedIds.includes(c.id) ? 'active' : ''}">
+                                    <input type="checkbox" value="${c.id}" ${assignedIds.includes(c.id) ? 'checked' : ''}>
+                                    ${c.name}
+                                </label>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <button class="mgmt-save-btn save-assignment-btn" data-user-id="${user.id}">Save</button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            tbody.querySelectorAll('.company-toggle input').forEach(input => {
+                input.addEventListener('change', () => input.parentElement.classList.toggle('active', input.checked));
+            });
+
+            tbody.querySelectorAll('.save-assignment-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const userId = btn.dataset.userId;
+                    btn.disabled = true; btn.textContent = 'Saving...';
+                    try {
+                        const row = btn.closest('tr');
+                        const companyIds = Array.from(row.querySelectorAll('.company-toggle input'))
+                            .filter(cb => cb.checked).map(cb => parseInt(cb.value));
+                        await setUserCompanies(userId, companyIds);
+                        mgmtUserCompanies = mgmtUserCompanies.filter(uc => uc.user_id !== userId);
+                        companyIds.forEach(cid => mgmtUserCompanies.push({ user_id: userId, company_id: cid }));
+                        showMgmtStatus('Assignments updated.', 'success');
+                    } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+                    btn.disabled = false; btn.textContent = 'Save';
+                });
+            });
+        }
+
+        // ── LOAD MANAGEMENT DATA ─────────────────
+        const mgmtResults = await Promise.allSettled([getAllUsers(), getAllCompanies(), getAllUserCompanies()]);
+        if (mgmtResults[0].status === 'fulfilled') mgmtUsers = mgmtResults[0].value;
+        else document.getElementById('users-loading').textContent = 'Error loading users.';
+        if (mgmtResults[1].status === 'fulfilled') mgmtCompanies = mgmtResults[1].value;
+        else document.getElementById('companies-loading').textContent = 'Run SQL migration to create companies table.';
+        if (mgmtResults[2].status === 'fulfilled') mgmtUserCompanies = mgmtResults[2].value;
+        else mgmtUserCompanies = [];
+
+        renderCompanies();
+        renderUsers();
+        renderAssignments();
     </script>
 </body>
 </html>
