@@ -467,13 +467,9 @@
 
         await checkAuth();
         await checkPageAccess('roster-tracker');
-        renderNavbar({ title: 'Roster Tracker', subtitle: 'Company performance overview' });
+        renderNavbar({ title: 'Company Tracker', subtitle: 'Company performance overview' });
         await renderSidebar();
         initInactivityTimer();
-    </script>
-
-    <script type="module">
-        import { supabase } from './src/supabaseClient.js';
 
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#6B7280';
