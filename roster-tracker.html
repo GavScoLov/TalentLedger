@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - Roster Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+    <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        /* ── Action bar (company dropdown + buttons) ── */
+        .action-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .company-select {
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-family: var(--font);
+            font-size: 0.875rem;
+            font-weight: 500;
+            background: #fff;
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 180px;
+        }
+        .company-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+        }
+        .action-bar-spacer { flex-grow: 1; }
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            font-family: var(--font);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .action-btn svg { width: 16px; height: 16px; }
+        .action-btn-primary { background: var(--primary); color: #1F2937; }
+        .action-btn-primary:hover { background: var(--primary-dark); }
+        .action-btn-outline {
+            background: #fff; color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .action-btn-outline:hover { background: var(--bg-default); color: var(--text-primary); }
+
+        /* ── Summary stat cards row ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .summary-stat {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 18px 20px;
+        }
+        .summary-stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        .summary-stat-icon.open { background: rgba(225, 167, 33, 0.1); color: var(--primary-dark); }
+        .summary-stat-icon.sched { background: rgba(180, 83, 9, 0.1); color: #B45309; }
+        .summary-stat-icon.intv { background: rgba(99, 102, 241, 0.1); color: #6366F1; }
+        .summary-stat-icon.acpt { background: rgba(22, 163, 74, 0.1); color: #16A34A; }
+        .summary-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+        .summary-stat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        /* ── Main dashboard grid ── */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 20px;
+        }
+        .dashboard-grid > .card { min-height: 0; overflow: hidden; }
+        .card-speedometer { grid-column: 1 / 3; text-align: center; height: 340px; }
+        .card-distribution { grid-column: 3; height: 340px; }
+        .card-mini-pie { grid-column: 1 / 3; display: flex; flex-direction: column; }
+        .card-bonuses { grid-column: 3; overflow-y: auto; }
+        .card-weekly { grid-column: 1 / -1; height: 320px; }
+
+        .card-title {
+            font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+        }
+        .chart-fill { position: relative; width: 100%; height: calc(100% - 30px); }
+        .overall-meter {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; height: calc(100% - 30px);
+        }
+
+        /* ── Mini Pie Row ── */
+        .pie-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; flex: 1; }
+        .pie-cell { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 0; }
+        .pie-cell h4 { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+        .pie-canvas-wrap { width: 100%; max-width: 140px; margin-bottom: 8px; }
+        .grade-legend { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .legend-item { display: flex; align-items: center; font-size: 0.65rem; color: var(--text-secondary); white-space: nowrap; }
+        .legend-color { width: 8px; height: 8px; margin-right: 4px; border-radius: 2px; flex-shrink: 0; }
+
+        /* ── Bonuses ── */
+        .bonus-psa, .bonus-trc { margin-bottom: 12px; }
+        .bonus-trc { margin-bottom: 0; }
+        .psa-header, .trc-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            font-size: 1rem; color: #1F2937; padding: 10px 16px;
+            border-radius: var(--radius) var(--radius) 0 0; font-weight: 700; letter-spacing: 0.02em;
+        }
+        .trc-header { background: linear-gradient(135deg, var(--primary-dark) 0%, #A67C17 100%); color: #fff; }
+        .psa-table, .trc-table {
+            background-color: rgba(var(--primary-rgb), 0.04);
+            border: 1px solid rgba(var(--primary-rgb), 0.1); border-top: none;
+            padding: 10px 12px; display: grid; grid-template-columns: 36px 1fr;
+            gap: 4px 8px; border-radius: 0 0 var(--radius) var(--radius);
+        }
+        .psa-i, .psa-w, .psa-r, .trc-r { font-size: 1.125rem; font-weight: 700; text-align: center; color: var(--primary); }
+        .psa-interview, .psa-accept, .psa-refer, .trc-refer { font-size: 0.8rem; color: var(--text-secondary); align-self: center; }
+        .psa-i, .trc-r { grid-column: 1; grid-row: 1; }
+        .psa-interview, .trc-refer { grid-column: 2; grid-row: 1; }
+        .psa-w { grid-column: 1; grid-row: 2; }
+        .psa-accept { grid-column: 2; grid-row: 2; }
+        .psa-r { grid-column: 1; grid-row: 3; }
+        .psa-refer { grid-column: 2; grid-row: 3; }
+
+        /* ── Data Entry Modal ── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 500;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: #fff; border-radius: var(--radius-lg);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2); width: 100%;
+            max-width: 520px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 24px; border-bottom: 1px solid var(--border-color);
+        }
+        .modal-header h2 { font-size: 1.125rem; font-weight: 700; color: var(--text-primary); }
+        .modal-close {
+            background: none; border: none; cursor: pointer; padding: 4px;
+            color: var(--text-secondary); border-radius: var(--radius);
+            transition: all 0.15s;
+        }
+        .modal-close:hover { background: var(--bg-default); color: var(--text-primary); }
+        .modal-close svg { width: 20px; height: 20px; }
+        .modal-body { padding: 24px; }
+        .modal-body .notice {
+            padding: 12px 16px; margin-bottom: 16px; border-radius: var(--radius);
+            font-size: 0.875rem; font-weight: 500;
+        }
+        .notice-success { color: #16A34A; background: #DCFCE7; border: 1px solid #BBF7D0; }
+        .notice-error { color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; }
+
+        /* ── Responsive ── */
+        @media (max-width: 1200px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .dashboard-grid { grid-template-columns: 1fr 1fr; }
+            .card-speedometer { grid-column: 1 / -1; height: 300px; }
+            .card-distribution { grid-column: 1; height: 300px; }
+            .card-mini-pie { grid-column: 2; }
+            .card-bonuses { grid-column: 1 / -1; }
+            .card-weekly { grid-column: 1 / -1; height: 280px; }
+        }
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .card-speedometer, .card-distribution, .card-mini-pie, .card-bonuses, .card-weekly { grid-column: 1; }
+            .card-speedometer { height: 280px; }
+            .card-distribution { height: 280px; }
+            .card-weekly { height: 260px; }
+        }
+        @media (max-width: 640px) {
+            .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .summary-stat { padding: 14px 16px; gap: 10px; }
+            .summary-stat-icon { width: 36px; height: 36px; font-size: 1rem; }
+            .summary-stat-value { font-size: 1.25rem; }
+            .pie-row { grid-template-columns: 1fr; gap: 20px; }
+            .pie-canvas-wrap { max-width: 160px; }
+            .card-weekly { height: 240px; }
+            .action-bar { gap: 8px; }
+            .company-select { min-width: 140px; }
+        }
+
+        /* ── Print ── */
+        @media print {
+            @page { size: landscape; margin: 6mm; }
+            html, body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; padding: 0; overflow: visible !important; }
+            .sidebar, .sidebar-overlay, .topbar, .modal-overlay, .action-bar { display: none !important; }
+            .app-layout { display: block !important; margin: 0 !important; padding: 0 !important; }
+
+            .main-content {
+                margin: 0 !important;
+                padding: 0 !important;
+                transform: scale(0.48);
+                transform-origin: top left;
+                width: 208%; /* 1/0.48 to fill page width */
+            }
+
+            /* Print header */
+            .print-header { display: flex !important; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 2px solid var(--primary); padding-bottom: 8px; }
+            .print-header-left h1 { font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0; }
+            .print-header-left p { font-size: 12px; color: var(--text-secondary); margin: 2px 0 0; }
+            .print-header-right { font-size: 12px; color: var(--text-secondary); text-align: right; }
+
+            /* Force 4-column stats regardless of viewport */
+            .stats-row { gap: 10px !important; margin-bottom: 10px !important; grid-template-columns: repeat(4, 1fr) !important; }
+            .summary-stat { padding: 10px 14px; gap: 10px; }
+            .summary-stat-icon { width: 32px; height: 32px; font-size: 0.9rem; border-radius: 8px; }
+            .summary-stat-icon svg { width: 16px; height: 16px; }
+            .summary-stat-value { font-size: 1.15rem; }
+            .summary-stat-label { font-size: 0.65rem; }
+
+            /* Force 3-column grid regardless of viewport */
+            .dashboard-grid { gap: 10px !important; grid-template-columns: 1fr 1fr 1fr !important; }
+            .card { box-shadow: none !important; border: 1px solid #e0e0e0; padding: 12px !important; break-inside: avoid; }
+            .card-title { font-size: 0.75rem; margin-bottom: 8px; }
+
+            /* Force correct grid column assignments */
+            .card-speedometer { grid-column: 1 / 3 !important; height: 280px !important; }
+            .card-distribution { grid-column: 3 !important; height: 280px !important; }
+            .card-mini-pie { grid-column: 1 / 3 !important; min-height: 0; }
+            .card-bonuses { grid-column: 3 !important; min-height: 0; }
+            .card-weekly { grid-column: 1 / -1 !important; height: 220px !important; }
+
+            .card-bonuses { font-size: 0.8rem; }
+            .bonus-psa { margin-bottom: 10px; }
+            .psa-header, .trc-header { font-size: 0.9rem; padding: 7px 12px; }
+            .psa-table, .trc-table { padding: 8px 10px; gap: 3px 8px; }
+            .psa-i, .psa-w, .psa-r, .trc-r { font-size: 1rem; }
+            .psa-interview, .psa-accept, .psa-refer, .trc-refer { font-size: 0.75rem; }
+
+            .pie-row { gap: 12px; }
+            .pie-cell { padding: 4px 0; }
+            .pie-cell h4 { font-size: 0.7rem; margin-bottom: 4px; }
+            .pie-canvas-wrap { max-width: 120px; margin-bottom: 6px; }
+            .grade-legend { gap: 5px; }
+            .legend-item { font-size: 0.6rem; }
+            .legend-color { width: 8px; height: 8px; }
+        }
+
+        /* Print header hidden on screen */
+        .print-header { display: none; }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <!-- Print-only header -->
+            <div class="print-header">
+                <div class="print-header-left">
+                    <h1>Roster Tracker</h1>
+                    <p id="print-company-label">Company performance overview &mdash; All Companies</p>
+                </div>
+                <div class="print-header-right">
+                    <div>TalentLedger</div>
+                    <div id="print-date"></div>
+                </div>
+            </div>
+
+            <!-- Action bar: company dropdown + buttons -->
+            <div class="action-bar">
+                <select class="company-select" id="company-filter">
+                    <option value="all">All Companies</option>
+                </select>
+                <div class="action-bar-spacer"></div>
+                <button class="action-btn action-btn-primary" id="data-entry-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    Data Entry
+                </button>
+                <button class="action-btn action-btn-outline" id="print-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m0 0a48.159 48.159 0 0 1 12.5 0m-12.5 0v-3a2.25 2.25 0 0 1 2.25-2.25h6a2.25 2.25 0 0 1 2.25 2.25v3" /></svg>
+                    Print
+                </button>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="stats-row">
+                <div class="card summary-stat">
+                    <div class="summary-stat-icon open">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                    </div>
+                    <div>
+                        <div class="summary-stat-value" id="stat-open">--</div>
+                        <div class="summary-stat-label">Open Orders</div>
+                    </div>
+                </div>
+                <div class="card summary-stat">
+                    <div class="summary-stat-icon sched">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                    </div>
+                    <div>
+                        <div class="summary-stat-value" id="stat-sched">--</div>
+                        <div class="summary-stat-label">Scheduled</div>
+                    </div>
+                </div>
+                <div class="card summary-stat">
+                    <div class="summary-stat-icon intv">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                    </div>
+                    <div>
+                        <div class="summary-stat-value" id="stat-intv">--</div>
+                        <div class="summary-stat-label">Interviewed</div>
+                    </div>
+                </div>
+                <div class="card summary-stat">
+                    <div class="summary-stat-icon acpt">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    </div>
+                    <div>
+                        <div class="summary-stat-value" id="stat-acpt">--</div>
+                        <div class="summary-stat-label">Accepted</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="dashboard-grid">
+                <div class="card card-speedometer">
+                    <div class="card-title">Success Speedometer</div>
+                    <div class="overall-meter"><canvas id="open-order-meter"></canvas></div>
+                </div>
+                <div class="card card-distribution">
+                    <div class="card-title">Branch Distribution</div>
+                    <div class="chart-fill"><canvas id="bonus-distribution-chart"></canvas></div>
+                </div>
+                <div class="card card-mini-pie">
+                    <div class="card-title">Success Activity</div>
+                    <div class="pie-row">
+                        <div class="pie-cell">
+                            <h4>Scheduled / Order</h4>
+                            <div class="pie-canvas-wrap"><canvas id="scheduled-order"></canvas></div>
+                            <div class="grade-legend" id="scheduled-order-legend"></div>
+                        </div>
+                        <div class="pie-cell">
+                            <h4>Interviewed / Scheduled</h4>
+                            <div class="pie-canvas-wrap"><canvas id="interview-scheduled"></canvas></div>
+                            <div class="grade-legend" id="interview-scheduled-legend"></div>
+                        </div>
+                        <div class="pie-cell">
+                            <h4>Accepted / Interviewed</h4>
+                            <div class="pie-canvas-wrap"><canvas id="accepted-interview"></canvas></div>
+                            <div class="grade-legend" id="accepted-interview-legend"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-bonuses">
+                    <div class="card-title">Bonus Programs</div>
+                    <div class="bonus-psa">
+                        <div class="psa-header">PSA - Bonus Program</div>
+                        <div class="psa-table">
+                            <div class="psa-i">I</div><div class="psa-interview">~ $25 - Interview</div>
+                            <div class="psa-w">W</div><div class="psa-accept">~ $25 - Accepted &amp; Work &gt; 40 hrs</div>
+                            <div class="psa-r">R</div><div class="psa-refer">~ $25 - Referral works &gt; 80 hrs</div>
+                        </div>
+                    </div>
+                    <div class="bonus-trc">
+                        <div class="trc-header">TRC - Bonus Program</div>
+                        <div class="trc-table">
+                            <div class="trc-r">R</div><div class="trc-refer">~ $100 - Referral works &gt; 80 hrs</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card card-weekly">
+                    <div class="card-title">Weekly Activity</div>
+                    <div class="chart-fill"><canvas id="weekly-breakdown-chart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Entry Modal -->
+    <div class="modal-overlay" id="data-entry-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>Data Entry</h2>
+                <button class="modal-close" id="modal-close-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="form-message"></div>
+                <form id="company-data-form">
+                    <div class="form-group">
+                        <label class="form-label" for="entry-company">Company</label>
+                        <select class="form-select" id="entry-company" name="company" required>
+                            <option value="TRC">TRC</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Current Week</label>
+                        <span id="display_week" style="font-weight:700;font-size:1.125rem;color:var(--primary);">--</span>
+                        <input type="hidden" id="calculated_week" name="week" value="">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="date">Friday Date</label>
+                        <input class="form-input" type="date" id="date" name="date" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="open_order">Open Order #</label>
+                            <input class="form-input" type="number" id="open_order" name="open_order" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="scheduled">Scheduled #</label>
+                            <input class="form-input" type="number" id="scheduled" name="scheduled" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="interviewed">Interviewed #</label>
+                            <input class="form-input" type="number" id="interviewed" name="interviewed" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="accepted">Accepted #</label>
+                            <input class="form-input" type="number" id="accepted" name="accepted" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="rom">ROM #</label>
+                            <input class="form-input" type="number" id="rom" name="rom" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="car">CAR #</label>
+                            <input class="form-input" type="number" id="car" name="car" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="aus">AUS #</label>
+                        <input class="form-input" type="number" id="aus" name="aus" placeholder="0">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top:8px;width:100%;">Submit Data</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { supabase } from './src/supabaseClient.js';
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+
+        await checkAuth();
+        await checkPageAccess('roster-tracker');
+        renderNavbar({ title: 'Roster Tracker', subtitle: 'Company performance overview' });
+        await renderSidebar();
+        initInactivityTimer();
+    </script>
+
+    <script type="module">
+        import { supabase } from './src/supabaseClient.js';
+
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#6B7280';
+        if (window.matchMedia('print').matches) Chart.defaults.animation = false;
+
+        // ── Chart instance tracking (for re-rendering on filter change) ──
+        const chartInstances = {};
+
+        function destroyCharts() {
+            Object.values(chartInstances).forEach(c => c.destroy());
+            Object.keys(chartInstances).forEach(k => delete chartInstances[k]);
+        }
+
+        // Reset canvas elements (Chart.js needs fresh canvases)
+        function resetCanvas(id) {
+            const old = document.getElementById(id);
+            if (!old) return null;
+            const parent = old.parentElement;
+            const canvas = document.createElement('canvas');
+            canvas.id = id;
+            parent.replaceChild(canvas, old);
+            return canvas;
+        }
+
+        // ── Data fetching with optional company filter ──
+        async function fetchCompanyTotals(company) {
+            let query = supabase.from('company_data')
+                .select('open_order, scheduled, interviewed, accepted, rom, car, aus');
+            if (company && company !== 'all') query = query.eq('company', company);
+
+            const { data, error } = await query;
+            if (error) { console.error('Error fetching company totals:', error); return null; }
+
+            const totals = { TotalOpenOrder: 0, TotalScheduled: 0, TotalInterviewed: 0, TotalAccepted: 0, TotalROM: 0, TotalCAR: 0, TotalAUS: 0 };
+            data.forEach(row => {
+                totals.TotalOpenOrder += Number(row.open_order) || 0;
+                totals.TotalScheduled += Number(row.scheduled) || 0;
+                totals.TotalInterviewed += Number(row.interviewed) || 0;
+                totals.TotalAccepted += Number(row.accepted) || 0;
+                totals.TotalROM += Number(row.rom) || 0;
+                totals.TotalCAR += Number(row.car) || 0;
+                totals.TotalAUS += Number(row.aus) || 0;
+            });
+            return totals;
+        }
+
+        async function fetchWeeklyData(company) {
+            let query = supabase.from('company_data')
+                .select('week, date, open_order, scheduled, interviewed, accepted')
+                .order('date', { ascending: true });
+            if (company && company !== 'all') query = query.eq('company', company);
+
+            const { data, error } = await query;
+            if (error) { console.error('Error fetching weekly data:', error); return []; }
+
+            const weekMap = {};
+            data.forEach(row => {
+                const wk = row.week;
+                if (!weekMap[wk]) weekMap[wk] = { week_start_date: row.date, weekly_open: 0, weekly_scheduled: 0, weekly_interviewed: 0, weekly_accepted: 0 };
+                weekMap[wk].weekly_open += Number(row.open_order) || 0;
+                weekMap[wk].weekly_scheduled += Number(row.scheduled) || 0;
+                weekMap[wk].weekly_interviewed += Number(row.interviewed) || 0;
+                weekMap[wk].weekly_accepted += Number(row.accepted) || 0;
+            });
+            return Object.values(weekMap).sort((a, b) => new Date(a.week_start_date) - new Date(b.week_start_date));
+        }
+
+        async function fetchDistinctCompanies() {
+            const { data, error } = await supabase.from('company_data').select('company');
+            if (error) return [];
+            return [...new Set(data.map(r => r.company))].sort();
+        }
+
+        // ── Color helpers ──
+        const colorPaletteDark = 'rgba(225, 167, 33, 1)';
+        const colorPaletteMedDark = 'rgba(225, 167, 33, 0.7)';
+        const colorPaletteMedLight = 'rgba(225, 167, 33, 0.4)';
+        const colorPaletteLight = 'rgba(225, 167, 33, 0.15)';
+
+        const getColorForRatio = (chartName, ratio) => {
+            const c = { red: '#EF4444', yellow: '#F59E0B', green: '#10B981' };
+            switch (chartName) {
+                case 'scheduled-order': return ratio < 0.50 ? c.red : ratio < 0.75 ? c.yellow : c.green;
+                case 'interview-scheduled': return ratio < 0.70 ? c.red : ratio < 0.90 ? c.yellow : c.green;
+                case 'accepted-interview': return ratio < 0.50 ? c.red : ratio < 0.80 ? c.yellow : c.green;
+                default: return '#4299e1';
+            }
+        };
+
+        const getThresholdsForChart = (n) => {
+            switch (n) {
+                case 'scheduled-order': return { green: 75, yellow: 50 };
+                case 'interview-scheduled': return { green: 90, yellow: 70 };
+                case 'accepted-interview': return { green: 80, yellow: 50 };
+                default: return { green: 0, yellow: 0 };
+            }
+        };
+
+        function createGradeLegend(containerId, chartName) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const t = getThresholdsForChart(chartName);
+            el.innerHTML = `
+                <div class="legend-item"><div class="legend-color" style="background:#10B981;"></div><span>>= ${t.green}%</span></div>
+                <div class="legend-item"><div class="legend-color" style="background:#F59E0B;"></div><span>${t.yellow}-${t.green - 1}%</span></div>
+                <div class="legend-item"><div class="legend-color" style="background:#EF4444;"></div><span>< ${t.yellow}%</span></div>
+            `;
+        }
+
+        // ── Chart creators ──
+        function createRatioPie(canvasId, primaryVal, totalVal, primLabel, secLabel, chartName, legendId) {
+            const ctx = resetCanvas(canvasId);
+            if (!ctx) return;
+            const titleEl = ctx.closest('.pie-cell')?.querySelector('h4');
+            const p = Number(primaryVal) || 0, t = Number(totalVal) || 0;
+            const s = t > p ? t - p : 0;
+            const ratio = t > 0 ? p / t : 0;
+            const pct = (ratio * 100).toFixed(0);
+            if (titleEl) titleEl.textContent = `${primLabel} / ${secLabel} (${pct}%)`;
+
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: [primLabel, secLabel], datasets: [{ data: [p, s], backgroundColor: [getColorForRatio(chartName, ratio), '#F3F4F6'], borderColor: '#fff', borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: true, cutout: '55%', plugins: { legend: { display: false }, datalabels: { color: '#1F2937', font: { weight: 'bold', size: 12 }, formatter: v => v > 0 ? v : '' } } },
+                plugins: [ChartDataLabels]
+            });
+            if (chartName && legendId) createGradeLegend(legendId, chartName);
+        }
+
+        function createSpeedometer(canvasId, data) {
+            const ctx = resetCanvas(canvasId);
+            if (!ctx) return;
+            const ts = Number(data.TotalScheduled) || 0, ti = Number(data.TotalInterviewed) || 0;
+            const ta = Number(data.TotalAccepted) || 0, to = Number(data.TotalOpenOrder) || 0;
+            const pieces = [ta, ti - ta, ts - ti, to - ts];
+            const displayValues = [ta, ti, ts, to - ts];
+
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: ['Accepted', 'Interviewed', 'Scheduled', 'Unfulfilled'], datasets: [{ data: pieces, backgroundColor: [colorPaletteDark, colorPaletteMedDark, colorPaletteMedLight, colorPaletteLight], borderColor: '#fff', borderWidth: 2 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '50%',
+                    plugins: {
+                        title: { display: true, text: `Total Open Orders: ${to.toLocaleString()}`, font: { size: 13, weight: '600' }, color: '#1F2937', padding: { bottom: 8 } },
+                        legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 16, font: { size: 11 } } },
+                        datalabels: { anchor: 'end', align: 'start', color: '#1F2937', font: { size: 12, weight: '600' }, formatter: (v, ctx) => { if (ctx.dataset.data[ctx.dataIndex] <= 0) return ''; const dv = displayValues[ctx.dataIndex]; const pct = to > 0 ? ((dv / to) * 100).toFixed(0) : 0; return `${dv} ~ ${pct}%`; } }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+        }
+
+        function createDistribution(canvasId, data) {
+            const ctx = resetCanvas(canvasId);
+            if (!ctx) return;
+            const total = data.TotalAccepted;
+            const vals = [data.TotalROM || 0, data.TotalCAR || 0, data.TotalAUS || 0];
+
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: ['ROM', 'CAR', 'AUS'], datasets: [{ data: vals, backgroundColor: [colorPaletteDark, colorPaletteMedDark, colorPaletteMedLight], borderColor: '#fff', borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '45%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 16, font: { size: 11 } } }, datalabels: { color: '#1F2937', font: { size: 12, weight: '600' }, formatter: v => { if (v <= 0) return ''; const pct = total > 0 ? ((v / total) * 100).toFixed(0) : 0; return `${v} (${pct}%)`; } } } },
+                plugins: [ChartDataLabels]
+            });
+        }
+
+        function createWeeklyChart(canvasId, data) {
+            const ctx = resetCanvas(canvasId);
+            if (!ctx) return;
+            if (!data || data.length === 0) { ctx.parentElement.innerHTML = '<p style="text-align:center;color:#718096;margin-top:40px;">Not enough weekly data.</p>'; return; }
+
+            const labels = data.map(i => i.week_start_date);
+            chartInstances[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Open Orders', data: data.map(i => i.weekly_open), borderColor: colorPaletteLight, backgroundColor: 'rgba(225,167,33,0.03)', fill: true, tension: 0.35, borderWidth: 2 },
+                        { label: 'Scheduled', data: data.map(i => i.weekly_scheduled), borderColor: colorPaletteMedLight, tension: 0.35, borderWidth: 2 },
+                        { label: 'Interviewed', data: data.map(i => i.weekly_interviewed), borderColor: colorPaletteMedDark, tension: 0.35, borderWidth: 2 },
+                        { label: 'Accepted', data: data.map(i => i.weekly_accepted), borderColor: colorPaletteDark, tension: 0.35, borderWidth: 2, pointRadius: 3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', labels: { boxWidth: 10, padding: 16, font: { size: 11 } } }, datalabels: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } } } }
+            });
+        }
+
+        // ── Render all charts ──
+        async function renderDashboard(company = 'all') {
+            destroyCharts();
+            const [companyData, weeklyData] = await Promise.all([
+                fetchCompanyTotals(company),
+                fetchWeeklyData(company)
+            ]);
+
+            if (!companyData) { console.error("No company data loaded."); return; }
+
+            document.getElementById('stat-open').textContent = companyData.TotalOpenOrder.toLocaleString();
+            document.getElementById('stat-sched').textContent = companyData.TotalScheduled.toLocaleString();
+            document.getElementById('stat-intv').textContent = companyData.TotalInterviewed.toLocaleString();
+            document.getElementById('stat-acpt').textContent = companyData.TotalAccepted.toLocaleString();
+
+            createSpeedometer('open-order-meter', companyData);
+            createDistribution('bonus-distribution-chart', companyData);
+            createRatioPie('scheduled-order', companyData.TotalScheduled, companyData.TotalOpenOrder, 'Scheduled', 'Order', 'scheduled-order', 'scheduled-order-legend');
+            createRatioPie('interview-scheduled', companyData.TotalInterviewed, companyData.TotalScheduled, 'Interviewed', 'Scheduled', 'interview-scheduled', 'interview-scheduled-legend');
+            createRatioPie('accepted-interview', companyData.TotalAccepted, companyData.TotalInterviewed, 'Accepted', 'Interviewed', 'accepted-interview', 'accepted-interview-legend');
+            createWeeklyChart('weekly-breakdown-chart', weeklyData);
+
+            // Update print header
+            const label = company === 'all' ? 'All Companies' : company;
+            document.getElementById('print-company-label').textContent = `Company performance overview \u2014 ${label}`;
+        }
+
+        // ── Populate company dropdown ──
+        const companies = await fetchDistinctCompanies();
+        const select = document.getElementById('company-filter');
+        companies.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            select.appendChild(opt);
+        });
+
+        // Also populate modal company dropdown
+        const entryCompanySelect = document.getElementById('entry-company');
+        entryCompanySelect.innerHTML = '';
+        companies.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            entryCompanySelect.appendChild(opt);
+        });
+
+        select.addEventListener('change', () => renderDashboard(select.value));
+
+        // ── Initial render ──
+        await renderDashboard('all');
+
+        // ── Print button ──
+        document.getElementById('print-date').textContent = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        document.getElementById('print-btn').addEventListener('click', () => {
+            // Disable animations and resize charts before printing
+            Chart.defaults.animation = false;
+            Object.values(chartInstances).forEach(c => c.resize());
+            setTimeout(() => {
+                window.print();
+                // Re-enable animations after printing
+                Chart.defaults.animation = true;
+            }, 200);
+        });
+
+        // ── Data Entry Modal ──
+        const modal = document.getElementById('data-entry-modal');
+        document.getElementById('data-entry-btn').addEventListener('click', () => modal.classList.add('open'));
+        document.getElementById('modal-close-btn').addEventListener('click', () => modal.classList.remove('open'));
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+
+        // Week calculation
+        const BASE_DATE = new Date('2025-05-23T00:00:00');
+        const dateInput = document.getElementById('date');
+        const displayWeek = document.getElementById('display_week');
+        const hiddenWeek = document.getElementById('calculated_week');
+
+        function calculateWeek() {
+            if (!dateInput.value) { displayWeek.textContent = '--'; hiddenWeek.value = ''; return; }
+            const sel = new Date(dateInput.value + 'T00:00:00');
+            const diffDays = Math.floor((sel.getTime() - BASE_DATE.getTime()) / (1000 * 60 * 60 * 24));
+            const weekNum = Math.floor(diffDays / 7) + 1;
+            displayWeek.textContent = weekNum;
+            hiddenWeek.value = weekNum;
+        }
+        dateInput.addEventListener('change', calculateWeek);
+
+        // Form submission
+        const form = document.getElementById('company-data-form');
+        const msgContainer = document.getElementById('form-message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const company = document.getElementById('entry-company').value;
+            if (!dateInput.value) { msgContainer.innerHTML = '<div class="notice notice-error">Please select a date.</div>'; return; }
+
+            try {
+                const { error } = await supabase.from('company_data').insert({
+                    company,
+                    week: parseInt(hiddenWeek.value),
+                    date: dateInput.value,
+                    open_order: parseInt(document.getElementById('open_order').value) || 0,
+                    scheduled: parseInt(document.getElementById('scheduled').value) || 0,
+                    interviewed: parseInt(document.getElementById('interviewed').value) || 0,
+                    accepted: parseInt(document.getElementById('accepted').value) || 0,
+                    rom: parseInt(document.getElementById('rom').value) || 0,
+                    car: parseInt(document.getElementById('car').value) || 0,
+                    aus: parseInt(document.getElementById('aus').value) || 0
+                }).select();
+
+                if (error) { msgContainer.innerHTML = `<div class="notice notice-error">Error: ${error.message}</div>`; return; }
+
+                msgContainer.innerHTML = `<div class="notice notice-success">Data submitted for ${company} Week ${hiddenWeek.value}!</div>`;
+                form.reset();
+                displayWeek.textContent = '--';
+                hiddenWeek.value = '';
+
+                // Refresh dashboard with current filter
+                await renderDashboard(select.value);
+            } catch (err) {
+                msgContainer.innerHTML = '<div class="notice notice-error">Error submitting data. Please try again.</div>';
+            }
+        });
+    </script>
+</body>
+</html>

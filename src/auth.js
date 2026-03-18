@@ -141,3 +141,74 @@ export async function deleteUserProfile(userId) {
     .eq('id', userId);
   if (error) throw error;
 }
+
+// ── Company management ──
+
+// Get all companies
+export async function getAllCompanies() {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('*')
+    .order('name');
+  if (error) throw error;
+  return data || [];
+}
+
+// Create a new company
+export async function createCompany(name, slug) {
+  const { data, error } = await supabase
+    .from('companies')
+    .insert({ name, slug })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// Delete a company
+export async function deleteCompany(companyId) {
+  const { error } = await supabase
+    .from('companies')
+    .delete()
+    .eq('id', companyId);
+  if (error) throw error;
+}
+
+// ── User-Company assignments ──
+
+// Get all user-company assignments
+export async function getAllUserCompanies() {
+  const { data, error } = await supabase
+    .from('user_companies')
+    .select('*');
+  if (error) throw error;
+  return data || [];
+}
+
+// Set companies for a user (replace all)
+export async function setUserCompanies(userId, companyIds) {
+  // Delete existing assignments
+  const { error: delError } = await supabase
+    .from('user_companies')
+    .delete()
+    .eq('user_id', userId);
+  if (delError) throw delError;
+
+  // Insert new assignments
+  if (companyIds.length > 0) {
+    const rows = companyIds.map(cid => ({ user_id: userId, company_id: cid }));
+    const { error: insError } = await supabase
+      .from('user_companies')
+      .insert(rows);
+    if (insError) throw insError;
+  }
+}
+
+// ── User creation (invite) ──
+
+// Create a new user with email + temporary password
+export async function createUserWithEmail(email, password) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  return data;
+}
