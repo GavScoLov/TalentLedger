@@ -312,7 +312,7 @@
 
     <script type="module">
         import {
-            checkAuth, checkPageAccess, isAdmin, getUser,
+            checkAuth, checkPageAccess, isSuperAdmin, getUser,
             getAllUsers, updateUserRole, updateUserPages, deleteUserProfile,
             getAllCompanies, createCompany, deleteCompany,
             getAllUserCompanies, setUserCompanies,
@@ -929,12 +929,13 @@
         let mgmtUserCompanies = [];
 
         const SITE_PAGES = [
+            { slug: 'dashboard', label: 'Dashboard' },
             { slug: 'commission', label: 'Commission' },
             { slug: 'data-visualization', label: 'Descending Revenue' },
             { slug: 'hours-breakdown', label: 'Hours Breakdown' },
             { slug: 'profit-loss', label: 'Profit & Loss' },
             { slug: 'state-tax', label: 'State Tax' },
-            { slug: 'roster-tracker', label: 'Roster Tracker' },
+            { slug: 'roster-tracker', label: 'Company Tracker' },
             { slug: 'settings', label: 'Settings' },
         ];
 
@@ -1040,15 +1041,15 @@
                     </td>
                     <td>
                         <select class="role-select" data-user-id="${user.id}" ${isCurrentUser ? 'disabled title="Cannot change your own role"' : ''}>
+                            <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
                             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                            <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
-                            <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                            <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
                         </select>
                     </td>
                     <td>
                         <div class="page-toggles" data-user-id="${user.id}">
-                            ${user.role === 'admin'
-                                ? '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (admin)</span>'
+                            ${user.role === 'super_admin'
+                                ? '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (super admin)</span>'
                                 : SITE_PAGES.map(p => `
                                     <label class="page-toggle ${allowedPages.includes(p.slug) ? 'active' : ''}">
                                         <input type="checkbox" value="${p.slug}" ${allowedPages.includes(p.slug) ? 'checked' : ''}>
@@ -1076,8 +1077,8 @@
                 select.addEventListener('change', () => {
                     const userId = select.dataset.userId;
                     const tc = tbody.querySelector(`.page-toggles[data-user-id="${userId}"]`);
-                    if (select.value === 'admin') {
-                        tc.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (admin)</span>';
+                    if (select.value === 'super_admin') {
+                        tc.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (super admin)</span>';
                     } else {
                         const user = mgmtUsers.find(u => u.id === userId);
                         const ap = user?.allowed_pages || [];
@@ -1103,7 +1104,7 @@
                         const row = btn.closest('tr');
                         const role = row.querySelector('.role-select').value;
                         await updateUserRole(userId, role);
-                        if (role !== 'admin') {
+                        if (role !== 'super_admin') {
                             const cbs = row.querySelectorAll('.page-toggle input');
                             const pages = Array.from(cbs).filter(cb => cb.checked).map(cb => cb.value);
                             await updateUserPages(userId, pages);
@@ -1112,7 +1113,7 @@
                         const user = mgmtUsers.find(u => u.id === userId);
                         if (user) {
                             user.role = role;
-                            if (role !== 'admin') {
+                            if (role !== 'super_admin') {
                                 user.allowed_pages = Array.from(row.querySelectorAll('.page-toggle input')).filter(cb => cb.checked).map(cb => cb.value);
                             }
                         }

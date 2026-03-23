@@ -76,20 +76,20 @@ export function onAuthStateChange(callback) {
 // Get current user's role from profiles table
 export async function getUserRole() {
   const profile = await _getProfile();
-  return profile?.role || 'viewer';
+  return profile?.role || 'user';
 }
 
-// Check if current user is an admin
-export async function isAdmin() {
+// Check if current user is a super admin
+export async function isSuperAdmin() {
   const role = await getUserRole();
-  return role === 'admin';
+  return role === 'super_admin';
 }
 
 // Get the list of pages the current user can access
 export async function getAllowedPages() {
   const profile = await _getProfile();
   if (!profile) return null; // no profile = allow all (graceful fallback)
-  if (profile.role === 'admin') return null; // null = all pages
+  if (profile.role === 'super_admin') return null; // null = all pages
   if (!profile.allowed_pages || !Array.isArray(profile.allowed_pages) || profile.allowed_pages.length === 0) return null;
   return profile.allowed_pages;
 }
@@ -99,7 +99,7 @@ export async function checkPageAccess(pageSlug) {
   const allowed = await getAllowedPages();
   if (allowed === null) return true; // admin has access to everything
   if (!allowed.includes(pageSlug)) {
-    window.location.href = './commission.html';
+    window.location.href = './dashboard.html';
     return false;
   }
   return true;

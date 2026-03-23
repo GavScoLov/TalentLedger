@@ -67,7 +67,7 @@
     </div>
 
     <script type="module">
-        import { checkAuth, isAdmin, getAllUsers, updateUserRole, updateUserPages, deleteUserProfile, getUser } from './src/auth.js';
+        import { checkAuth, isSuperAdmin, getAllUsers, updateUserRole, updateUserPages, deleteUserProfile, getUser } from './src/auth.js';
         import { supabase } from './src/supabaseClient.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
@@ -78,18 +78,22 @@
         renderNavbar();
         initInactivityTimer();
 
-        // Only admins can access this page
-        const adminCheck = await isAdmin();
+        // Only super admins can access this page
+        const adminCheck = await isSuperAdmin();
         if (!adminCheck) {
-            window.location.href = './commission.html';
-            throw new Error('Not admin');
+            window.location.href = './dashboard.html';
+            throw new Error('Not super admin');
         }
 
         const SITE_PAGES = [
+            { slug: 'dashboard', label: 'Dashboard' },
             { slug: 'commission', label: 'Commission' },
             { slug: 'data-visualization', label: 'Descending Revenue' },
             { slug: 'hours-breakdown', label: 'Hours Breakdown' },
             { slug: 'profit-loss', label: 'Profit & Loss' },
+            { slug: 'state-tax', label: 'State Tax' },
+            { slug: 'roster-tracker', label: 'Company Tracker' },
+            { slug: 'settings', label: 'Settings' },
         ];
 
         function showStatus(msg, type) {
@@ -132,14 +136,14 @@
                     </td>
                     <td>
                         <select class="role-select" data-user-id="${user.id}" ${isCurrentUser ? 'disabled title="Cannot change your own role"' : ''}>
+                            <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
                             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                            <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editor</option>
-                            <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                            <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
                         </select>
                     </td>
                     <td>
                         <div class="page-toggles" data-user-id="${user.id}">
-                            ${user.role === 'admin' ? '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (admin)</span>' :
+                            ${user.role === 'super_admin' ? '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (super admin)</span>' :
                             SITE_PAGES.map(p => `
                                 <label class="page-toggle ${allowedPages.includes(p.slug) ? 'active' : ''}">
                                     <input type="checkbox" value="${p.slug}" ${allowedPages.includes(p.slug) ? 'checked' : ''}>
@@ -169,8 +173,8 @@
                 select.addEventListener('change', () => {
                     const userId = select.dataset.userId;
                     const togglesContainer = tbody.querySelector(`.page-toggles[data-user-id="${userId}"]`);
-                    if (select.value === 'admin') {
-                        togglesContainer.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (admin)</span>';
+                    if (select.value === 'super_admin') {
+                        togglesContainer.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (super admin)</span>';
                     } else {
                         const user = users.find(u => u.id === userId);
                         const allowedPages = user?.allowed_pages || [];
@@ -200,7 +204,7 @@
                         const role = row.querySelector('.role-select').value;
                         await updateUserRole(userId, role);
 
-                        if (role !== 'admin') {
+                        if (role !== 'super_admin') {
                             const checkboxes = row.querySelectorAll('.page-toggle input');
                             const pages = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
                             await updateUserPages(userId, pages);
@@ -210,7 +214,7 @@
                         const user = users.find(u => u.id === userId);
                         if (user) {
                             user.role = role;
-                            if (role !== 'admin') {
+                            if (role !== 'super_admin') {
                                 const checkboxes = row.querySelectorAll('.page-toggle input');
                                 user.allowed_pages = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
                             }

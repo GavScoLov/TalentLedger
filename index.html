@@ -48,13 +48,13 @@
         // Redirect if already logged in
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            window.location.href = './commission.html';
+            window.location.href = './dashboard.html';
         }
 
         // Auto-redirect on auth state change (e.g. after Google OAuth callback)
         onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
-                window.location.href = './commission.html';
+                window.location.href = './dashboard.html';
             }
         });
 
@@ -67,7 +67,7 @@
 
             try {
                 await login(email, password);
-                window.location.href = './commission.html';
+                window.location.href = './dashboard.html';
             } catch (err) {
                 errorEl.textContent = err.message || 'Invalid email or password.';
                 errorEl.style.display = 'block';

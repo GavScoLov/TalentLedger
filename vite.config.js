@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: resolve(__dirnameESM, 'index.html'),
+          dashboard: resolve(__dirnameESM, 'dashboard.html'),
           commission: resolve(__dirnameESM, 'commission.html'),
           dataVisualization: resolve(__dirnameESM, 'data-visualization.html'),
           hoursBreakdown: resolve(__dirnameESM, 'hours-breakdown.html'),

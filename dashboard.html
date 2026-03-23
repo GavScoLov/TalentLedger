@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - Dashboard</title>
+    <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+    <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        .dashboard-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+        .dashboard-section {
+            margin-bottom: 28px;
+        }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        .metric-card {
+            background: var(--bg-paper);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .metric-period {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .metric-change {
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .metric-change.positive { color: #16A34A; }
+        .metric-change.negative { color: #DC2626; }
+        .metric-change.neutral { color: var(--text-secondary); }
+
+        .tracker-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        .tracker-card {
+            background: var(--bg-paper);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+        }
+        .tracker-card-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .tracker-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .tracker-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tracker-row-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .tracker-row-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .tracker-change {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: right;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+        .tracker-change.positive { color: #16A34A; }
+        .tracker-change.negative { color: #DC2626; }
+        .tracker-change.neutral { color: var(--text-secondary); }
+
+        .loading-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 1100px) {
+            .tracker-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .metric-grid { grid-template-columns: 1fr; }
+            .tracker-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <div class="main-content">
+            <div class="page-header">
+                <div class="page-header-left">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle" id="date-range-label">Loading...</p>
+                </div>
+            </div>
+
+            <!-- Revenue Section -->
+            <div class="dashboard-section">
+                <div class="dashboard-section-title">Revenue</div>
+                <div class="metric-grid" id="revenue-grid">
+                    <div class="loading-state">Loading revenue data...</div>
+                </div>
+            </div>
+
+            <!-- Hours Section -->
+            <div class="dashboard-section">
+                <div class="dashboard-section-title">Hours</div>
+                <div class="metric-grid" id="hours-grid">
+                    <div class="loading-state">Loading hours data...</div>
+                </div>
+            </div>
+
+            <!-- Company Tracker Section -->
+            <div class="dashboard-section">
+                <div class="dashboard-section-title">Company Tracker</div>
+                <div class="tracker-grid" id="tracker-grid">
+                    <div class="loading-state">Loading tracker data...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { checkAuth, checkPageAccess } from './src/auth.js';
+        import { initInactivityTimer } from './src/main.js';
+        import { renderNavbar } from './src/components/navbar.js';
+        import { renderSidebar } from './src/components/sidebar.js';
+        import { fetchTotalBillingByBranch, fetchTotalHoursByBranch, getLatestAvailableSunday, formatCurrency, formatNumber } from './src/apiClient.js';
+        import { supabase } from './src/supabaseClient.js';
+
+        await checkAuth();
+        await checkPageAccess('dashboard');
+        renderNavbar();
+        await renderSidebar();
+        initInactivityTimer();
+
+        // ── Date helpers ──
+
+        function subtractDays(dateStr, n) {
+            const d = new Date(dateStr + 'T00:00:00');
+            d.setDate(d.getDate() - n);
+            return d.toISOString().split('T')[0];
+        }
+
+        function formatDateLabel(dateStr) {
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function pctChange(current, prior) {
+            if (!prior || prior === 0) return null;
+            return ((current - prior) / prior) * 100;
+        }
+
+        function changeHTML(current, prior) {
+            const pct = pctChange(current, prior);
+            if (pct === null) return '<span class="metric-change neutral">N/A</span>';
+            const cls = pct > 0 ? 'positive' : pct < 0 ? 'negative' : 'neutral';
+            const arrow = pct > 0 ? '\u2191' : pct < 0 ? '\u2193' : '';
+            return `<span class="metric-change ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}% vs prior</span>`;
+        }
+
+        // ── Date calculation ──
+
+        const currentWeekEnd = getLatestAvailableSunday();
+        const currentWeekStart = subtractDays(currentWeekEnd, 6);
+        const priorWeekEnd = subtractDays(currentWeekStart, 1);
+        const priorWeekStart = subtractDays(priorWeekEnd, 6);
+
+        // For averaging: go back ~12 weeks
+        const avgStart = subtractDays(currentWeekEnd, 84);
+
+        document.getElementById('date-range-label').textContent =
+            `Week of ${formatDateLabel(currentWeekStart)} vs ${formatDateLabel(priorWeekStart)}`;
+
+        // ── Fetch revenue & hours data ──
+
+        async function loadRevenueAndHours() {
+            try {
+                const [currentBilling, priorBilling, avgBilling, currentHours, priorHours, avgHours] = await Promise.all([
+                    fetchTotalBillingByBranch(currentWeekStart, currentWeekEnd),
+                    fetchTotalBillingByBranch(priorWeekStart, priorWeekEnd),
+                    fetchTotalBillingByBranch(avgStart, currentWeekEnd),
+                    fetchTotalHoursByBranch(currentWeekStart, currentWeekEnd),
+                    fetchTotalHoursByBranch(priorWeekStart, priorWeekEnd),
+                    fetchTotalHoursByBranch(avgStart, currentWeekEnd),
+                ]);
+
+                // Sum totals across all branches
+                const sumField = (arr, field) => arr.reduce((s, r) => s + (parseFloat(r[field]) || 0), 0);
+
+                const curRev = sumField(currentBilling, 'total_billing');
+                const prvRev = sumField(priorBilling, 'total_billing');
+                // Average: total over period / number of weeks (~12)
+                const totalAvgRev = sumField(avgBilling, 'total_billing');
+                const numWeeks = 12;
+                const avgRev = totalAvgRev / numWeeks;
+
+                const curHrs = sumField(currentHours, 'total_hours');
+                const prvHrs = sumField(priorHours, 'total_hours');
+                const totalAvgHrs = sumField(avgHours, 'total_hours');
+                const avgHrs = totalAvgHrs / numWeeks;
+
+                // Render revenue cards
+                document.getElementById('revenue-grid').innerHTML = `
+                    <div class="metric-card">
+                        <span class="metric-period">Current Week</span>
+                        <span class="metric-value">${formatCurrency(curRev)}</span>
+                        <span class="metric-label">Total Revenue</span>
+                        ${changeHTML(curRev, prvRev)}
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-period">Prior Week</span>
+                        <span class="metric-value">${formatCurrency(prvRev)}</span>
+                        <span class="metric-label">Total Revenue</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-period">12-Week Average</span>
+                        <span class="metric-value">${formatCurrency(avgRev)}</span>
+                        <span class="metric-label">Avg Weekly Revenue</span>
+                    </div>
+                `;
+
+                // Render hours cards
+                document.getElementById('hours-grid').innerHTML = `
+                    <div class="metric-card">
+                        <span class="metric-period">Current Week</span>
+                        <span class="metric-value">${formatNumber(curHrs, 1)}</span>
+                        <span class="metric-label">Total Hours</span>
+                        ${changeHTML(curHrs, prvHrs)}
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-period">Prior Week</span>
+                        <span class="metric-value">${formatNumber(prvHrs, 1)}</span>
+                        <span class="metric-label">Total Hours</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-period">12-Week Average</span>
+                        <span class="metric-value">${formatNumber(avgHrs, 1)}</span>
+                        <span class="metric-label">Avg Weekly Hours</span>
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('revenue-grid').innerHTML = `<div class="loading-state">Error loading revenue: ${err.message}</div>`;
+                document.getElementById('hours-grid').innerHTML = `<div class="loading-state">Error loading hours: ${err.message}</div>`;
+            }
+        }
+
+        // ── Fetch company tracker data ──
+
+        async function loadTrackerData() {
+            try {
+                const { data: rosterData, error } = await supabase
+                    .from('roster_company_data')
+                    .select('week, date, open_order, scheduled, interviewed, accepted')
+                    .order('date', { ascending: false });
+
+                if (error) throw error;
+                if (!rosterData || rosterData.length === 0) {
+                    document.getElementById('tracker-grid').innerHTML = '<div class="loading-state">No company tracker data available.</div>';
+                    return;
+                }
+
+                // Group by week and sum across all companies
+                const weekMap = {};
+                for (const row of rosterData) {
+                    const w = row.week;
+                    if (!weekMap[w]) {
+                        weekMap[w] = { week: w, date: row.date, open_order: 0, scheduled: 0, interviewed: 0, accepted: 0 };
+                    }
+                    weekMap[w].open_order += row.open_order || 0;
+                    weekMap[w].scheduled += row.scheduled || 0;
+                    weekMap[w].interviewed += row.interviewed || 0;
+                    weekMap[w].accepted += row.accepted || 0;
+                }
+
+                // Sort weeks descending by date
+                const weeks = Object.values(weekMap).sort((a, b) => b.date.localeCompare(a.date));
+
+                const current = weeks[0] || { open_order: 0, scheduled: 0, interviewed: 0, accepted: 0 };
+                const prior = weeks[1] || { open_order: 0, scheduled: 0, interviewed: 0, accepted: 0 };
+
+                // Compute averages across all weeks
+                const numW = weeks.length;
+                const avg = {
+                    open_order: weeks.reduce((s, w) => s + w.open_order, 0) / numW,
+                    scheduled: weeks.reduce((s, w) => s + w.scheduled, 0) / numW,
+                    interviewed: weeks.reduce((s, w) => s + w.interviewed, 0) / numW,
+                    accepted: weeks.reduce((s, w) => s + w.accepted, 0) / numW,
+                };
+
+                const metrics = [
+                    { title: 'Open Orders', key: 'open_order' },
+                    { title: 'Scheduled', key: 'scheduled' },
+                    { title: 'Interviewed', key: 'interviewed' },
+                    { title: 'Accepted', key: 'accepted' },
+                ];
+
+                document.getElementById('tracker-grid').innerHTML = metrics.map(m => `
+                    <div class="tracker-card">
+                        <div class="tracker-card-title">${m.title}</div>
+                        <div class="tracker-rows">
+                            <div class="tracker-row">
+                                <span class="tracker-row-label">Current Week</span>
+                                <span class="tracker-row-value">${formatNumber(current[m.key])}</span>
+                            </div>
+                            <div class="tracker-row">
+                                <span class="tracker-row-label">Prior Week</span>
+                                <span class="tracker-row-value">${formatNumber(prior[m.key])}</span>
+                            </div>
+                            <div class="tracker-row">
+                                <span class="tracker-row-label">Average</span>
+                                <span class="tracker-row-value">${formatNumber(avg[m.key], 1)}</span>
+                            </div>
+                        </div>
+                        <div class="tracker-change ${pctChange(current[m.key], prior[m.key]) > 0 ? 'positive' : pctChange(current[m.key], prior[m.key]) < 0 ? 'negative' : 'neutral'}">
+                            ${changeHTML(current[m.key], prior[m.key]).replace(/<[^>]+>/g, '')}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                document.getElementById('tracker-grid').innerHTML = `<div class="loading-state">Error loading tracker: ${err.message}</div>`;
+            }
+        }
+
+        // ── Load data ──
+        loadRevenueAndHours();
+        loadTrackerData();
+    </script>
+</body>
+</html>
