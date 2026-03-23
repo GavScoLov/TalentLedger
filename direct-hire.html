@@ -228,13 +228,30 @@
             dhpChart = new Chart(ctx, {
                 type: type,
                 data: { labels, datasets },
+                plugins: [ChartDataLabels],
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     scales: {
                         x: { ticks: { maxRotation: 45, font: { size: 10 } } },
                         y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } },
                     },
-                    plugins: { legend: { labels: { font: { size: 11 } } } },
+                    plugins: {
+                        legend: { labels: { font: { size: 11 } } },
+                        datalabels: {
+                            display: function(context) {
+                                if (context.dataset.label === 'Trend') return false;
+                                const val = context.parsed?.y ?? context.parsed;
+                                return val !== null && val !== undefined && val !== 0;
+                            },
+                            anchor: 'end', align: 'top',
+                            color: '#333',
+                            font: { size: 10, weight: '600' },
+                            formatter: (value) => formatCurrency(value),
+                            rotation: type === 'bar' ? -45 : 0,
+                            offset: 2,
+                        },
+                    },
+                    layout: { padding: { top: 30 } },
                 },
             });
         }
