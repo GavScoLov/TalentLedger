@@ -1,4 +1,5 @@
 import { getAllowedPages, isSuperAdmin } from '../auth.js';
+import sidebarIcon from '../../assets/TalentLedger-Icon.png';
 
 const navItems = [
   {
@@ -104,7 +105,7 @@ export async function renderSidebar() {
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <img src="./assets/TalentLedger-SidebarIcon.png" alt="TalentLedger" style="width:40px;height:40px;border-radius:8px;object-fit:cover;object-position:center 25%;">
+        <img src="${sidebarIcon}" alt="TalentLedger" style="width:40px;height:40px;border-radius:8px;object-fit:cover;object-position:center 25%;">
         <span class="sidebar-app-name">TalentLedger</span>
       </div>
       <nav class="sidebar-nav">${navHTML}</nav>
