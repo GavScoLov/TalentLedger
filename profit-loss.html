@@ -621,6 +621,30 @@
                     }]
                 },
                 plugins: [...plugins, {
+                    id: 'yearDivider',
+                    afterDraw(chart) {
+                        const labels = chart.data.labels;
+                        if (!labels || labels.length < 2) return;
+                        const xScale = chart.scales.x;
+                        const yScale = chart.scales.y;
+                        const c2 = chart.ctx;
+                        for (let i = 1; i < labels.length; i++) {
+                            const prevYear = String(labels[i - 1]).match(/(\d{4})/);
+                            const currYear = String(labels[i]).match(/(\d{4})/);
+                            if (prevYear && currYear && prevYear[1] !== currYear[1]) {
+                                const xPos = (xScale.getPixelForValue(i - 1) + xScale.getPixelForValue(i)) / 2;
+                                c2.save();
+                                c2.beginPath();
+                                c2.moveTo(xPos, yScale.top);
+                                c2.lineTo(xPos, yScale.bottom);
+                                c2.lineWidth = 3;
+                                c2.strokeStyle = '#000';
+                                c2.stroke();
+                                c2.restore();
+                            }
+                        }
+                    }
+                }, {
                     id: 'totalAnnotation',
                     afterDraw(chart) {
                         const { ctx: c } = chart;

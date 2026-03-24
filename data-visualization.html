@@ -550,10 +550,37 @@
                 });
             }
 
+            // Plugin: thick black vertical line between years
+            const yearDividerPlugin = {
+                id: 'yearDivider',
+                afterDraw(chart) {
+                    const labels = chart.data.labels;
+                    if (!labels || labels.length < 2) return;
+                    const xScale = chart.scales.x;
+                    const yScale = chart.scales.y;
+                    const ctx = chart.ctx;
+                    for (let i = 1; i < labels.length; i++) {
+                        const prevYear = String(labels[i - 1]).match(/(\d{4})/);
+                        const currYear = String(labels[i]).match(/(\d{4})/);
+                        if (prevYear && currYear && prevYear[1] !== currYear[1]) {
+                            const xPos = (xScale.getPixelForValue(i - 1) + xScale.getPixelForValue(i)) / 2;
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(xPos, yScale.top);
+                            ctx.lineTo(xPos, yScale.bottom);
+                            ctx.lineWidth = 3;
+                            ctx.strokeStyle = '#000';
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+                }
+            };
+
             mainChart = new Chart(ctx, {
                 type: graphType,
                 data: { labels: allLabels, datasets },
-                plugins: [ChartDataLabels],
+                plugins: [ChartDataLabels, yearDividerPlugin],
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
