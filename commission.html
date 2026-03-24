@@ -88,7 +88,23 @@
         }
         .pct-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.1); }
         .pct-header { display: grid; grid-template-columns: 1fr 70px 70px; gap: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-        .companies-scroll { max-height: calc(100vh - 460px); overflow-y: auto; padding-right: 4px; }
+        .companies-scroll { max-height: calc(100vh - 500px); overflow-y: auto; padding-right: 4px; }
+        .company-search-wrap {
+            position: relative; margin-bottom: 8px;
+        }
+        .company-search-wrap svg {
+            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+            width: 14px; height: 14px; color: var(--text-secondary);
+        }
+        .company-search-input {
+            width: 100%; padding: 7px 10px 7px 30px;
+            border: 1px solid var(--border-color); border-radius: var(--radius);
+            font-family: var(--font); font-size: 0.8rem; background: #fff; color: var(--text-primary);
+        }
+        .company-search-input:focus {
+            outline: none; border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.1);
+        }
 
         /* New producer modal */
         .modal-overlay {
@@ -149,6 +165,10 @@
                                 <option value="11">December</option>
                             </select>
                             <select class="form-select" id="comm_year" name="comm_year" style="min-width:80px;"></select>
+                            <div class="company-search-wrap" style="flex:1;min-width:160px;max-width:240px;margin:0;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                                <input type="text" class="company-search-input" id="company-report-search" placeholder="Search companies...">
+                            </div>
                             <button type="button" class="btn btn-primary" id="apply-btn">Apply</button>
                             <button type="button" class="btn btn-outlined" onclick="window.print()">Print</button>
                         </div>
@@ -194,6 +214,12 @@
                             <input type="checkbox" id="show-all-companies" checked style="accent-color:var(--primary);">
                             Show companies outside current timeframe
                         </label>
+                    </div>
+
+                    <!-- Company search -->
+                    <div class="company-search-wrap">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                        <input type="text" class="company-search-input" id="company-settings-search" placeholder="Search companies...">
                     </div>
 
                     <!-- Company assignments by branch -->
@@ -416,6 +442,7 @@
 
         function renderCompanyPanel() {
             const container = document.getElementById('companies-container');
+            const searchTerm = (document.getElementById('company-settings-search')?.value || '').toLowerCase().trim();
             // Filter out _Corporate branches
             const branches = Object.keys(companiesByBranch).filter(b => !b.includes('_Corporate'));
             if (branches.length === 0 || !selectedProducerId) {
@@ -431,10 +458,11 @@
 
             container.innerHTML = '';
             branches.forEach(branch => {
-                // Filter companies based on toggle
+                // Filter companies based on toggle and search
                 const companies = companiesByBranch[branch].filter(({ company }) => {
-                    if (showAllCompanies) return true;
-                    return currentTimeframeCompanies.has(`${company}||${branch}`);
+                    if (!showAllCompanies && !currentTimeframeCompanies.has(`${company}||${branch}`)) return false;
+                    if (searchTerm && !company.toLowerCase().includes(searchTerm) && !branch.toLowerCase().includes(searchTerm)) return false;
+                    return true;
                 });
                 if (companies.length === 0) return; // skip empty branches
 
@@ -729,6 +757,10 @@
 
         function renderTable(rows, groupBy) {
             const tbody = document.getElementById('commission_table_body');
+            const reportSearch = (document.getElementById('company-report-search')?.value || '').toLowerCase().trim();
+            if (reportSearch) {
+                rows = rows.filter(r => r.label.toLowerCase().includes(reportSearch));
+            }
 
             // If producers are selected for report, add commission columns
             const selectedProducers = producers.filter(p => reportProducerIds.includes(String(p.id)));
@@ -876,6 +908,16 @@
         // ── Event listeners ──────────────────────────────────────
         document.getElementById('apply-btn').addEventListener('click', loadData);
         document.getElementById('group_by').addEventListener('change', processData);
+
+        // Company search in report table
+        document.getElementById('company-report-search').addEventListener('input', () => {
+            if (rawData.length || rawHours.length) processData();
+        });
+
+        // Company search in settings panel
+        document.getElementById('company-settings-search').addEventListener('input', () => {
+            renderCompanyPanel();
+        });
 
         // Show/hide old companies toggle
         document.getElementById('show-all-companies').addEventListener('change', (e) => {
