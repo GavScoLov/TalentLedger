@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalentLedger - Time Tracker</title>
+    <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+    <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+    <link rel="stylesheet" href="./src/design-system.css">
+    <style>
+        /* ── Action bar ── */
+        .action-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .action-bar-spacer { flex-grow: 1; }
+        .filter-select {
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-family: var(--font);
+            font-size: 0.875rem;
+            font-weight: 500;
+            background: #fff;
+            color: var(--text-primary);
+            cursor: pointer;
+            min-width: 160px;
+        }
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+        }
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            font-family: var(--font);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .action-btn svg { width: 16px; height: 16px; }
+        .action-btn-primary { background: var(--primary); color: #1F2937; }
+        .action-btn-primary:hover { background: var(--primary-dark); }
+        .action-btn-outline {
+            background: #fff; color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+        .action-btn-outline:hover { background: var(--bg-default); color: var(--text-primary); }
+
+        /* ── Search bar ── */
+        .search-wrap {
+            position: relative;
+            flex: 1;
+            max-width: 320px;
+        }
+        .search-wrap svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--text-secondary);
+        }
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 32px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-family: var(--font);
+            font-size: 0.875rem;
+            background: #fff;
+            color: var(--text-primary);
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+        }
+
+        /* ── Stat cards ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .summary-stat {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 18px 20px;
+        }
+        .summary-stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .summary-stat-icon svg { width: 22px; height: 22px; }
+        .summary-stat-text { display: flex; flex-direction: column; }
+        .summary-stat-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .summary-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        /* ── Time entries table ── */
+        .table-wrap {
+            overflow-x: auto;
+            max-height: calc(100vh - 340px);
+            overflow-y: auto;
+        }
+        .time-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .time-table thead { position: sticky; top: 0; z-index: 2; }
+        .time-table th {
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            background: var(--bg-default);
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+        .time-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        .time-table tbody tr:hover { background: var(--bg-default); }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-badge.approved { background: #d1fae5; color: #065f46; }
+        .status-badge.pending { background: #fef3c7; color: #92400e; }
+        .status-badge.rejected { background: #fee2e2; color: #991b1b; }
+        .status-badge.submitted { background: #dbeafe; color: #1e40af; }
+
+        /* ── Placeholder banner ── */
+        .api-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #1e40af;
+        }
+        .api-banner svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .stats-row { grid-template-columns: 1fr; }
+            .action-bar { flex-direction: column; align-items: stretch; }
+            .search-wrap { max-width: 100%; }
+        }
+
+        /* ── Print ── */
+        @media print {
+            .action-bar, .api-banner { display: none !important; }
+            .table-wrap { max-height: none; overflow: visible; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <div class="topbar">
+            <button class="topbar-menu-btn" onclick="import('./src/components/sidebar.js').then(m=>m.toggleSidebar())">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:22px;height:22px"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+            </button>
+            <h1 class="topbar-title">Time Tracker</h1>
+        </div>
+
+        <!-- API connection banner -->
+        <div class="api-banner">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+            <span>Displaying sample data. TempWorks API integration coming soon.</span>
+        </div>
+
+        <!-- Filters / search -->
+        <div class="action-bar">
+            <select class="filter-select" id="clientFilter">
+                <option value="">All Clients</option>
+            </select>
+            <select class="filter-select" id="statusFilter">
+                <option value="">All Statuses</option>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending</option>
+                <option value="submitted">Submitted</option>
+                <option value="rejected">Rejected</option>
+            </select>
+            <select class="filter-select" id="weekFilter">
+                <option value="">All Weeks</option>
+            </select>
+            <div class="search-wrap">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                <input type="text" class="search-input" id="searchInput" placeholder="Search by employee, client, or department...">
+            </div>
+            <div class="action-bar-spacer"></div>
+            <button class="action-btn action-btn-outline" onclick="window.print()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" /></svg>
+                Print
+            </button>
+        </div>
+
+        <!-- Summary stat cards -->
+        <div class="stats-row">
+            <div class="card summary-stat">
+                <div class="summary-stat-icon" style="background:#dbeafe;color:#2563eb;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                </div>
+                <div class="summary-stat-text">
+                    <span class="summary-stat-label">Total Employees</span>
+                    <span class="summary-stat-value" id="statEmployees">0</span>
+                </div>
+            </div>
+            <div class="card summary-stat">
+                <div class="summary-stat-icon" style="background:#d1fae5;color:#059669;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </div>
+                <div class="summary-stat-text">
+                    <span class="summary-stat-label">Total Hours</span>
+                    <span class="summary-stat-value" id="statHours">0</span>
+                </div>
+            </div>
+            <div class="card summary-stat">
+                <div class="summary-stat-icon" style="background:#fef3c7;color:#d97706;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </div>
+                <div class="summary-stat-text">
+                    <span class="summary-stat-label">OT Hours</span>
+                    <span class="summary-stat-value" id="statOT">0</span>
+                </div>
+            </div>
+            <div class="card summary-stat">
+                <div class="summary-stat-icon" style="background:#ede9fe;color:#7c3aed;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" /></svg>
+                </div>
+                <div class="summary-stat-text">
+                    <span class="summary-stat-label">Total Pay</span>
+                    <span class="summary-stat-value" id="statPay">$0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time entries table -->
+        <div class="card" style="padding:0;">
+            <div class="table-wrap">
+                <table class="time-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Client</th>
+                            <th>Department</th>
+                            <th>Week Ending</th>
+                            <th>Reg Hours</th>
+                            <th>OT Hours</th>
+                            <th>Total Hours</th>
+                            <th>Pay Rate</th>
+                            <th>Bill Rate</th>
+                            <th>Total Pay</th>
+                            <th>Total Bill</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="timeTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script type="module">
+import { supabase } from './src/supabaseClient.js';
+import { checkAuth } from './src/auth.js';
+import { renderSidebar } from './src/components/sidebar.js';
+
+await checkAuth();
+await renderSidebar();
+
+/* ── Sample data (will be replaced by TempWorks API) ── */
+const SAMPLE_DATA = [
+    { employee: 'John Smith', client: 'Acme Corp', department: 'Warehouse', weekEnding: '2026-03-20', regHours: 40, otHours: 5, payRate: 18.50, billRate: 27.75, status: 'approved' },
+    { employee: 'Jane Doe', client: 'Acme Corp', department: 'Assembly', weekEnding: '2026-03-20', regHours: 40, otHours: 0, payRate: 16.00, billRate: 24.00, status: 'approved' },
+    { employee: 'Carlos Rivera', client: 'TechStart Inc', department: 'IT Support', weekEnding: '2026-03-20', regHours: 32, otHours: 0, payRate: 25.00, billRate: 42.50, status: 'pending' },
+    { employee: 'Aisha Patel', client: 'TechStart Inc', department: 'Admin', weekEnding: '2026-03-20', regHours: 40, otHours: 8, payRate: 20.00, billRate: 34.00, status: 'submitted' },
+    { employee: 'Mike Johnson', client: 'Summit Healthcare', department: 'Maintenance', weekEnding: '2026-03-20', regHours: 40, otHours: 2, payRate: 17.00, billRate: 25.50, status: 'approved' },
+    { employee: 'Sara Williams', client: 'Summit Healthcare', department: 'Nursing Aide', weekEnding: '2026-03-20', regHours: 36, otHours: 0, payRate: 22.00, billRate: 38.50, status: 'pending' },
+    { employee: 'David Lee', client: 'Greenfield Logistics', department: 'Forklift', weekEnding: '2026-03-20', regHours: 40, otHours: 10, payRate: 19.00, billRate: 30.00, status: 'approved' },
+    { employee: 'Maria Garcia', client: 'Greenfield Logistics', department: 'Shipping', weekEnding: '2026-03-20', regHours: 40, otHours: 4, payRate: 16.50, billRate: 26.00, status: 'submitted' },
+    { employee: 'James Brown', client: 'Acme Corp', department: 'Warehouse', weekEnding: '2026-03-13', regHours: 40, otHours: 6, payRate: 18.00, billRate: 27.00, status: 'approved' },
+    { employee: 'Emily Chen', client: 'TechStart Inc', department: 'Data Entry', weekEnding: '2026-03-13', regHours: 40, otHours: 0, payRate: 15.50, billRate: 23.25, status: 'approved' },
+    { employee: 'Robert Taylor', client: 'Summit Healthcare', department: 'Janitorial', weekEnding: '2026-03-13', regHours: 38, otHours: 0, payRate: 15.00, billRate: 22.50, status: 'rejected' },
+    { employee: 'Lisa Anderson', client: 'Greenfield Logistics', department: 'Packing', weekEnding: '2026-03-13', regHours: 40, otHours: 3, payRate: 16.00, billRate: 25.00, status: 'approved' },
+];
+
+let allData = [...SAMPLE_DATA];
+
+/* ── Populate filter dropdowns ── */
+function populateFilters() {
+    const clients = [...new Set(allData.map(d => d.client))].sort();
+    const weeks = [...new Set(allData.map(d => d.weekEnding))].sort().reverse();
+
+    const clientSel = document.getElementById('clientFilter');
+    clients.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        clientSel.appendChild(o);
+    });
+
+    const weekSel = document.getElementById('weekFilter');
+    weeks.forEach(w => {
+        const o = document.createElement('option');
+        o.value = w; o.textContent = `Week Ending ${w}`;
+        weekSel.appendChild(o);
+    });
+}
+
+/* ── Filter + render ── */
+function getFiltered() {
+    const client = document.getElementById('clientFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const week = document.getElementById('weekFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase().trim();
+
+    return allData.filter(d => {
+        if (client && d.client !== client) return false;
+        if (status && d.status !== status) return false;
+        if (week && d.weekEnding !== week) return false;
+        if (search) {
+            const hay = `${d.employee} ${d.client} ${d.department}`.toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+}
+
+function fmt$(v) { return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function render() {
+    const rows = getFiltered();
+
+    // Stats
+    const uniqueEmps = new Set(rows.map(r => r.employee)).size;
+    const totalReg = rows.reduce((s, r) => s + r.regHours, 0);
+    const totalOT = rows.reduce((s, r) => s + r.otHours, 0);
+    const totalPay = rows.reduce((s, r) => s + (r.regHours * r.payRate) + (r.otHours * r.payRate * 1.5), 0);
+
+    document.getElementById('statEmployees').textContent = uniqueEmps;
+    document.getElementById('statHours').textContent = (totalReg + totalOT).toLocaleString();
+    document.getElementById('statOT').textContent = totalOT.toLocaleString();
+    document.getElementById('statPay').textContent = fmt$(totalPay);
+
+    // Table
+    const tbody = document.getElementById('timeTableBody');
+    tbody.innerHTML = rows.map(r => {
+        const totalH = r.regHours + r.otHours;
+        const pay = (r.regHours * r.payRate) + (r.otHours * r.payRate * 1.5);
+        const bill = (r.regHours * r.billRate) + (r.otHours * r.billRate * 1.5);
+        return `<tr>
+            <td style="font-weight:600">${r.employee}</td>
+            <td>${r.client}</td>
+            <td>${r.department}</td>
+            <td>${r.weekEnding}</td>
+            <td>${r.regHours}</td>
+            <td>${r.otHours || '—'}</td>
+            <td style="font-weight:600">${totalH}</td>
+            <td>${fmt$(r.payRate)}</td>
+            <td>${fmt$(r.billRate)}</td>
+            <td style="font-weight:600">${fmt$(pay)}</td>
+            <td>${fmt$(bill)}</td>
+            <td><span class="status-badge ${r.status}">${r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+populateFilters();
+render();
+
+// Filter listeners
+document.getElementById('clientFilter').addEventListener('change', render);
+document.getElementById('statusFilter').addEventListener('change', render);
+document.getElementById('weekFilter').addEventListener('change', render);
+document.getElementById('searchInput').addEventListener('input', render);
+</script>
+</body>
+</html>
