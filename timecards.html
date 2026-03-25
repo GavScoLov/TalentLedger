@@ -285,6 +285,8 @@ let tsEmployees = [];      // TimeStation employees
 let tsDepartments = [];    // TimeStation departments (employers)
 let tsEmpIdSet = new Set(); // Set of TempWorks IDs that exist in TimeStation
 let tsEmpDeptMap = {};     // TW employee ID -> TimeStation department name
+let twToTsMap = {};        // TW employee ID -> TS employee_id
+let shiftDailyHours = {};  // TW employee ID -> { mon:X, tue:X, ... } per weekend_date
 
 /* ══════════════════════════════════════════════════════ */
 /* Toast                                                  */
@@ -326,14 +328,16 @@ async function loadTimeStationData() {
   tsEmployees = tsEmps || [];
   tsDepartments = tsDepts || [];
 
-  // Build lookup: custom_employee_id (TW ID) -> TimeStation department
+  // Build lookups
   tsEmpIdSet.clear();
   tsEmpDeptMap = {};
+  twToTsMap = {};
   tsEmployees.forEach(e => {
     if (e.custom_employee_id) {
       const twId = parseInt(e.custom_employee_id);
       tsEmpIdSet.add(twId);
       tsEmpDeptMap[twId] = e.primary_department || e.current_department || 'Unknown';
+      twToTsMap[twId] = e.employee_id; // TS employee_id (e.g. "emp_xxx")
     }
   });
 }
@@ -372,9 +376,64 @@ async function loadTimecards(weekendDate) {
     }
   }
 
+  // Load TimeStation shifts for this week and compute daily hours
+  await loadShiftsForWeek(weekendDate);
+
   populateCustomerFilter();
   selectedIds.clear();
   render();
+}
+
+async function loadShiftsForWeek(weekendDate) {
+  shiftDailyHours = {};
+
+  // Weekend date is Sunday. Week runs Mon-Sun.
+  // Mon = 6 days before Sunday, Sun = the weekend date itself
+  const sunday = new Date(weekendDate + 'T12:00:00');
+  const monday = new Date(sunday);
+  monday.setDate(sunday.getDate() - 6);
+
+  // Get all TS employee IDs for our filtered timecards
+  const tsIds = [...new Set(allTimecards.map(t => twToTsMap[t.employee_id]).filter(Boolean))];
+  if (!tsIds.length) return;
+
+  // Fetch shifts in date range for these employees
+  const { data: shifts } = await supabase
+    .from('ts_shifts')
+    .select('*')
+    .in('employee_id', tsIds)
+    .gte('time_in', monday.toISOString().split('T')[0] + 'T00:00:00')
+    .lte('time_in', weekendDate + 'T23:59:59');
+
+  if (!shifts || !shifts.length) return;
+
+  // Build reverse map: TS employee_id -> TW employee_id
+  const tsToTwMap = {};
+  for (const [twId, tsId] of Object.entries(twToTsMap)) {
+    tsToTwMap[tsId] = parseInt(twId);
+  }
+
+  // Compute daily hours per TW employee
+  // Days: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
+  const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  for (const shift of shifts) {
+    const twId = tsToTwMap[shift.employee_id];
+    if (!twId) continue;
+
+    if (!shiftDailyHours[twId]) {
+      shiftDailyHours[twId] = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0, total: 0 };
+    }
+
+    const shiftDate = new Date(shift.time_in);
+    // getDay(): 0=Sun,1=Mon,...6=Sat -> convert to Mon=0,...Sun=6
+    const jsDay = shiftDate.getDay();
+    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const hours = (shift.total_minutes || 0) / 60;
+
+    shiftDailyHours[twId][dayNames[dayIdx]] += hours;
+    shiftDailyHours[twId].total += hours;
+  }
 }
 
 function populateCustomerFilter() {
@@ -423,7 +482,10 @@ function render() {
   const pending = allTimecards.filter(t => (t.employer_approval || 'pending') === 'pending').length;
   const approved = allTimecards.filter(t => t.employer_approval === 'approved').length;
   const denied = allTimecards.filter(t => t.employer_approval === 'denied').length;
-  const totalHours = allTimecards.reduce((s, t) => s + (t.regular_hours || 0) + (t.overtime_hours || 0) + (t.doubletime_hours || 0), 0);
+  const totalHours = allTimecards.reduce((s, t) => {
+    const sh = shiftDailyHours[t.employee_id];
+    return s + (sh ? sh.total : 0);
+  }, 0);
 
   document.getElementById('statTotal').textContent = allTimecards.length;
   document.getElementById('statPending').textContent = pending;
@@ -450,18 +512,24 @@ function render() {
     const emp = employees[t.employee_id];
     const empName = emp ? `${emp.first_name} ${emp.last_name}` : `Employee #${t.employee_id}`;
     const approval = t.employer_approval || 'pending';
-    const total = (t.regular_hours || 0) + (t.overtime_hours || 0) + (t.doubletime_hours || 0);
 
-    totals.d1 += t.day1_hours || 0;
-    totals.d2 += t.day2_hours || 0;
-    totals.d3 += t.day3_hours || 0;
-    totals.d4 += t.day4_hours || 0;
-    totals.d5 += t.day5_hours || 0;
-    totals.d6 += t.day6_hours || 0;
-    totals.d7 += t.day7_hours || 0;
-    totals.reg += t.regular_hours || 0;
-    totals.ot += t.overtime_hours || 0;
+    // Use TimeStation shift hours for daily breakdown
+    const sh = shiftDailyHours[t.employee_id] || { mon:0, tue:0, wed:0, thu:0, fri:0, sat:0, sun:0, total:0 };
+    const total = sh.total;
+
+    totals.d1 += sh.mon;
+    totals.d2 += sh.tue;
+    totals.d3 += sh.wed;
+    totals.d4 += sh.thu;
+    totals.d5 += sh.fri;
+    totals.d6 += sh.sat;
+    totals.d7 += sh.sun;
+    totals.reg += total > 40 ? 40 : total;
+    totals.ot += total > 40 ? total - 40 : 0;
     totals.total += total;
+
+    const reg = total > 40 ? 40 : total;
+    const ot = total > 40 ? total - 40 : 0;
 
     const checked = selectedIds.has(t.id) ? 'checked' : '';
     const isPending = approval === 'pending';
@@ -473,15 +541,15 @@ function render() {
         <div class="employee-id">#${t.employee_id}</div>
       </td>
       <td>${escapeHtml(tsEmpDeptMap[t.employee_id] || t.customer_name || '—')}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day1_hours)}">${fmtHours(t.day1_hours)}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day2_hours)}">${fmtHours(t.day2_hours)}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day3_hours)}">${fmtHours(t.day3_hours)}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day4_hours)}">${fmtHours(t.day4_hours)}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day5_hours)}">${fmtHours(t.day5_hours)}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day6_hours)}">${fmtHours(t.day6_hours)}</td>
-      <td class="hours-cell ${fmtHoursClass(t.day7_hours)}">${fmtHours(t.day7_hours)}</td>
-      <td class="hours-cell hours-highlight">${fmtHours(t.regular_hours)}</td>
-      <td class="hours-cell ${t.overtime_hours > 0 ? 'hours-highlight' : 'hours-zero'}">${fmtHours(t.overtime_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.mon)}">${fmtHours(sh.mon)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.tue)}">${fmtHours(sh.tue)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.wed)}">${fmtHours(sh.wed)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.thu)}">${fmtHours(sh.thu)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.fri)}">${fmtHours(sh.fri)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.sat)}">${fmtHours(sh.sat)}</td>
+      <td class="hours-cell ${fmtHoursClass(sh.sun)}">${fmtHours(sh.sun)}</td>
+      <td class="hours-cell hours-highlight">${fmtHours(reg)}</td>
+      <td class="hours-cell ${ot > 0 ? 'hours-highlight' : 'hours-zero'}">${fmtHours(ot)}</td>
       <td class="hours-cell hours-highlight">${fmtHours(total)}</td>
       <td>$${Number(t.pay_rate || 0).toFixed(2)}</td>
       <td>$${Number(t.bill_rate || 0).toFixed(2)}</td>
