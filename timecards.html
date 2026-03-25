@@ -266,12 +266,12 @@
 <script type="module">
 import { supabase } from './src/supabaseClient.js';
 import { renderSidebar } from './src/components/sidebar.js';
-import { renderTopbar } from './src/components/navbar.js';
+import { renderNavbar } from './src/components/navbar.js';
 import { checkAuth } from './src/auth.js';
 
 await checkAuth();
 renderSidebar();
-renderTopbar();
+renderNavbar();
 
 /* ══════════════════════════════════════════════════════ */
 /* State                                                  */
