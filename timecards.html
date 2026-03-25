@@ -281,6 +281,10 @@ let employees = {};
 let selectedIds = new Set();
 let currentPage = 0;
 let pageSize = 100;
+let tsEmployees = [];      // TimeStation employees
+let tsDepartments = [];    // TimeStation departments (employers)
+let tsEmpIdSet = new Set(); // Set of TempWorks IDs that exist in TimeStation
+let tsEmpDeptMap = {};     // TW employee ID -> TimeStation department name
 
 /* ══════════════════════════════════════════════════════ */
 /* Toast                                                  */
@@ -312,6 +316,28 @@ async function loadWeeks() {
   return weeks[0] || null;
 }
 
+async function loadTimeStationData() {
+  // Load TimeStation employees and departments (once)
+  const [{ data: tsEmps }, { data: tsDepts }] = await Promise.all([
+    supabase.from('ts_employees').select('*'),
+    supabase.from('ts_departments').select('*')
+  ]);
+
+  tsEmployees = tsEmps || [];
+  tsDepartments = tsDepts || [];
+
+  // Build lookup: custom_employee_id (TW ID) -> TimeStation department
+  tsEmpIdSet.clear();
+  tsEmpDeptMap = {};
+  tsEmployees.forEach(e => {
+    if (e.custom_employee_id) {
+      const twId = parseInt(e.custom_employee_id);
+      tsEmpIdSet.add(twId);
+      tsEmpDeptMap[twId] = e.primary_department || e.current_department || 'Unknown';
+    }
+  });
+}
+
 async function loadTimecards(weekendDate) {
   if (!weekendDate) return;
 
@@ -328,12 +354,12 @@ async function loadTimecards(weekendDate) {
     return;
   }
 
-  allTimecards = data || [];
+  // Filter to only employees that exist in TimeStation
+  allTimecards = (data || []).filter(t => tsEmpIdSet.has(t.employee_id));
 
   // Load employee names for these timecards
   const empIds = [...new Set(allTimecards.map(t => t.employee_id).filter(Boolean))];
   if (empIds.length) {
-    // Supabase IN filter has a limit, batch if needed
     const batchSize = 200;
     employees = {};
     for (let i = 0; i < empIds.length; i += batchSize) {
@@ -352,10 +378,11 @@ async function loadTimecards(weekendDate) {
 }
 
 function populateCustomerFilter() {
-  const customers = [...new Set(allTimecards.map(t => t.customer_name).filter(Boolean))].sort();
+  // Use TimeStation departments as the employer filter
+  const deptNames = [...new Set(allTimecards.map(t => tsEmpDeptMap[t.employee_id]).filter(Boolean))].sort();
   const sel = document.getElementById('customerFilter');
   sel.innerHTML = '<option value="">All Employers</option>' +
-    customers.map(c => `<option value="${c}">${c}</option>`).join('');
+    deptNames.map(d => `<option value="${d}">${d}</option>`).join('');
 }
 
 /* ══════════════════════════════════════════════════════ */
@@ -367,7 +394,7 @@ function getFilteredTimecards() {
   const search = document.getElementById('searchInput').value.toLowerCase().trim();
 
   return allTimecards.filter(t => {
-    if (customer && t.customer_name !== customer) return false;
+    if (customer && tsEmpDeptMap[t.employee_id] !== customer) return false;
     if (status && (t.employer_approval || 'pending') !== status) return false;
     if (search) {
       const emp = employees[t.employee_id];
@@ -445,7 +472,7 @@ function render() {
         <div class="employee-name">${escapeHtml(empName)}</div>
         <div class="employee-id">#${t.employee_id}</div>
       </td>
-      <td>${escapeHtml(t.customer_name || '—')}</td>
+      <td>${escapeHtml(tsEmpDeptMap[t.employee_id] || t.customer_name || '—')}</td>
       <td class="hours-cell ${fmtHoursClass(t.day1_hours)}">${fmtHours(t.day1_hours)}</td>
       <td class="hours-cell ${fmtHoursClass(t.day2_hours)}">${fmtHours(t.day2_hours)}</td>
       <td class="hours-cell ${fmtHoursClass(t.day3_hours)}">${fmtHours(t.day3_hours)}</td>
@@ -644,6 +671,8 @@ document.getElementById('bulkDenyBtn').addEventListener('click', () => bulkSetAp
 /* ══════════════════════════════════════════════════════ */
 /* Init                                                   */
 /* ══════════════════════════════════════════════════════ */
+// Load TimeStation data first, then timecards
+await loadTimeStationData();
 const firstWeek = await loadWeeks();
 if (firstWeek) {
   await loadTimecards(firstWeek);
