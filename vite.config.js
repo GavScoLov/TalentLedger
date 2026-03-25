@@ -28,6 +28,8 @@ export default defineConfig(({ mode }) => {
           timeTracker: resolve(__dirnameESM, 'time-tracker.html'),
           employerPortal: resolve(__dirnameESM, 'employer-portal.html'),
           rosterTracker: resolve(__dirnameESM, 'roster-tracker.html'),
+          tempworks: resolve(__dirnameESM, 'tempworks.html'),
+          timecards: resolve(__dirnameESM, 'timecards.html'),
         },
       },
     },

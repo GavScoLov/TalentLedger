@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TalentLedger - TempWorks</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      background: var(--bg-paper);
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 12px 24px;
+      cursor: pointer;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab:hover { color: var(--text-primary); }
+    .tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg-paper);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-card .label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--text-disabled);
+      margin-top: 4px;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .search-bar input, .search-bar select {
+      padding: 10px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: var(--bg-paper);
+      color: var(--text-primary);
+    }
+    .search-bar input { flex: 1; min-width: 200px; }
+    .search-bar select { min-width: 150px; }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-paper);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+    }
+    .data-table th {
+      background: #f8f8f8;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .data-table th:hover { color: var(--primary); }
+    .data-table td {
+      padding: 10px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text-primary);
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: #fafafa; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-active { background: #DEF7EC; color: #03543F; }
+    .badge-inactive { background: #FDE8E8; color: #9B1C1C; }
+    .badge-posted { background: #DEF7EC; color: #03543F; }
+    .badge-proofed { background: #FEF3C7; color: #92400E; }
+    .badge-open { background: #DBEAFE; color: #1E40AF; }
+
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .pagination button {
+      padding: 8px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      background: var(--bg-paper);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .pagination button:hover { background: #f0f0f0; }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .table-wrap { overflow-x: auto; }
+
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .search-bar { flex-direction: column; }
+      .search-bar input, .search-bar select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="main-content">
+    <div class="topbar">
+      <button class="topbar-menu-btn" onclick="document.querySelector('.sidebar')?.classList.toggle('open')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+      </button>
+      <h1 class="topbar-title">TempWorks</h1>
+    </div>
+
+    <div id="sync-status" class="sync-status"></div>
+
+    <div class="tab-bar">
+      <div class="tab active" data-tab="overview">Overview</div>
+      <div class="tab" data-tab="employees">Employees</div>
+      <div class="tab" data-tab="timecards">Timecards</div>
+      <div class="tab" data-tab="customers">By Customer</div>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="stats-grid" id="overview-stats"></div>
+      <h3 style="margin-bottom: 12px; color: var(--text-primary);">Weekly Hours by Branch</h3>
+      <div class="table-wrap">
+        <table class="data-table" id="branch-table">
+          <thead>
+            <tr>
+              <th>Branch</th>
+              <th>Week Ending</th>
+              <th>Headcount</th>
+              <th>Total Hours</th>
+              <th>Avg Pay Rate</th>
+              <th>Avg Bill Rate</th>
+            </tr>
+          </thead>
+          <tbody id="branch-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EMPLOYEES TAB -->
+    <div class="tab-content" id="tab-employees">
+      <div class="search-bar">
+        <input type="text" id="emp-search" placeholder="Search by name, email, or phone...">
+        <select id="emp-branch-filter">
+          <option value="">All Branches</option>
+        </select>
+        <select id="emp-status-filter">
+          <option value="">All Statuses</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th data-sort="last_name">Name</th>
+              <th data-sort="email">Email</th>
+              <th data-sort="phone">Phone</th>
+              <th data-sort="city">City</th>
+              <th data-sort="state">State</th>
+              <th data-sort="branch_name">Branch</th>
+              <th data-sort="employee_status">Status</th>
+            </tr>
+          </thead>
+          <tbody id="emp-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="emp-pagination"></div>
+    </div>
+
+    <!-- TIMECARDS TAB -->
+    <div class="tab-content" id="tab-timecards">
+      <div class="search-bar">
+        <input type="text" id="tc-search" placeholder="Search by employee or customer...">
+        <select id="tc-week-filter">
+          <option value="">All Weeks</option>
+        </select>
+        <select id="tc-status-filter">
+          <option value="">All Statuses</option>
+          <option value="Posted">Posted</option>
+          <option value="Proofed">Proofed</option>
+          <option value="Open">Open</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Customer</th>
+              <th>Week Ending</th>
+              <th>Reg Hrs</th>
+              <th>OT Hrs</th>
+              <th>Total</th>
+              <th>Pay Rate</th>
+              <th>Bill Rate</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tc-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="tc-pagination"></div>
+    </div>
+
+    <!-- CUSTOMERS TAB -->
+    <div class="tab-content" id="tab-customers">
+      <div class="search-bar">
+        <input type="text" id="cust-search" placeholder="Search by customer name...">
+        <select id="cust-week-filter">
+          <option value="">All Weeks</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Week Ending</th>
+              <th>Headcount</th>
+              <th>Regular</th>
+              <th>Overtime</th>
+              <th>Total Hours</th>
+              <th>Est. Billing</th>
+            </tr>
+          </thead>
+          <tbody id="cust-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+  import { supabase } from './src/supabaseClient.js';
+  import { checkAuth } from './src/auth.js';
+  import { renderSidebar } from './src/components/sidebar.js';
+
+  await checkAuth();
+  await renderSidebar();
+
+  // State
+  let employees = [];
+  let timecards = [];
+  let empPage = 0;
+  let tcPage = 0;
+  const PAGE_SIZE = 50;
+
+  // Tab switching
+  document.querySelectorAll('.tab-bar .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Load sync status
+  async function loadSyncStatus() {
+    const { data } = await supabase
+      .from('tw_sync_log')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(1);
+    if (data && data[0]) {
+      const d = data[0];
+      const ago = timeAgo(new Date(d.completed_at || d.started_at));
+      document.getElementById('sync-status').innerHTML =
+        `<span class="sync-dot"></span> Last synced ${ago} (${d.records_synced} ${d.sync_type} records)`;
+    }
+  }
+
+  // Load overview stats
+  async function loadOverview() {
+    const [empCount, tcCount, activeCount, branchData] = await Promise.all([
+      supabase.from('tw_employees').select('id', { count: 'exact', head: true }),
+      supabase.from('tw_timecards').select('id', { count: 'exact', head: true }),
+      supabase.from('tw_timecards').select('employee_id', { count: 'exact', head: true })
+        .gte('weekend_date', new Date(Date.now() - 14*24*60*60*1000).toISOString().split('T')[0]),
+      supabase.from('tw_branch_weekly_summary').select('*').order('weekend_date', { ascending: false }).limit(20)
+    ]);
+
+    const totalHours = await supabase.from('tw_timecards')
+      .select('regular_hours, overtime_hours, doubletime_hours');
+
+    let hours = 0;
+    if (totalHours.data) {
+      hours = totalHours.data.reduce((sum, t) =>
+        sum + (t.regular_hours || 0) + (t.overtime_hours || 0) + (t.doubletime_hours || 0), 0);
+    }
+
+    document.getElementById('overview-stats').innerHTML = `
+      <div class="stat-card">
+        <div class="label">Total Employees</div>
+        <div class="value">${(empCount.count || 0).toLocaleString()}</div>
+        <div class="sub">Synced from TempWorks</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Total Timecards</div>
+        <div class="value">${(tcCount.count || 0).toLocaleString()}</div>
+        <div class="sub">Across all synced weeks</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Recent Active Workers</div>
+        <div class="value">${(activeCount.count || 0).toLocaleString()}</div>
+        <div class="sub">With timecards in last 2 weeks</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Total Hours Tracked</div>
+        <div class="value">${hours.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+        <div class="sub">All synced timecards</div>
+      </div>
+    `;
+
+    // Branch table
+    if (branchData.data) {
+      document.getElementById('branch-body').innerHTML = branchData.data.map(b => `
+        <tr>
+          <td>${b.branch_name || 'Unknown'}</td>
+          <td>${b.weekend_date || ''}</td>
+          <td>${b.headcount || 0}</td>
+          <td>${(b.total_hours || 0).toLocaleString()}</td>
+          <td>$${(b.avg_pay_rate || 0).toFixed(2)}</td>
+          <td>$${(b.avg_bill_rate || 0).toFixed(2)}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // Load employees
+  async function loadEmployees() {
+    const search = document.getElementById('emp-search').value.trim().toLowerCase();
+    const branch = document.getElementById('emp-branch-filter').value;
+    const status = document.getElementById('emp-status-filter').value;
+
+    let query = supabase.from('tw_employees')
+      .select('*', { count: 'exact' })
+      .order('last_name', { ascending: true })
+      .range(empPage * PAGE_SIZE, (empPage + 1) * PAGE_SIZE - 1);
+
+    if (branch) query = query.eq('branch_name', branch);
+    if (status) query = query.eq('employee_status', status);
+    if (search) query = query.or(`last_name.ilike.%${search}%,first_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+
+    const { data, count } = await query;
+    employees = data || [];
+
+    document.getElementById('emp-body').innerHTML = employees.map(e => `
+      <tr>
+        <td><strong>${(e.last_name || '').trim()}</strong>, ${e.first_name || ''}</td>
+        <td>${e.email || '-'}</td>
+        <td>${e.phone || '-'}</td>
+        <td>${e.city || '-'}</td>
+        <td>${e.state || '-'}</td>
+        <td>${e.branch_name || '-'}</td>
+        <td><span class="badge ${statusBadge(e.employee_status)}">${e.employee_status || '-'}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">No employees found</td></tr>';
+
+    renderPagination('emp-pagination', empPage, count, (p) => { empPage = p; loadEmployees(); });
+  }
+
+  // Load timecards
+  async function loadTimecards() {
+    const search = document.getElementById('tc-search').value.trim().toLowerCase();
+    const week = document.getElementById('tc-week-filter').value;
+    const status = document.getElementById('tc-status-filter').value;
+
+    let query = supabase.from('tw_weekly_hours')
+      .select('*', { count: 'exact' })
+      .order('weekend_date', { ascending: false })
+      .range(tcPage * PAGE_SIZE, (tcPage + 1) * PAGE_SIZE - 1);
+
+    if (week) query = query.eq('weekend_date', week);
+    if (status) query = query.eq('status', status);
+    if (search) query = query.or(`last_name.ilike.%${search}%,first_name.ilike.%${search}%,customer_name.ilike.%${search}%`);
+
+    const { data, count } = await query;
+    timecards = data || [];
+
+    document.getElementById('tc-body').innerHTML = timecards.map(t => `
+      <tr>
+        <td>${(t.last_name || '').trim()}, ${t.first_name || ''}</td>
+        <td>${t.customer_name || '-'}</td>
+        <td>${t.weekend_date || ''}</td>
+        <td>${t.regular_hours || 0}</td>
+        <td>${t.overtime_hours || 0}</td>
+        <td><strong>${t.total_hours || 0}</strong></td>
+        <td>$${(t.pay_rate || 0).toFixed(2)}</td>
+        <td>$${(t.bill_rate || 0).toFixed(2)}</td>
+        <td><span class="badge badge-${(t.status || 'open').toLowerCase()}">${t.status || 'Open'}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-secondary)">No timecards found</td></tr>';
+
+    renderPagination('tc-pagination', tcPage, count, (p) => { tcPage = p; loadTimecards(); });
+  }
+
+  // Load customer summary
+  async function loadCustomers() {
+    const search = document.getElementById('cust-search').value.trim().toLowerCase();
+    const week = document.getElementById('cust-week-filter').value;
+
+    let query = supabase.from('tw_customer_weekly_summary')
+      .select('*')
+      .order('weekend_date', { ascending: false })
+      .order('total_hours', { ascending: false });
+
+    if (week) query = query.eq('weekend_date', week);
+    if (search) query = query.ilike('customer_name', `%${search}%`);
+
+    const { data } = await query;
+
+    document.getElementById('cust-body').innerHTML = (data || []).map(c => `
+      <tr>
+        <td><strong>${c.customer_name || 'Unknown'}</strong></td>
+        <td>${c.weekend_date || ''}</td>
+        <td>${c.headcount || 0}</td>
+        <td>${(c.total_regular || 0).toLocaleString()}</td>
+        <td>${(c.total_overtime || 0).toLocaleString()}</td>
+        <td><strong>${(c.total_hours || 0).toLocaleString()}</strong></td>
+        <td>$${(c.total_billing || 0).toLocaleString()}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary)">No data found</td></tr>';
+  }
+
+  // Populate filters
+  async function loadFilters() {
+    // Branches
+    const { data: branches } = await supabase
+      .from('tw_employees')
+      .select('branch_name')
+      .not('branch_name', 'is', null)
+      .order('branch_name');
+    const uniqueBranches = [...new Set((branches || []).map(b => b.branch_name).filter(Boolean))];
+    const branchSelect = document.getElementById('emp-branch-filter');
+    uniqueBranches.forEach(b => {
+      branchSelect.innerHTML += `<option value="${b}">${b}</option>`;
+    });
+
+    // Statuses
+    const { data: statuses } = await supabase
+      .from('tw_employees')
+      .select('employee_status')
+      .not('employee_status', 'is', null);
+    const uniqueStatuses = [...new Set((statuses || []).map(s => s.employee_status).filter(Boolean))];
+    const statusSelect = document.getElementById('emp-status-filter');
+    uniqueStatuses.sort().forEach(s => {
+      statusSelect.innerHTML += `<option value="${s}">${s}</option>`;
+    });
+
+    // Weeks
+    const { data: weeks } = await supabase
+      .from('tw_timecards')
+      .select('weekend_date')
+      .order('weekend_date', { ascending: false });
+    const uniqueWeeks = [...new Set((weeks || []).map(w => w.weekend_date).filter(Boolean))];
+    [document.getElementById('tc-week-filter'), document.getElementById('cust-week-filter')].forEach(sel => {
+      uniqueWeeks.forEach(w => {
+        sel.innerHTML += `<option value="${w}">${w}</option>`;
+      });
+    });
+  }
+
+  // Helpers
+  function statusBadge(status) {
+    if (!status) return '';
+    const s = status.toLowerCase();
+    if (['active', 'a', 'wp'].includes(s)) return 'badge-active';
+    if (['inactive', 'i', 'dnu', 'terminated'].includes(s)) return 'badge-inactive';
+    return '';
+  }
+
+  function renderPagination(id, page, total, onPage) {
+    const totalPages = Math.ceil((total || 0) / PAGE_SIZE);
+    document.getElementById(id).innerHTML = `
+      <button ${page === 0 ? 'disabled' : ''} onclick="return false" id="${id}-prev">Previous</button>
+      <span>Page ${page + 1} of ${totalPages || 1} (${(total || 0).toLocaleString()} records)</span>
+      <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="return false" id="${id}-next">Next</button>
+    `;
+    document.getElementById(`${id}-prev`)?.addEventListener('click', () => onPage(page - 1));
+    document.getElementById(`${id}-next`)?.addEventListener('click', () => onPage(page + 1));
+  }
+
+  function timeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+  }
+
+  // Event listeners for search/filter
+  let searchTimeout;
+  ['emp-search', 'emp-branch-filter', 'emp-status-filter'].forEach(id => {
+    document.getElementById(id).addEventListener(id.includes('search') ? 'input' : 'change', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => { empPage = 0; loadEmployees(); }, 300);
+    });
+  });
+  ['tc-search', 'tc-week-filter', 'tc-status-filter'].forEach(id => {
+    document.getElementById(id).addEventListener(id.includes('search') ? 'input' : 'change', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => { tcPage = 0; loadTimecards(); }, 300);
+    });
+  });
+  ['cust-search', 'cust-week-filter'].forEach(id => {
+    document.getElementById(id).addEventListener(id.includes('search') ? 'input' : 'change', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(loadCustomers, 300);
+    });
+  });
+
+  // Initialize
+  await Promise.all([loadSyncStatus(), loadOverview(), loadFilters()]);
+  await loadEmployees();
+  </script>
+</body>
+</html>

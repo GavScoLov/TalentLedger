@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TalentLedger — Timecards</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    .tc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+    }
+    .tc-header h1 { font-size: 1.4rem; font-weight: 700; }
+    .tc-header .week-label {
+      font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;
+      background: var(--bg-paper); border: 1px solid var(--border-color);
+      padding: 6px 14px; border-radius: var(--radius);
+    }
+
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat-card {
+      background: var(--bg-paper); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow-sm);
+    }
+    .stat-card .label { font-size: 0.72rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+
+    .filters-bar {
+      display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+    }
+    .filters-bar select, .filters-bar input {
+      padding: 8px 14px; border: 1px solid var(--border-color); border-radius: var(--radius);
+      font-family: var(--font); font-size: 0.85rem; background: var(--bg-paper);
+      color: var(--text-primary); min-width: 160px;
+    }
+    .filters-bar input { flex: 1; min-width: 200px; max-width: 300px; }
+    .filters-bar input:focus, .filters-bar select:focus {
+      outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+    }
+    .spacer { flex: 1; }
+
+    .bulk-bar {
+      display: flex; align-items: center; gap: 12px; padding: 12px 18px;
+      background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius); margin-bottom: 16px;
+    }
+    .bulk-bar .info { flex: 1; font-size: 0.85rem; color: #92400e; font-weight: 500; }
+    .bulk-bar .info strong { color: #78350f; }
+
+    .card { background: var(--bg-paper); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+    .table-wrap { overflow-x: auto; }
+
+    .tc-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .tc-table thead { position: sticky; top: 0; z-index: 2; }
+    .tc-table th {
+      padding: 10px 14px; text-align: left; font-weight: 600; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);
+      background: #f8f8f8; border-bottom: 2px solid var(--border-color); white-space: nowrap;
+    }
+    .tc-table td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary); white-space: nowrap;
+    }
+    .tc-table tbody tr:hover { background: #fafafa; }
+    .tc-table tfoot td {
+      padding: 10px 14px; font-weight: 700; background: #f8f8f8;
+      border-top: 2px solid var(--border-color);
+    }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+    }
+    .badge-pending { background: #FEF3C7; color: #92400E; }
+    .badge-approved { background: #D1FAE5; color: #065F46; }
+    .badge-denied { background: #FEE2E2; color: #991B1B; }
+    .badge-proofed { background: #DBEAFE; color: #1E40AF; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px;
+      border-radius: var(--radius); font-family: var(--font); font-size: 0.75rem;
+      font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+    }
+    .btn-approve { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+    .btn-approve:hover { background: #A7F3D0; }
+    .btn-deny { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+    .btn-deny:hover { background: #FECACA; }
+    .btn-undo { background: #F3F4F6; color: #6B7280; border: 1px solid var(--border-color); }
+    .btn-undo:hover { background: #E5E7EB; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: var(--bg-paper); color: var(--text-secondary); border: 1px solid var(--border-color); }
+    .btn-outline:hover { background: #f0f0f0; color: var(--text-primary); }
+
+    .employee-name { font-weight: 600; }
+    .employee-id { font-size: 0.75rem; color: var(--text-secondary); }
+
+    .hours-cell { text-align: center; min-width: 45px; }
+    .hours-zero { color: var(--text-disabled); }
+    .hours-highlight { font-weight: 700; color: var(--primary-dark); }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-secondary);
+    }
+    .empty-state h3 { font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; }
+
+    .pagination {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; font-size: 0.82rem; color: var(--text-secondary);
+    }
+    .pagination button {
+      padding: 6px 14px; border: 1px solid var(--border-color); border-radius: var(--radius);
+      background: var(--bg-paper); cursor: pointer; font-size: 0.82rem; font-family: var(--font);
+    }
+    .pagination button:hover { background: #f0f0f0; }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+      border-radius: var(--radius); font-size: 0.85rem; font-weight: 500;
+      color: #fff; z-index: 9999; opacity: 0; transform: translateY(10px);
+      transition: all 0.3s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast-success { background: #059669; }
+    .toast-error { background: #DC2626; }
+
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .filters-bar { flex-direction: column; }
+      .filters-bar input, .filters-bar select { max-width: 100%; min-width: 100%; }
+      .tc-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <div class="main-content" id="main-content">
+
+      <!-- Header -->
+      <div class="tc-header">
+        <h1>Timecard Approvals</h1>
+        <div class="week-label" id="weekLabel">Week Ending: —</div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="label">Total Timecards</div>
+          <div class="value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Pending</div>
+          <div class="value" id="statPending" style="color:#D97706;">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Approved</div>
+          <div class="value" id="statApproved" style="color:#059669;">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Denied</div>
+          <div class="value" id="statDenied" style="color:#DC2626;">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Total Hours</div>
+          <div class="value" id="statHours">0</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters-bar">
+        <select id="weekFilter">
+          <option value="">Loading weeks...</option>
+        </select>
+        <select id="customerFilter">
+          <option value="">All Employers</option>
+        </select>
+        <select id="statusFilter">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="Search employee name...">
+        <div class="spacer"></div>
+        <select id="pageSizeFilter">
+          <option value="100">Show 100</option>
+          <option value="200">Show 200</option>
+          <option value="500">Show 500</option>
+          <option value="all">Show All</option>
+        </select>
+        <button class="btn btn-outline" onclick="window.print()">Export / Print</button>
+      </div>
+
+      <!-- Bulk actions -->
+      <div class="bulk-bar" id="bulkBar" style="display:none;">
+        <input type="checkbox" id="selectAll" title="Select all visible">
+        <div class="info"><strong id="bulkCount">0</strong> pending timecards selected</div>
+        <button class="btn btn-approve" id="bulkApproveBtn">Approve Selected</button>
+        <button class="btn btn-deny" id="bulkDenyBtn">Deny Selected</button>
+      </div>
+
+      <!-- Table -->
+      <div class="card" style="padding:0;">
+        <div class="table-wrap">
+          <table class="tc-table">
+            <thead>
+              <tr>
+                <th style="width:30px;"><input type="checkbox" id="headerCheckbox" title="Select all"></th>
+                <th>Employee</th>
+                <th>Employer</th>
+                <th class="hours-cell">Mon</th>
+                <th class="hours-cell">Tue</th>
+                <th class="hours-cell">Wed</th>
+                <th class="hours-cell">Thu</th>
+                <th class="hours-cell">Fri</th>
+                <th class="hours-cell">Sat</th>
+                <th class="hours-cell">Sun</th>
+                <th class="hours-cell">Reg</th>
+                <th class="hours-cell">OT</th>
+                <th class="hours-cell">Total</th>
+                <th>Pay Rate</th>
+                <th>Bill Rate</th>
+                <th>TW Status</th>
+                <th>Approval</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="18" class="empty-state"><p>Loading timecards...</p></td></tr>
+            </tbody>
+            <tfoot id="tableFoot" style="display:none;">
+              <tr>
+                <td></td>
+                <td colspan="2"><strong>TOTALS</strong></td>
+                <td class="hours-cell" id="footMon">0</td>
+                <td class="hours-cell" id="footTue">0</td>
+                <td class="hours-cell" id="footWed">0</td>
+                <td class="hours-cell" id="footThu">0</td>
+                <td class="hours-cell" id="footFri">0</td>
+                <td class="hours-cell" id="footSat">0</td>
+                <td class="hours-cell" id="footSun">0</td>
+                <td class="hours-cell" id="footReg">0</td>
+                <td class="hours-cell" id="footOT">0</td>
+                <td class="hours-cell" id="footTotal">0</td>
+                <td colspan="5"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination" id="paginationControls">
+        <span>Showing 0 timecards</span>
+        <span></span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+<script type="module">
+import { supabase } from './src/supabaseClient.js';
+import { renderSidebar } from './src/components/sidebar.js';
+import { renderTopbar } from './src/components/navbar.js';
+import { checkAuth } from './src/auth.js';
+
+await checkAuth();
+renderSidebar();
+renderTopbar();
+
+/* ══════════════════════════════════════════════════════ */
+/* State                                                  */
+/* ══════════════════════════════════════════════════════ */
+let allTimecards = [];
+let employees = {};
+let selectedIds = new Set();
+let currentPage = 0;
+let pageSize = 100;
+
+/* ══════════════════════════════════════════════════════ */
+/* Toast                                                  */
+/* ══════════════════════════════════════════════════════ */
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast toast-${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Load Data                                              */
+/* ══════════════════════════════════════════════════════ */
+async function loadWeeks() {
+  const { data } = await supabase
+    .from('tw_timecards')
+    .select('weekend_date')
+    .order('weekend_date', { ascending: false });
+
+  const weeks = [...new Set((data || []).map(r => r.weekend_date))];
+  const sel = document.getElementById('weekFilter');
+  sel.innerHTML = weeks.map((w, i) => {
+    const d = new Date(w + 'T12:00:00');
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `<option value="${w}" ${i === 0 ? 'selected' : ''}>Week Ending ${label}</option>`;
+  }).join('');
+
+  return weeks[0] || null;
+}
+
+async function loadTimecards(weekendDate) {
+  if (!weekendDate) return;
+
+  document.getElementById('weekLabel').textContent = `Week Ending: ${new Date(weekendDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
+
+  const { data, error } = await supabase
+    .from('tw_timecards')
+    .select('*')
+    .eq('weekend_date', weekendDate)
+    .order('customer_name');
+
+  if (error) {
+    showToast('Error loading timecards: ' + error.message, 'error');
+    return;
+  }
+
+  allTimecards = data || [];
+
+  // Load employee names for these timecards
+  const empIds = [...new Set(allTimecards.map(t => t.employee_id).filter(Boolean))];
+  if (empIds.length) {
+    // Supabase IN filter has a limit, batch if needed
+    const batchSize = 200;
+    employees = {};
+    for (let i = 0; i < empIds.length; i += batchSize) {
+      const batch = empIds.slice(i, i + batchSize);
+      const { data: emps } = await supabase
+        .from('tw_employees')
+        .select('id, first_name, last_name')
+        .in('id', batch);
+      (emps || []).forEach(e => { employees[e.id] = e; });
+    }
+  }
+
+  populateCustomerFilter();
+  selectedIds.clear();
+  render();
+}
+
+function populateCustomerFilter() {
+  const customers = [...new Set(allTimecards.map(t => t.customer_name).filter(Boolean))].sort();
+  const sel = document.getElementById('customerFilter');
+  sel.innerHTML = '<option value="">All Employers</option>' +
+    customers.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Render                                                 */
+/* ══════════════════════════════════════════════════════ */
+function getFilteredTimecards() {
+  const customer = document.getElementById('customerFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase().trim();
+
+  return allTimecards.filter(t => {
+    if (customer && t.customer_name !== customer) return false;
+    if (status && (t.employer_approval || 'pending') !== status) return false;
+    if (search) {
+      const emp = employees[t.employee_id];
+      const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : '';
+      if (!name.includes(search) && !String(t.employee_id).includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function render() {
+  const filtered = getFilteredTimecards();
+  const tbody = document.getElementById('tableBody');
+  const tfoot = document.getElementById('tableFoot');
+
+  // Pagination
+  const totalFiltered = filtered.length;
+  const isShowAll = pageSize === 'all';
+  const effectivePageSize = isShowAll ? totalFiltered : pageSize;
+  const totalPages = isShowAll ? 1 : Math.max(1, Math.ceil(totalFiltered / pageSize));
+  if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+  const start = currentPage * effectivePageSize;
+  const pageItems = filtered.slice(start, start + effectivePageSize);
+
+  // Stats (always based on ALL timecards, not just current page)
+  const pending = allTimecards.filter(t => (t.employer_approval || 'pending') === 'pending').length;
+  const approved = allTimecards.filter(t => t.employer_approval === 'approved').length;
+  const denied = allTimecards.filter(t => t.employer_approval === 'denied').length;
+  const totalHours = allTimecards.reduce((s, t) => s + (t.regular_hours || 0) + (t.overtime_hours || 0) + (t.doubletime_hours || 0), 0);
+
+  document.getElementById('statTotal').textContent = allTimecards.length;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('statApproved').textContent = approved;
+  document.getElementById('statDenied').textContent = denied;
+  document.getElementById('statHours').textContent = totalHours.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  // Bulk bar
+  const bulkBar = document.getElementById('bulkBar');
+  const pendingFiltered = filtered.filter(t => (t.employer_approval || 'pending') === 'pending');
+  bulkBar.style.display = pendingFiltered.length > 0 ? 'flex' : 'none';
+  document.getElementById('bulkCount').textContent = selectedIds.size || pendingFiltered.length;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="18" class="empty-state"><h3>No timecards found</h3><p>Try adjusting your filters.</p></td></tr>';
+    tfoot.style.display = 'none';
+    return;
+  }
+
+  // Totals
+  let totals = { d1: 0, d2: 0, d3: 0, d4: 0, d5: 0, d6: 0, d7: 0, reg: 0, ot: 0, total: 0 };
+
+  tbody.innerHTML = pageItems.map(t => {
+    const emp = employees[t.employee_id];
+    const empName = emp ? `${emp.first_name} ${emp.last_name}` : `Employee #${t.employee_id}`;
+    const approval = t.employer_approval || 'pending';
+    const total = (t.regular_hours || 0) + (t.overtime_hours || 0) + (t.doubletime_hours || 0);
+
+    totals.d1 += t.day1_hours || 0;
+    totals.d2 += t.day2_hours || 0;
+    totals.d3 += t.day3_hours || 0;
+    totals.d4 += t.day4_hours || 0;
+    totals.d5 += t.day5_hours || 0;
+    totals.d6 += t.day6_hours || 0;
+    totals.d7 += t.day7_hours || 0;
+    totals.reg += t.regular_hours || 0;
+    totals.ot += t.overtime_hours || 0;
+    totals.total += total;
+
+    const checked = selectedIds.has(t.id) ? 'checked' : '';
+    const isPending = approval === 'pending';
+
+    return `<tr data-id="${t.id}">
+      <td><input type="checkbox" class="row-check" data-id="${t.id}" ${checked} ${!isPending ? 'disabled' : ''}></td>
+      <td>
+        <div class="employee-name">${escapeHtml(empName)}</div>
+        <div class="employee-id">#${t.employee_id}</div>
+      </td>
+      <td>${escapeHtml(t.customer_name || '—')}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day1_hours)}">${fmtHours(t.day1_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day2_hours)}">${fmtHours(t.day2_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day3_hours)}">${fmtHours(t.day3_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day4_hours)}">${fmtHours(t.day4_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day5_hours)}">${fmtHours(t.day5_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day6_hours)}">${fmtHours(t.day6_hours)}</td>
+      <td class="hours-cell ${fmtHoursClass(t.day7_hours)}">${fmtHours(t.day7_hours)}</td>
+      <td class="hours-cell hours-highlight">${fmtHours(t.regular_hours)}</td>
+      <td class="hours-cell ${t.overtime_hours > 0 ? 'hours-highlight' : 'hours-zero'}">${fmtHours(t.overtime_hours)}</td>
+      <td class="hours-cell hours-highlight">${fmtHours(total)}</td>
+      <td>$${Number(t.pay_rate || 0).toFixed(2)}</td>
+      <td>$${Number(t.bill_rate || 0).toFixed(2)}</td>
+      <td><span class="badge badge-${(t.status || '').toLowerCase() === 'proofed' ? 'proofed' : 'pending'}">${escapeHtml(t.status || '—')}</span></td>
+      <td><span class="badge badge-${approval}">${approval.charAt(0).toUpperCase() + approval.slice(1)}</span></td>
+      <td>${renderActions(t.id, approval)}</td>
+    </tr>`;
+  }).join('');
+
+  // Footer totals
+  tfoot.style.display = '';
+  document.getElementById('footMon').textContent = fmtHours(totals.d1);
+  document.getElementById('footTue').textContent = fmtHours(totals.d2);
+  document.getElementById('footWed').textContent = fmtHours(totals.d3);
+  document.getElementById('footThu').textContent = fmtHours(totals.d4);
+  document.getElementById('footFri').textContent = fmtHours(totals.d5);
+  document.getElementById('footSat').textContent = fmtHours(totals.d6);
+  document.getElementById('footSun').textContent = fmtHours(totals.d7);
+  document.getElementById('footReg').textContent = fmtHours(totals.reg);
+  document.getElementById('footOT').textContent = fmtHours(totals.ot);
+  document.getElementById('footTotal').textContent = fmtHours(totals.total);
+
+  // Bind checkboxes
+  document.querySelectorAll('.row-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedIds.add(parseInt(cb.dataset.id));
+      else selectedIds.delete(parseInt(cb.dataset.id));
+      document.getElementById('bulkCount').textContent = selectedIds.size;
+    });
+  });
+
+  // Pagination controls
+  const pagDiv = document.getElementById('paginationControls');
+  if (isShowAll || totalPages <= 1) {
+    pagDiv.innerHTML = `<span>Showing all ${totalFiltered} of ${allTimecards.length} timecards</span><span></span>`;
+  } else {
+    const from = start + 1;
+    const to = Math.min(start + effectivePageSize, totalFiltered);
+    pagDiv.innerHTML = `
+      <span>Showing ${from}–${to} of ${totalFiltered} timecards</span>
+      <span>
+        <button id="prevPage" ${currentPage === 0 ? 'disabled' : ''}>Previous</button>
+        <span style="margin:0 10px;">Page ${currentPage + 1} of ${totalPages}</span>
+        <button id="nextPage" ${currentPage >= totalPages - 1 ? 'disabled' : ''}>Next</button>
+      </span>
+    `;
+    document.getElementById('prevPage')?.addEventListener('click', () => { currentPage--; render(); });
+    document.getElementById('nextPage')?.addEventListener('click', () => { currentPage++; render(); });
+  }
+}
+
+function renderActions(id, approval) {
+  if (approval === 'approved') {
+    return `<button class="btn btn-undo" onclick="setApproval(${id}, 'pending')">Undo</button>`;
+  }
+  if (approval === 'denied') {
+    return `<button class="btn btn-undo" onclick="setApproval(${id}, 'pending')">Undo</button>`;
+  }
+  return `
+    <button class="btn btn-approve" onclick="setApproval(${id}, 'approved')">Approve</button>
+    <button class="btn btn-deny" onclick="setApproval(${id}, 'denied')">Deny</button>
+  `;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Helpers                                                */
+/* ══════════════════════════════════════════════════════ */
+function fmtHours(v) {
+  const n = Number(v || 0);
+  return n === 0 ? '—' : n % 1 === 0 ? String(n) : n.toFixed(1);
+}
+function fmtHoursClass(v) {
+  return Number(v || 0) === 0 ? 'hours-zero' : '';
+}
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Approval Actions                                       */
+/* ══════════════════════════════════════════════════════ */
+window.setApproval = async function(id, status) {
+  const { error } = await supabase
+    .from('tw_timecards')
+    .update({
+      employer_approval: status,
+      employer_approval_at: status === 'pending' ? null : new Date().toISOString()
+    })
+    .eq('id', id);
+
+  if (error) {
+    showToast('Error updating approval: ' + error.message, 'error');
+    return;
+  }
+
+  // Update local state
+  const tc = allTimecards.find(t => t.id === id);
+  if (tc) {
+    tc.employer_approval = status;
+    tc.employer_approval_at = status === 'pending' ? null : new Date().toISOString();
+  }
+  selectedIds.delete(id);
+  render();
+  showToast(`Timecard ${status === 'pending' ? 'reset to pending' : status}`);
+};
+
+async function bulkSetApproval(status) {
+  const ids = selectedIds.size > 0
+    ? [...selectedIds]
+    : getFilteredTimecards().filter(t => (t.employer_approval || 'pending') === 'pending').map(t => t.id);
+
+  if (!ids.length) return;
+
+  const { error } = await supabase
+    .from('tw_timecards')
+    .update({
+      employer_approval: status,
+      employer_approval_at: new Date().toISOString()
+    })
+    .in('id', ids);
+
+  if (error) {
+    showToast('Error updating approvals: ' + error.message, 'error');
+    return;
+  }
+
+  // Update local state
+  ids.forEach(id => {
+    const tc = allTimecards.find(t => t.id === id);
+    if (tc) {
+      tc.employer_approval = status;
+      tc.employer_approval_at = new Date().toISOString();
+    }
+  });
+  selectedIds.clear();
+  render();
+  showToast(`${ids.length} timecard(s) ${status}`);
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Event Listeners                                        */
+/* ══════════════════════════════════════════════════════ */
+document.getElementById('weekFilter').addEventListener('change', (e) => {
+  loadTimecards(e.target.value);
+});
+
+document.getElementById('customerFilter').addEventListener('change', () => {
+  selectedIds.clear();
+  currentPage = 0;
+  render();
+});
+
+document.getElementById('statusFilter').addEventListener('change', () => {
+  selectedIds.clear();
+  currentPage = 0;
+  render();
+});
+
+document.getElementById('searchInput').addEventListener('input', () => { currentPage = 0; render(); });
+
+document.getElementById('pageSizeFilter').addEventListener('change', (e) => {
+  pageSize = e.target.value === 'all' ? 'all' : parseInt(e.target.value);
+  currentPage = 0;
+  render();
+});
+
+document.getElementById('headerCheckbox').addEventListener('change', (e) => {
+  const filtered = getFilteredTimecards().filter(t => (t.employer_approval || 'pending') === 'pending');
+  if (e.target.checked) {
+    filtered.forEach(t => selectedIds.add(t.id));
+  } else {
+    selectedIds.clear();
+  }
+  render();
+});
+
+document.getElementById('selectAll').addEventListener('change', (e) => {
+  document.getElementById('headerCheckbox').checked = e.target.checked;
+  document.getElementById('headerCheckbox').dispatchEvent(new Event('change'));
+});
+
+document.getElementById('bulkApproveBtn').addEventListener('click', () => bulkSetApproval('approved'));
+document.getElementById('bulkDenyBtn').addEventListener('click', () => bulkSetApproval('denied'));
+
+/* ══════════════════════════════════════════════════════ */
+/* Init                                                   */
+/* ══════════════════════════════════════════════════════ */
+const firstWeek = await loadWeeks();
+if (firstWeek) {
+  await loadTimecards(firstWeek);
+} else {
+  document.getElementById('tableBody').innerHTML =
+    '<tr><td colspan="18" class="empty-state"><h3>No timecards synced yet</h3><p>Run the n8n TempWorks sync workflow first.</p></td></tr>';
+}
+</script>
+</body>
+</html>
