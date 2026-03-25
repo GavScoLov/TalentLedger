@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
           settings: resolve(__dirnameESM, 'settings.html'),
           stateTax: resolve(__dirnameESM, 'state-tax.html'),
           timeTracker: resolve(__dirnameESM, 'time-tracker.html'),
+          employerPortal: resolve(__dirnameESM, 'employer-portal.html'),
           rosterTracker: resolve(__dirnameESM, 'roster-tracker.html'),
         },
       },

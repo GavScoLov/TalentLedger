@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeTracker — Employer Portal</title>
+    <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+    <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+    <style>
+        :root {
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --primary: #FACC15;
+            --primary-dark: #EAB308;
+            --primary-rgb: 250,204,21;
+            --bg-page: #F9FAFB;
+            --bg-paper: #FFFFFF;
+            --bg-default: #F3F4F6;
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --border-color: #E5E7EB;
+            --radius: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font); background: var(--bg-page); color: var(--text-primary);
+            min-height: 100vh;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        /* ── Top Nav ── */
+        .employer-nav {
+            background: var(--bg-paper); border-bottom: 1px solid var(--border-color);
+            padding: 0 24px; height: 56px; display: flex; align-items: center; gap: 16px;
+            box-shadow: var(--shadow-sm); position: sticky; top: 0; z-index: 100;
+        }
+        .employer-nav .logo {
+            display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; color: var(--text-primary);
+        }
+        .employer-nav .logo img { height: 32px; width: 32px; object-fit: cover; border-radius: 6px; }
+        .employer-nav .nav-spacer { flex: 1; }
+        .employer-nav .nav-user { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+        .employer-nav .nav-user strong { color: var(--text-primary); }
+        .nav-btn {
+            padding: 6px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 0.8rem;
+            font-weight: 600; cursor: pointer; border: 1px solid var(--border-color); background: #fff;
+            color: var(--text-secondary); transition: all 0.15s;
+        }
+        .nav-btn:hover { background: var(--bg-default); color: var(--text-primary); }
+
+        /* ── Layout ── */
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+        .card {
+            background: var(--bg-paper); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 20px;
+        }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+        }
+        .card-header h2 { font-size: 1rem; font-weight: 700; }
+        .card-header .subtitle { font-size: 0.8rem; color: var(--text-secondary); }
+
+        /* ── Tabs ── */
+        .tab-bar { display: flex; gap: 0; margin-bottom: 20px; }
+        .tab-bar .tab {
+            padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+            border: 2px solid var(--border-color); background: var(--bg-paper);
+            color: var(--text-secondary); transition: all 0.2s;
+        }
+        .tab-bar .tab:first-child { border-radius: 8px 0 0 8px; }
+        .tab-bar .tab:last-child { border-radius: 0 8px 8px 0; }
+        .tab-bar .tab:not(:first-child) { border-left: none; }
+        .tab-bar .tab.active { background: var(--primary); border-color: var(--primary); color: #1F2937; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ── Stats ── */
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+        .stat-card { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+        .stat-icon {
+            width: 42px; height: 42px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .stat-icon svg { width: 20px; height: 20px; }
+        .stat-label { font-size: 0.7rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+
+        /* ── Action bar ── */
+        .action-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .action-bar-spacer { flex: 1; }
+        .filter-select {
+            padding: 8px 14px; border: 1px solid var(--border-color); border-radius: var(--radius);
+            font-family: var(--font); font-size: 0.85rem; font-weight: 500;
+            background: #fff; color: var(--text-primary); cursor: pointer; min-width: 150px;
+        }
+        .search-wrap { position: relative; flex: 1; max-width: 280px; }
+        .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-secondary); }
+        .search-input {
+            width: 100%; padding: 8px 12px 8px 32px; border: 1px solid var(--border-color);
+            border-radius: var(--radius); font-family: var(--font); font-size: 0.85rem;
+            background: #fff; color: var(--text-primary);
+        }
+        .search-input:focus, .filter-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15); }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+            border-radius: var(--radius); font-family: var(--font); font-size: 0.8rem;
+            font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+        }
+        .btn svg { width: 16px; height: 16px; }
+        .btn-primary { background: var(--primary); color: #1F2937; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-approve { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .btn-approve:hover { background: #a7f3d0; }
+        .btn-reject { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .btn-reject:hover { background: #fecaca; }
+        .btn-outline { background: #fff; color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-outline:hover { background: var(--bg-default); color: var(--text-primary); }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+        /* ── Tables ── */
+        .table-wrap { overflow-x: auto; }
+        .ep-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .ep-table thead { position: sticky; top: 0; z-index: 2; }
+        .ep-table th {
+            padding: 10px 14px; text-align: left; font-weight: 600; font-size: 0.72rem;
+            text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);
+            background: var(--bg-default); border-bottom: 2px solid var(--border-color); white-space: nowrap;
+        }
+        .ep-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-color); color: var(--text-primary); white-space: nowrap; }
+        .ep-table tbody tr:hover { background: var(--bg-default); }
+        .ep-table td input[type="number"], .ep-table td input[type="time"] {
+            padding: 4px 6px; font-size: 12px; border: 1px solid var(--border-color);
+            border-radius: 4px; font-family: var(--font); width: 70px; text-align: center;
+        }
+        .ep-table td input:focus { outline: none; border-color: var(--primary); }
+
+        /* ── Status badges ── */
+        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+        .badge-approved { background: #d1fae5; color: #065f46; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-rejected { background: #fee2e2; color: #991b1b; }
+        .badge-submitted { background: #dbeafe; color: #1e40af; }
+        .badge-edited { background: #ede9fe; color: #5b21b6; }
+        .badge-present { background: #d1fae5; color: #065f46; }
+        .badge-absent { background: #f3f4f6; color: #6b7280; }
+
+        /* ── Device mismatch ── */
+        .device-warn { color: #DC2626; font-weight: 700; }
+        .device-ok { color: #059669; }
+
+        /* ── Daily check-in cards ── */
+        .checkin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+        .checkin-card { padding: 16px; }
+        .checkin-card .worker-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+        .checkin-card .worker-id { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 10px; }
+        .checkin-detail { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.82rem; border-bottom: 1px solid #f3f4f6; }
+        .checkin-detail:last-child { border-bottom: none; }
+        .checkin-detail .label { color: var(--text-secondary); }
+        .checkin-detail .value { font-weight: 600; }
+
+        /* ── Approve all bar ── */
+        .bulk-bar {
+            display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+            background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius); margin-bottom: 16px;
+        }
+        .bulk-bar .info { flex: 1; font-size: 0.85rem; color: #92400e; font-weight: 500; }
+        .bulk-bar .info strong { color: #78350f; }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center; padding: 60px 20px; color: var(--text-secondary);
+        }
+        .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4; }
+        .empty-state h3 { font-size: 1rem; color: var(--text-primary); margin-bottom: 4px; }
+        .empty-state p { font-size: 0.85rem; }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) {
+            .stats-row { grid-template-columns: 1fr; }
+            .container { padding: 16px; }
+            .action-bar { flex-direction: column; align-items: stretch; }
+            .search-wrap { max-width: 100%; }
+            .checkin-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ── Print ── */
+        @media print {
+            .employer-nav, .tab-bar, .action-bar, .bulk-bar { display: none !important; }
+            .container { padding: 0; max-width: 100%; }
+            .tab-content { display: block !important; page-break-inside: avoid; }
+            .card { border: 1px solid #ccc; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- Top Navigation                                  -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <nav class="employer-nav">
+        <div class="logo">
+            <img src="./assets/TalentLedger-Icon.png" alt="TT">
+            <span>TimeTracker</span>
+        </div>
+        <div class="nav-spacer"></div>
+        <div class="nav-user">
+            <span>Signed in as <strong id="navUserName">—</strong></span>
+            <span style="color:var(--border-color)">|</span>
+            <span id="navCompanyName" style="font-weight:600;color:var(--text-primary);">—</span>
+        </div>
+        <button class="nav-btn" id="logoutBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+            Logout
+        </button>
+    </nav>
+
+    <div class="container">
+        <!-- Tabs -->
+        <div class="tab-bar">
+            <div class="tab active" data-tab="today">Today's Check-ins</div>
+            <div class="tab" data-tab="weekly">Weekly Timesheets</div>
+            <div class="tab" data-tab="history">History</div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- TAB: Today's Check-ins                          -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <div class="tab-content active" id="tab-today">
+            <!-- Stats -->
+            <div class="stats-row">
+                <div class="card stat-card">
+                    <div class="stat-icon" style="background:#d1fae5;color:#059669;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+                    </div>
+                    <div>
+                        <div class="stat-label">Checked In</div>
+                        <div class="stat-value" id="statCheckedIn">0</div>
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon" style="background:#fef3c7;color:#d97706;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    </div>
+                    <div>
+                        <div class="stat-label">Expected</div>
+                        <div class="stat-value" id="statExpected">0</div>
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon" style="background:#fee2e2;color:#dc2626;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                    </div>
+                    <div>
+                        <div class="stat-label">Absent</div>
+                        <div class="stat-value" id="statAbsent">0</div>
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon" style="background:#fee2e2;color:#dc2626;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                    </div>
+                    <div>
+                        <div class="stat-label">Device Alerts</div>
+                        <div class="stat-value" id="statDeviceAlerts">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action bar -->
+            <div class="action-bar">
+                <select class="filter-select" id="todayLocationFilter"><option value="">All Locations</option></select>
+                <div class="search-wrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                    <input type="text" class="search-input" id="todaySearch" placeholder="Search workers...">
+                </div>
+                <div class="action-bar-spacer"></div>
+                <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:500;" id="todayDateLabel"></span>
+            </div>
+
+            <!-- Daily table -->
+            <div class="card" style="padding:0;">
+                <div class="table-wrap">
+                    <table class="ep-table">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Employee ID</th>
+                                <th>Location</th>
+                                <th>Clock In</th>
+                                <th>Lunch Out</th>
+                                <th>Lunch In</th>
+                                <th>Clock Out</th>
+                                <th>Hours</th>
+                                <th>Device</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="todayBody">
+                            <tr><td colspan="10" class="empty-state"><p>Loading...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- TAB: Weekly Timesheets                          -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <div class="tab-content" id="tab-weekly">
+            <!-- Action bar -->
+            <div class="action-bar">
+                <select class="filter-select" id="weekSelect"><option value="">Select Week</option></select>
+                <select class="filter-select" id="weekStatusFilter">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="edited">Edited</option>
+                </select>
+                <div class="search-wrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                    <input type="text" class="search-input" id="weekSearch" placeholder="Search workers...">
+                </div>
+                <div class="action-bar-spacer"></div>
+                <button class="btn btn-outline" onclick="window.print()">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" /></svg>
+                    Print
+                </button>
+            </div>
+
+            <!-- Bulk actions bar -->
+            <div class="bulk-bar" id="bulkBar" style="display:none;">
+                <div class="info">
+                    <strong id="bulkCount">0</strong> pending timesheets for this week
+                </div>
+                <button class="btn btn-approve" id="approveAllBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    Approve All
+                </button>
+                <button class="btn btn-primary" id="submitWeekBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>
+                    Submit Week
+                </button>
+            </div>
+
+            <!-- Weekly table -->
+            <div class="card" style="padding:0;">
+                <div class="table-wrap">
+                    <table class="ep-table">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAllWeekly" title="Select all"></th>
+                                <th>Employee</th>
+                                <th>Employee ID</th>
+                                <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+                                <th>Reg</th>
+                                <th>OT</th>
+                                <th>Total</th>
+                                <th>Rate</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="weeklyBody">
+                            <tr><td colspan="16" class="empty-state"><p>Select a week to view timesheets.</p></td></tr>
+                        </tbody>
+                        <tfoot id="weeklyFoot" style="display:none;">
+                            <tr style="background:var(--bg-default);font-weight:700;">
+                                <td></td>
+                                <td colspan="2">TOTALS</td>
+                                <td id="footMon">0</td><td id="footTue">0</td><td id="footWed">0</td>
+                                <td id="footThu">0</td><td id="footFri">0</td><td id="footSat">0</td><td id="footSun">0</td>
+                                <td id="footReg">0</td><td id="footOT">0</td><td id="footTotal">0</td>
+                                <td></td><td></td><td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!-- TAB: History — past approved weeks              -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <div class="tab-content" id="tab-history">
+            <div class="action-bar">
+                <div class="search-wrap">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                    <input type="text" class="search-input" id="historySearch" placeholder="Search workers...">
+                </div>
+                <div class="action-bar-spacer"></div>
+                <button class="btn btn-outline" onclick="window.print()">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" /></svg>
+                    Print
+                </button>
+            </div>
+
+            <div class="card" style="padding:0;">
+                <div class="table-wrap">
+                    <table class="ep-table">
+                        <thead>
+                            <tr>
+                                <th>Week Ending</th>
+                                <th>Employee</th>
+                                <th>Employee ID</th>
+                                <th>Total Hours</th>
+                                <th>Reg</th>
+                                <th>OT</th>
+                                <th>Rate</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                                <th>Reviewed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody">
+                            <tr><td colspan="10" class="empty-state"><p>Loading...</p></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script type="module">
+import { supabase } from './src/supabaseClient.js';
+
+/* ══════════════════════════════════════════════════════ */
+/* Auth — employer portal login                          */
+/* ══════════════════════════════════════════════════════ */
+const { data: { user } } = await supabase.auth.getUser();
+if (!user) { window.location.href = './index.html'; }
+
+// Get employer association for this user
+let currentEmployer = null;
+let employerLocations = [];
+let employerWorkers = [];
+let weeklyData = [];
+let todayPunches = [];
+
+// Try to find which employer this user belongs to
+// For now, check if there's an employer linked to this user's profile
+const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+const userName = profile?.email || user.email || 'User';
+
+document.getElementById('navUserName').textContent = userName;
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = './index.html';
+});
+
+/* ── Check tables exist ── */
+async function checkTables() {
+    const { error } = await supabase.from('time_employers').select('id').limit(1);
+    if (error && error.code === '42P01') {
+        document.getElementById('todayBody').innerHTML =
+            '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">TimeTracker tables not found. Run <b>supabase-add-time-tracker.sql</b> in the Supabase SQL Editor.</td></tr>';
+        return false;
+    }
+    return true;
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Load Data                                             */
+/* ══════════════════════════════════════════════════════ */
+async function loadEmployerData() {
+    if (!await checkTables()) return;
+
+    // Load all employers — eventually filter to assigned employer
+    const { data: allEmployers } = await supabase.from('time_employers').select('*').order('name');
+    const employers = allEmployers || [];
+
+    // For now, use first employer or let user pick
+    // TODO: link auth user to employer via time_workers.auth_user_id or a separate mapping
+    if (employers.length > 0) {
+        currentEmployer = employers[0];
+        document.getElementById('navCompanyName').textContent = currentEmployer.name;
+    }
+
+    if (!currentEmployer) {
+        document.getElementById('todayBody').innerHTML =
+            '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">No employer assigned to your account. Contact your administrator.</td></tr>';
+        return;
+    }
+
+    // Load locations for this employer
+    const { data: locs } = await supabase.from('time_locations').select('*').eq('employer_id', currentEmployer.id).order('name');
+    employerLocations = locs || [];
+
+    // Load workers for this employer
+    const { data: wrks } = await supabase.from('time_workers').select('*').eq('employer_id', currentEmployer.id).order('last_name');
+    employerWorkers = wrks || [];
+
+    // Load today's punches
+    const today = new Date().toISOString().split('T')[0];
+    const workerIds = employerWorkers.map(w => w.id);
+    if (workerIds.length) {
+        const { data: punches } = await supabase.from('time_punches').select('*')
+            .in('worker_id', workerIds)
+            .gte('punch_time', today + 'T00:00:00')
+            .lte('punch_time', today + 'T23:59:59')
+            .order('punch_time');
+        todayPunches = punches || [];
+    }
+
+    // Load weekly timesheets
+    const { data: weekly } = await supabase.from('time_weekly').select('*').eq('employer_id', currentEmployer.id).order('week_ending', { ascending: false });
+    weeklyData = weekly || [];
+
+    populateFilters();
+    renderToday();
+    renderWeekly();
+    renderHistory();
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Filters                                                */
+/* ══════════════════════════════════════════════════════ */
+function populateFilters() {
+    // Location filter for today
+    const locFilter = document.getElementById('todayLocationFilter');
+    locFilter.innerHTML = '<option value="">All Locations</option>';
+    employerLocations.forEach(l => {
+        const o = document.createElement('option');
+        o.value = l.id; o.textContent = l.name;
+        locFilter.appendChild(o);
+    });
+
+    // Week filter for weekly tab
+    const weekSel = document.getElementById('weekSelect');
+    const weeks = [...new Set(weeklyData.map(w => w.week_ending))].sort().reverse();
+    weekSel.innerHTML = '<option value="">Select Week</option>';
+    weeks.forEach(w => {
+        const o = document.createElement('option');
+        o.value = w; o.textContent = `Week Ending ${w}`;
+        weekSel.appendChild(o);
+    });
+    // Auto-select most recent week
+    if (weeks.length) {
+        weekSel.value = weeks[0];
+    }
+
+    // Set today's date label
+    document.getElementById('todayDateLabel').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* Helpers                                                */
+/* ══════════════════════════════════════════════════════ */
+function workerName(id) {
+    const w = employerWorkers.find(wr => wr.id === id);
+    return w ? `${w.first_name} ${w.last_name}` : 'Unknown';
+}
+function workerEmpId(id) {
+    return employerWorkers.find(wr => wr.id === id)?.employee_id || '—';
+}
+function locName(id) {
+    return employerLocations.find(l => l.id === id)?.name || '—';
+}
+function fmtTime(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+function fmt$(v) { return '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+/* ══════════════════════════════════════════════════════ */
+/* RENDER: Today's Check-ins                              */
+/* ══════════════════════════════════════════════════════ */
+function renderToday() {
+    const locFilter = document.getElementById('todayLocationFilter').value;
+    const search = document.getElementById('todaySearch').value.toLowerCase().trim();
+
+    // Build per-worker punch summary for today
+    const workerPunches = {};
+    todayPunches.forEach(p => {
+        if (!workerPunches[p.worker_id]) workerPunches[p.worker_id] = {};
+        workerPunches[p.worker_id][p.punch_type] = p;
+    });
+
+    let rows = employerWorkers.filter(w => {
+        if (!w.active) return false;
+        if (locFilter && w.location_id !== parseInt(locFilter)) return false;
+        if (search) {
+            const hay = `${w.first_name} ${w.last_name} ${w.employee_id}`.toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+
+    // Stats
+    const checkedIn = rows.filter(w => workerPunches[w.id]?.clock_in).length;
+    const expected = rows.length;
+    const absent = expected - checkedIn;
+    const deviceAlerts = rows.filter(w => {
+        const p = workerPunches[w.id]?.clock_in;
+        return p && p.device_mismatch;
+    }).length;
+
+    document.getElementById('statCheckedIn').textContent = checkedIn;
+    document.getElementById('statExpected').textContent = expected;
+    document.getElementById('statAbsent').textContent = absent;
+    document.getElementById('statDeviceAlerts').textContent = deviceAlerts;
+
+    const tbody = document.getElementById('todayBody');
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">No workers found for today.</td></tr>';
+        return;
+    }
+
+    // Sort: checked-in first, then absent; device mismatches highlighted
+    rows.sort((a, b) => {
+        const aIn = workerPunches[a.id]?.clock_in ? 1 : 0;
+        const bIn = workerPunches[b.id]?.clock_in ? 1 : 0;
+        if (bIn !== aIn) return bIn - aIn;
+        return a.last_name.localeCompare(b.last_name);
+    });
+
+    tbody.innerHTML = rows.map(w => {
+        const punches = workerPunches[w.id] || {};
+        const clockIn = punches.clock_in;
+        const lunchOut = punches.lunch_out;
+        const lunchIn = punches.lunch_in;
+        const clockOut = punches.clock_out;
+        const isPresent = !!clockIn;
+        const mismatch = clockIn?.device_mismatch;
+
+        // Calculate hours if both clock in and out exist
+        let hours = '—';
+        if (clockIn && clockOut) {
+            const ms = new Date(clockOut.punch_time) - new Date(clockIn.punch_time);
+            let h = ms / 3600000;
+            // Subtract lunch if both punches exist
+            if (lunchOut && lunchIn) {
+                const lunchMs = new Date(lunchIn.punch_time) - new Date(lunchOut.punch_time);
+                h -= lunchMs / 3600000;
+            }
+            hours = h.toFixed(1);
+        }
+
+        // Device info
+        const deviceInfo = clockIn?.device_info || '—';
+        const deviceCell = mismatch
+            ? `<span class="device-warn" title="Different device detected!">⚠ ${deviceInfo}</span>`
+            : `<span class="device-ok">${deviceInfo}</span>`;
+
+        return `<tr${!isPresent ? ' style="opacity:0.5;"' : ''}>
+            <td style="font-weight:600">${w.first_name} ${w.last_name}</td>
+            <td>${w.employee_id}</td>
+            <td>${locName(w.location_id)}</td>
+            <td>${fmtTime(clockIn?.punch_time)}</td>
+            <td>${fmtTime(lunchOut?.punch_time)}</td>
+            <td>${fmtTime(lunchIn?.punch_time)}</td>
+            <td>${fmtTime(clockOut?.punch_time)}</td>
+            <td style="font-weight:600">${hours}</td>
+            <td>${deviceCell}</td>
+            <td><span class="badge badge-${isPresent ? 'present' : 'absent'}">${isPresent ? 'Present' : 'Absent'}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* RENDER: Weekly Timesheets                              */
+/* ══════════════════════════════════════════════════════ */
+function renderWeekly() {
+    const weekFilter = document.getElementById('weekSelect').value;
+    const statusFilter = document.getElementById('weekStatusFilter').value;
+    const search = document.getElementById('weekSearch').value.toLowerCase().trim();
+
+    let filtered = weeklyData.filter(w => {
+        if (weekFilter && w.week_ending !== weekFilter) return false;
+        if (statusFilter && w.status !== statusFilter) return false;
+        if (search) {
+            const name = workerName(w.worker_id).toLowerCase();
+            const empId = workerEmpId(w.worker_id).toLowerCase();
+            if (!name.includes(search) && !empId.includes(search)) return false;
+        }
+        return true;
+    });
+
+    // Bulk bar
+    const pendingCount = filtered.filter(w => w.status === 'pending' || w.status === 'submitted').length;
+    const bulkBar = document.getElementById('bulkBar');
+    if (pendingCount > 0 && weekFilter) {
+        bulkBar.style.display = 'flex';
+        document.getElementById('bulkCount').textContent = pendingCount;
+    } else {
+        bulkBar.style.display = 'none';
+    }
+
+    const tbody = document.getElementById('weeklyBody');
+    const tfoot = document.getElementById('weeklyFoot');
+
+    if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-secondary)">${weekFilter ? 'No timesheets for this week.' : 'Select a week to view timesheets.'}</td></tr>`;
+        tfoot.style.display = 'none';
+        return;
+    }
+
+    tfoot.style.display = '';
+
+    // Totals
+    const totals = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0, reg: 0, ot: 0, total: 0 };
+
+    tbody.innerHTML = filtered.map(w => {
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        days.forEach(d => totals[d] += Number(w[d + '_hours']) || 0);
+        totals.reg += Number(w.reg_hours) || 0;
+        totals.ot += Number(w.ot_hours) || 0;
+        totals.total += Number(w.total_hours) || 0;
+
+        const editable = w.status === 'pending' || w.status === 'submitted' || w.status === 'rejected';
+        const statusLabel = w.status.charAt(0).toUpperCase() + w.status.slice(1);
+
+        const daysCells = days.map(d => {
+            const val = Number(w[d + '_hours']) || 0;
+            if (editable) {
+                return `<td><input type="number" value="${val}" step="0.5" min="0" max="24" data-id="${w.id}" data-field="${d}_hours" onchange="window.editHours(this)"></td>`;
+            }
+            return `<td>${val || '—'}</td>`;
+        }).join('');
+
+        let actions = '';
+        if (editable) {
+            actions = `
+                <button class="btn btn-approve btn-sm" onclick="window.approveOne(${w.id})">Approve</button>
+                <button class="btn btn-reject btn-sm" onclick="window.rejectOne(${w.id})">Reject</button>
+            `;
+        } else if (w.status === 'approved') {
+            actions = `<button class="btn btn-outline btn-sm" onclick="window.reopenOne(${w.id})">Reopen</button>`;
+        }
+
+        return `<tr>
+            <td><input type="checkbox" class="week-cb" data-id="${w.id}" ${editable ? '' : 'disabled'}></td>
+            <td style="font-weight:600">${workerName(w.worker_id)}</td>
+            <td>${workerEmpId(w.worker_id)}</td>
+            ${daysCells}
+            <td style="font-weight:600">${Number(w.reg_hours).toFixed(1)}</td>
+            <td style="font-weight:600;${Number(w.ot_hours) > 0 ? 'color:#dc2626;' : ''}">${Number(w.ot_hours).toFixed(1)}</td>
+            <td style="font-weight:700">${Number(w.total_hours).toFixed(1)}</td>
+            <td>${fmt$(w.hourly_rate)}</td>
+            <td><span class="badge badge-${w.status}">${statusLabel}</span></td>
+            <td>${actions}</td>
+        </tr>`;
+    }).join('');
+
+    // Footer totals
+    document.getElementById('footMon').textContent = totals.mon.toFixed(1);
+    document.getElementById('footTue').textContent = totals.tue.toFixed(1);
+    document.getElementById('footWed').textContent = totals.wed.toFixed(1);
+    document.getElementById('footThu').textContent = totals.thu.toFixed(1);
+    document.getElementById('footFri').textContent = totals.fri.toFixed(1);
+    document.getElementById('footSat').textContent = totals.sat.toFixed(1);
+    document.getElementById('footSun').textContent = totals.sun.toFixed(1);
+    document.getElementById('footReg').textContent = totals.reg.toFixed(1);
+    document.getElementById('footOT').textContent = totals.ot.toFixed(1);
+    document.getElementById('footTotal').textContent = totals.total.toFixed(1);
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* RENDER: History                                        */
+/* ══════════════════════════════════════════════════════ */
+function renderHistory() {
+    const search = document.getElementById('historySearch').value.toLowerCase().trim();
+
+    let filtered = weeklyData.filter(w => {
+        if (w.status !== 'approved' && w.status !== 'rejected') return false;
+        if (search) {
+            const name = workerName(w.worker_id).toLowerCase();
+            const empId = workerEmpId(w.worker_id).toLowerCase();
+            if (!name.includes(search) && !empId.includes(search)) return false;
+        }
+        return true;
+    });
+
+    const tbody = document.getElementById('historyBody');
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">No history yet. Approved and rejected timesheets will appear here.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(w => {
+        const statusLabel = w.status.charAt(0).toUpperCase() + w.status.slice(1);
+        return `<tr>
+            <td>${w.week_ending}</td>
+            <td style="font-weight:600">${workerName(w.worker_id)}</td>
+            <td>${workerEmpId(w.worker_id)}</td>
+            <td style="font-weight:700">${Number(w.total_hours).toFixed(1)}</td>
+            <td>${Number(w.reg_hours).toFixed(1)}</td>
+            <td>${Number(w.ot_hours).toFixed(1)}</td>
+            <td>${fmt$(w.hourly_rate)}</td>
+            <td><span class="badge badge-${w.status}">${statusLabel}</span></td>
+            <td>${w.submitted_at ? new Date(w.submitted_at).toLocaleDateString() : '—'}</td>
+            <td>${w.reviewed_at ? new Date(w.reviewed_at).toLocaleDateString() : '—'}</td>
+        </tr>`;
+    }).join('');
+}
+
+/* ══════════════════════════════════════════════════════ */
+/* ACTIONS: Approve / Reject / Edit                       */
+/* ══════════════════════════════════════════════════════ */
+window.approveOne = async (id) => {
+    const { error } = await supabase.from('time_weekly').update({
+        status: 'approved',
+        reviewed_at: new Date().toISOString()
+    }).eq('id', id);
+    if (error) { alert('Error: ' + error.message); return; }
+    const idx = weeklyData.findIndex(w => w.id === id);
+    if (idx >= 0) { weeklyData[idx].status = 'approved'; weeklyData[idx].reviewed_at = new Date().toISOString(); }
+    renderWeekly();
+    renderHistory();
+};
+
+window.rejectOne = async (id) => {
+    const notes = prompt('Rejection reason (optional):') || '';
+    const { error } = await supabase.from('time_weekly').update({
+        status: 'rejected',
+        employer_notes: notes,
+        reviewed_at: new Date().toISOString()
+    }).eq('id', id);
+    if (error) { alert('Error: ' + error.message); return; }
+    const idx = weeklyData.findIndex(w => w.id === id);
+    if (idx >= 0) { weeklyData[idx].status = 'rejected'; weeklyData[idx].reviewed_at = new Date().toISOString(); weeklyData[idx].employer_notes = notes; }
+    renderWeekly();
+    renderHistory();
+};
+
+window.reopenOne = async (id) => {
+    if (!confirm('Reopen this timesheet for editing?')) return;
+    const { error } = await supabase.from('time_weekly').update({
+        status: 'pending',
+        reviewed_at: null
+    }).eq('id', id);
+    if (error) { alert('Error: ' + error.message); return; }
+    const idx = weeklyData.findIndex(w => w.id === id);
+    if (idx >= 0) { weeklyData[idx].status = 'pending'; weeklyData[idx].reviewed_at = null; }
+    renderWeekly();
+    renderHistory();
+};
+
+window.editHours = async (input) => {
+    const id = parseInt(input.dataset.id);
+    const field = input.dataset.field;
+    const val = parseFloat(input.value) || 0;
+
+    // Update local data
+    const rec = weeklyData.find(w => w.id === id);
+    if (rec) {
+        rec[field] = val;
+        // Recalculate totals
+        const days = ['mon_hours', 'tue_hours', 'wed_hours', 'thu_hours', 'fri_hours', 'sat_hours', 'sun_hours'];
+        const total = days.reduce((s, d) => s + (Number(rec[d]) || 0), 0);
+        rec.total_hours = total;
+        rec.reg_hours = Math.min(total, 40);
+        rec.ot_hours = Math.max(0, total - 40);
+        rec.status = 'edited';
+    }
+
+    // Save to Supabase
+    const updates = { [field]: val, status: 'edited' };
+    if (rec) {
+        updates.total_hours = rec.total_hours;
+        updates.reg_hours = rec.reg_hours;
+        updates.ot_hours = rec.ot_hours;
+    }
+    await supabase.from('time_weekly').update(updates).eq('id', id);
+    renderWeekly();
+};
+
+// Approve All button
+document.getElementById('approveAllBtn').addEventListener('click', async () => {
+    const weekFilter = document.getElementById('weekSelect').value;
+    if (!weekFilter) return;
+    const pending = weeklyData.filter(w => w.week_ending === weekFilter && (w.status === 'pending' || w.status === 'submitted'));
+    if (!pending.length) return;
+    if (!confirm(`Approve all ${pending.length} timesheets for week ending ${weekFilter}?`)) return;
+
+    const ids = pending.map(w => w.id);
+    const { error } = await supabase.from('time_weekly').update({
+        status: 'approved',
+        reviewed_at: new Date().toISOString()
+    }).in('id', ids);
+    if (error) { alert('Error: ' + error.message); return; }
+
+    pending.forEach(w => { w.status = 'approved'; w.reviewed_at = new Date().toISOString(); });
+    renderWeekly();
+    renderHistory();
+});
+
+// Submit Week button
+document.getElementById('submitWeekBtn').addEventListener('click', async () => {
+    const weekFilter = document.getElementById('weekSelect').value;
+    if (!weekFilter) return;
+    const pending = weeklyData.filter(w => w.week_ending === weekFilter && w.status === 'pending');
+    if (!pending.length) { alert('No pending timesheets to submit.'); return; }
+    if (!confirm(`Submit ${pending.length} timesheets for week ending ${weekFilter}?`)) return;
+
+    const ids = pending.map(w => w.id);
+    const { error } = await supabase.from('time_weekly').update({
+        status: 'submitted',
+        submitted_at: new Date().toISOString()
+    }).in('id', ids);
+    if (error) { alert('Error: ' + error.message); return; }
+
+    pending.forEach(w => { w.status = 'submitted'; w.submitted_at = new Date().toISOString(); });
+    renderWeekly();
+});
+
+// Select all checkbox
+document.getElementById('selectAllWeekly').addEventListener('change', (e) => {
+    document.querySelectorAll('.week-cb:not(:disabled)').forEach(cb => cb.checked = e.target.checked);
+});
+
+/* ══════════════════════════════════════════════════════ */
+/* Tab switching                                          */
+/* ══════════════════════════════════════════════════════ */
+document.querySelectorAll('.tab-bar .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    });
+});
+
+/* ══════════════════════════════════════════════════════ */
+/* Filter listeners                                       */
+/* ══════════════════════════════════════════════════════ */
+document.getElementById('todayLocationFilter').addEventListener('change', renderToday);
+document.getElementById('todaySearch').addEventListener('input', renderToday);
+document.getElementById('weekSelect').addEventListener('change', renderWeekly);
+document.getElementById('weekStatusFilter').addEventListener('change', renderWeekly);
+document.getElementById('weekSearch').addEventListener('input', renderWeekly);
+document.getElementById('historySearch').addEventListener('input', renderHistory);
+
+/* ── Init ── */
+await loadEmployerData();
+</script>
+</body>
+</html>
