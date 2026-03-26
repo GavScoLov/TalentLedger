@@ -873,13 +873,13 @@
         else agg[k].gspHours += hrs;
       }
       for (const r of headData) {
-        if (isCorporateBranch(r.branchname || r.branch)) continue;
-        const bn = r.branchname || r.branch || 'Unknown';
+        if (isCorporateBranch(r.branch)) continue;
+        const bn = r.branch || 'Unknown';
         const region = branchMap[bn] || 'Unassigned';
         const k = key(region, bn);
         if (!agg[k]) agg[k] = { region, branch: bn, gspHours: 0, dhpHours: 0, gspHead: 0, dhpHead: 0 };
-        const cnt = Number(r.unique_count || r.count || r.headcount) || 0;
-        if (isDHP(r.company_name || r.customername)) agg[k].dhpHead += cnt;
+        const cnt = Number(r.unique_row_count) || 0;
+        if (isDHP(r.company_name)) agg[k].dhpHead += cnt;
         else agg[k].gspHead += cnt;
       }
 
@@ -991,13 +991,13 @@
 
       const agg = {};
       for (const r of headData) {
-        const bn = r.branchname || r.branch || 'Unknown';
+        const bn = r.branch || 'Unknown';
         if (isCorporateBranch(bn)) continue;
-        if (!isDHP(r.company_name || r.customername)) continue;
+        if (!isDHP(r.company_name)) continue;
         const region = branchMap[bn] || 'Unassigned';
         const k = `${region}|||${bn}`;
         if (!agg[k]) agg[k] = { region, branch: bn, headcount: 0 };
-        agg[k].headcount += Number(r.unique_count || r.count || r.headcount) || 0;
+        agg[k].headcount += Number(r.unique_row_count) || 0;
       }
 
       const rows = Object.values(agg)
