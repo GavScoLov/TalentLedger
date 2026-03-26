@@ -1108,85 +1108,120 @@
     };
 
     /* ─── PSA Billing hierarchical renderer ─────────────────── */
-    function renderBillingTable(hierarchy, grandGsp, grandDhp) {
+    function renderBillingTable(hierarchy, sortedWeeks, grandGsp, grandDhp) {
+      const totalCols = sortedWeeks.length + 4; // company + N weeks + GSP Total + DHP Total + Total
+
+      function fmtWeek(w) {
+        if (w === '—') return '—';
+        const d = new Date(w + 'T12:00:00Z');
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+      }
+
+      const weekHeaders = sortedWeeks.map(w => `<th class="r">${fmtWeek(w)}</th>`).join('');
+
       let html = `<table class="billing-tbl">
         <thead><tr>
-          <th>Region / Branch / Company</th>
-          <th>Week Ending</th>
-          <th class="r">GSP Revenue</th>
-          <th class="r">DHP Revenue</th>
-          <th class="r">Total Revenue</th>
+          <th>Company</th>
+          ${weekHeaders}
+          <th class="r">GSP Total</th>
+          <th class="r">DHP Total</th>
+          <th class="r">Total</th>
         </tr></thead>
         <tbody>`;
 
-      for (const region of Object.keys(hierarchy).sort()) {
-        const c        = regionColor(region);
-        const branches = hierarchy[region];
-        const rk       = region; // key for data attrs
+      // Grand total accumulators per week
+      const grandWeekTotals = new Array(sortedWeeks.length).fill(0);
 
-        // Region header (click to collapse all branches + data in this region)
+      for (const region of Object.keys(hierarchy).sort()) {
+        const c  = regionColor(region);
+        const rk = region;
+
+        // Region header
         html += `<tr class="billing-region-hdr" style="background:${c.bg};color:${c.white};">
-          <td colspan="5">
+          <td colspan="${totalCols}">
             <button class="collapse-btn" data-rbtn="${rk}" onclick="toggleBillingRegion('${rk.replace(/'/g,"\\'")}')">▼</button>
             ${region}
           </td>
         </tr>`;
 
         let regionGsp = 0, regionDhp = 0;
+        const regionWeekTotals = new Array(sortedWeeks.length).fill(0);
 
-        for (const branch of Object.keys(branches).sort()) {
-          const companies = branches[branch];
-          const bk        = `${region}|||${branch}`;
+        for (const branch of Object.keys(hierarchy[region]).sort()) {
+          const bk = `${region}|||${branch}`;
 
-          // Branch header — collapses only this branch's data rows (not the branch total)
+          // Branch header
           html += `<tr class="billing-branch-hdr" data-rk="${rk}" style="background:${c.light};color:${c.text};">
-            <td colspan="5">
+            <td colspan="${totalCols}">
               <button class="collapse-btn" data-bbtn="${bk}" onclick="toggleBillingBranch('${bk.replace(/'/g,"\\'")}')">▼</button>
               ${branch}
             </td>
           </tr>`;
 
           let branchGsp = 0, branchDhp = 0;
+          const branchWeekTotals = new Array(sortedWeeks.length).fill(0);
 
-          for (const company of Object.keys(companies).sort()) {
-            const weeks = companies[company];
-            for (const week of Object.keys(weeks).sort()) {
-              const { gsp, dhp } = weeks[week];
-              branchGsp += gsp; branchDhp += dhp;
-              // data-rk hides row when region collapsed; data-bk hides when branch collapsed
-              html += `<tr class="billing-data-row" data-rk="${rk}" data-bk="${bk}" style="border-left:3px solid ${c.bg};">
-                <td>${company}</td>
-                <td>${week}</td>
-                <td class="r">${formatCurrency(gsp)}</td>
-                <td class="r">${formatCurrency(dhp)}</td>
-                <td class="r" style="font-weight:600;">${formatCurrency(gsp + dhp)}</td>
-              </tr>`;
-            }
+          for (const company of Object.keys(hierarchy[region][branch]).sort()) {
+            const compWeekData = hierarchy[region][branch][company];
+            let compGsp = 0, compDhp = 0;
+
+            const weekCells = sortedWeeks.map((w, i) => {
+              const { gsp, dhp } = compWeekData[w] || { gsp: 0, dhp: 0 };
+              const total = gsp + dhp;
+              branchWeekTotals[i] += total;
+              compGsp += gsp; compDhp += dhp;
+              return `<td class="r">${total > 0 ? formatCurrency(total) : '<span style="color:var(--text-disabled)">—</span>'}</td>`;
+            }).join('');
+
+            branchGsp += compGsp; branchDhp += compDhp;
+
+            html += `<tr class="billing-data-row" data-rk="${rk}" data-bk="${bk}" style="border-left:3px solid ${c.bg};">
+              <td>${company}</td>
+              ${weekCells}
+              <td class="r">${formatCurrency(compGsp)}</td>
+              <td class="r">${formatCurrency(compDhp)}</td>
+              <td class="r" style="font-weight:600;">${formatCurrency(compGsp + compDhp)}</td>
+            </tr>`;
           }
 
           regionGsp += branchGsp; regionDhp += branchDhp;
+          branchWeekTotals.forEach((v, i) => regionWeekTotals[i] += v);
 
-          // Branch subtotal — hidden when region collapsed, stays visible when branch collapsed
+          // Branch total (visible when branch collapsed)
+          const branchWeekCells = branchWeekTotals.map(v =>
+            `<td class="r" style="font-weight:600;">${formatCurrency(v)}</td>`
+          ).join('');
           html += `<tr class="billing-branch-total" data-rk="${rk}" style="background:${c.light};color:${c.text};border-left:3px solid ${c.bg};">
-            <td colspan="2">↳ ${branch} Total</td>
-            <td class="r">${formatCurrency(branchGsp)}</td>
-            <td class="r">${formatCurrency(branchDhp)}</td>
+            <td>↳ ${branch} Total</td>
+            ${branchWeekCells}
+            <td class="r" style="font-weight:600;">${formatCurrency(branchGsp)}</td>
+            <td class="r" style="font-weight:600;">${formatCurrency(branchDhp)}</td>
             <td class="r" style="font-weight:700;">${formatCurrency(branchGsp + branchDhp)}</td>
           </tr>`;
         }
 
-        // Region total — always visible
+        regionWeekTotals.forEach((v, i) => grandWeekTotals[i] += v);
+
+        // Region total (always visible)
+        const regionWeekCells = regionWeekTotals.map(v =>
+          `<td class="r" style="font-weight:700;">${formatCurrency(v)}</td>`
+        ).join('');
         html += `<tr class="billing-region-total" style="background:${c.bg};color:${c.white};">
-          <td colspan="2">${region} Total</td>
-          <td class="r">${formatCurrency(regionGsp)}</td>
-          <td class="r">${formatCurrency(regionDhp)}</td>
+          <td>${region} Total</td>
+          ${regionWeekCells}
+          <td class="r" style="font-weight:700;">${formatCurrency(regionGsp)}</td>
+          <td class="r" style="font-weight:700;">${formatCurrency(regionDhp)}</td>
           <td class="r" style="font-weight:700;">${formatCurrency(regionGsp + regionDhp)}</td>
         </tr>`;
       }
 
       // Grand total
+      const grandWeekCells = grandWeekTotals.map(v =>
+        `<td class="r">${formatCurrency(v)}</td>`
+      ).join('');
       html += `<tr class="billing-grand-total">
-        <td colspan="2">Grand Total</td>
+        <td>Grand Total</td>
+        ${grandWeekCells}
         <td class="r">${formatCurrency(grandGsp)}</td>
         <td class="r">${formatCurrency(grandDhp)}</td>
         <td class="r">${formatCurrency(grandGsp + grandDhp)}</td>
@@ -1225,6 +1260,14 @@
         else      { hierarchy[region][branch][company][week].gsp += amt; grandGsp += amt; }
       }
 
+      // Collect all unique weeks and sort them
+      const weekSet = new Set();
+      for (const branches of Object.values(hierarchy))
+        for (const companies of Object.values(branches))
+          for (const weeks of Object.values(companies))
+            for (const w of Object.keys(weeks)) weekSet.add(w);
+      const sortedWeeks = [...weekSet].sort();
+
       // Flat rows for CSV export (sorted)
       const csvRows = [];
       for (const region of Object.keys(hierarchy).sort()) {
@@ -1256,7 +1299,7 @@
         cols,
         rows: csvRows,
         filename: 'psa-billing.csv',
-        customRender: () => renderBillingTable(hierarchy, grandGsp, grandDhp),
+        customRender: () => renderBillingTable(hierarchy, sortedWeeks, grandGsp, grandDhp),
       };
     }
 
