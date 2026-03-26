@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
           rosterTracker: resolve(__dirnameESM, 'roster-tracker.html'),
           tempworks: resolve(__dirnameESM, 'tempworks.html'),
           timecards: resolve(__dirnameESM, 'timecards.html'),
+          reports:   resolve(__dirnameESM, 'reports.html'),
         },
       },
     },

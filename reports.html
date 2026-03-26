@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TalentLedger — Reports</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="shortcut icon" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    /* ── Date filter bar ─────────────────────────────────────── */
+    .date-filter-bar {
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap; margin-bottom: 28px;
+      background: var(--bg-paper); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 14px 18px;
+      box-shadow: var(--shadow-sm);
+    }
+    .date-filter-bar label {
+      font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;
+    }
+    .date-filter-bar input[type="date"] {
+      padding: 7px 12px; border: 1px solid var(--border-color);
+      border-radius: var(--radius); font-family: var(--font);
+      font-size: 0.85rem; background: var(--bg); color: var(--text-primary);
+    }
+    .date-filter-bar input[type="date"]:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(234,137,56,.15);
+    }
+    .date-filter-bar .sep { color: var(--text-secondary); font-size: 0.85rem; }
+    .date-filter-bar .spacer { flex: 1; }
+
+    /* ── Report cards grid ───────────────────────────────────── */
+    .reports-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px; margin-bottom: 32px;
+    }
+    .report-card {
+      background: var(--bg-paper); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 22px;
+      box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
+      gap: 12px; transition: box-shadow .15s, border-color .15s;
+    }
+    .report-card:hover { box-shadow: var(--shadow-md); border-color: #d0d0d0; }
+    .report-card.active {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(234,137,56,.12), var(--shadow-sm);
+    }
+    .report-card-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(234,137,56,.12); color: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .report-card-icon svg { width: 22px; height: 22px; }
+    .report-card-name {
+      font-size: 0.95rem; font-weight: 700; color: var(--text-primary);
+    }
+    .report-card-desc {
+      font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; flex: 1;
+    }
+    .report-card-source {
+      font-size: 0.72rem; color: var(--text-disabled); font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .btn-generate {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: var(--radius);
+      font-size: 0.82rem; font-weight: 600; font-family: var(--font);
+      background: var(--primary); color: #fff; border: none; cursor: pointer;
+      transition: background .15s; width: 100%; justify-content: center;
+    }
+    .btn-generate:hover { background: var(--primary-dark); }
+    .btn-generate:disabled {
+      background: var(--border-color); color: var(--text-disabled); cursor: not-allowed;
+    }
+    .btn-generate svg { width: 14px; height: 14px; }
+
+    /* ── Results section ─────────────────────────────────────── */
+    #results-section { display: none; }
+    .results-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
+    }
+    .results-title-group { display: flex; flex-direction: column; gap: 2px; }
+    .results-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+    .results-meta { font-size: 0.78rem; color: var(--text-secondary); }
+    .results-actions { display: flex; gap: 10px; align-items: center; }
+
+    /* ── Data table ──────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    .rpt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .rpt-table thead { position: sticky; top: 0; z-index: 2; }
+    .rpt-table th {
+      padding: 10px 14px; text-align: left; font-weight: 600; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);
+      background: #f8f8f8; border-bottom: 2px solid var(--border-color);
+      white-space: nowrap; user-select: none; cursor: pointer;
+    }
+    .rpt-table th:hover { color: var(--text-primary); }
+    .rpt-table th .sort-icon {
+      display: inline-block; margin-left: 4px; opacity: 0.35; font-style: normal; font-size: 0.7rem;
+    }
+    .rpt-table th.sort-asc .sort-icon,
+    .rpt-table th.sort-desc .sort-icon { opacity: 1; color: var(--primary); }
+    .rpt-table td {
+      padding: 10px 14px; border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary); white-space: nowrap;
+    }
+    .rpt-table tbody tr:hover { background: #fafafa; }
+    .rpt-table tfoot td {
+      padding: 10px 14px; font-weight: 700; background: #f8f8f8;
+      border-top: 2px solid var(--border-color);
+    }
+    .num-cell { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Badges ──────────────────────────────────────────────── */
+    .badge-active   { background:#D1FAE5; color:#065F46; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
+    .badge-inactive { background:#FEE2E2; color:#991B1B; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
+    .badge-warning  { background:#FEF3C7; color:#92400E; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
+
+    /* ── Loading ─────────────────────────────────────────────── */
+    .loading-overlay {
+      display: flex; align-items: center; justify-content: center;
+      padding: 60px; color: var(--text-secondary); font-size: 0.9rem; gap: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid var(--border-color);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    /* ── Section label ──────────────────────────────────────── */
+    .reports-section-label {
+      grid-column: 1 / -1;
+      font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 10px 0 2px; border-top: 1px solid var(--border-color); margin-top: 6px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .reports-section-label::after {
+      content: ''; flex: 1; height: 1px; background: var(--border-color);
+    }
+
+    /* ── Empty state ─────────────────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-secondary);
+    }
+    .empty-state svg { width: 40px; height: 40px; margin-bottom: 12px; opacity: .35; }
+    .empty-state p { font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <div class="main-content">
+
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Reports</h1>
+          <p class="page-subtitle">Generate and export preset reports from your staffing data</p>
+        </div>
+      </div>
+
+      <!-- Global date range filter -->
+      <div class="date-filter-bar">
+        <label>Date Range</label>
+        <input type="date" id="date-start">
+        <span class="sep">→</span>
+        <input type="date" id="date-end">
+        <div class="spacer"></div>
+        <button class="btn btn-outlined btn-sm" id="btn-reset-dates" style="font-size:.8rem;padding:7px 14px;">Reset to 30 Days</button>
+      </div>
+
+      <!-- Report cards grid -->
+      <div class="reports-grid" id="reports-grid">
+
+        <!-- 1. Employee Hours Summary -->
+        <div class="report-card" data-report="employee-hours">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">Employee Hours Summary</div>
+            <div class="report-card-source">Source: TimeStation Shifts</div>
+          </div>
+          <div class="report-card-desc">
+            Total hours and shift counts per employee for the selected date range. Includes department and status.
+          </div>
+          <button class="btn-generate" data-report="employee-hours">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 2. Department Hours Breakdown -->
+        <div class="report-card" data-report="dept-hours">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">Department Hours Breakdown</div>
+            <div class="report-card-source">Source: TimeStation Shifts</div>
+          </div>
+          <div class="report-card-desc">
+            Hours and headcount grouped by department. Useful for identifying where time is being spent.
+          </div>
+          <button class="btn-generate" data-report="dept-hours">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 3. Weekly Hours Trend -->
+        <div class="report-card" data-report="weekly-trend">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">Weekly Hours Trend</div>
+            <div class="report-card-source">Source: TimeStation Shifts</div>
+          </div>
+          <div class="report-card-desc">
+            Hours and shift counts grouped by week. Spot attendance patterns and seasonal trends over time.
+          </div>
+          <button class="btn-generate" data-report="weekly-trend">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 4. Zero Hours Employees -->
+        <div class="report-card" data-report="zero-hours">
+          <div class="report-card-icon" style="background:rgba(220,38,38,.1);color:#DC2626;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">Zero Hours Employees</div>
+            <div class="report-card-source">Source: TimeStation Employees + Shifts</div>
+          </div>
+          <div class="report-card-desc">
+            Employees with no recorded shifts in the selected date range. Helpful for identifying inactive workers.
+          </div>
+          <button class="btn-generate" data-report="zero-hours" style="background:#DC2626;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 5. TempWorks Timecards -->
+        <div class="report-card" data-report="tw-timecards">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">TempWorks Timecards</div>
+            <div class="report-card-source">Source: TempWorks Timecards</div>
+          </div>
+          <div class="report-card-desc">
+            Weekly timecard records from TempWorks filtered by weekend date. Shows regular, OT, and total hours with status.
+          </div>
+          <button class="btn-generate" data-report="tw-timecards">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- PSA section label -->
+        <div class="reports-section-label">PSA Staffing Reports</div>
+
+        <!-- 6. PSA Hours & Headcount by Region -->
+        <div class="report-card" data-report="psa-hours-headcount">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">PSA Hours & Headcount by Region</div>
+            <div class="report-card-source">Source: PSA API · Employee Hours + Headcount</div>
+          </div>
+          <div class="report-card-desc">
+            Total hours and unique headcount grouped by region and branch for the date range. Splits GSP and DHP.
+          </div>
+          <button class="btn-generate" data-report="psa-hours-headcount">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 7. PSA Weekly Revenue by Branch -->
+        <div class="report-card" data-report="psa-weekly-revenue">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">PSA Weekly Revenue by Branch</div>
+            <div class="report-card-source">Source: PSA API · Invoice Register</div>
+          </div>
+          <div class="report-card-desc">
+            Weekly invoice revenue per branch broken into GSP and DHP columns. Includes regional grouping.
+          </div>
+          <button class="btn-generate" data-report="psa-weekly-revenue">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 8. DHP Monthly Hours by Region & Branch -->
+        <div class="report-card" data-report="dhp-hours">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">DHP Hours by Region & Branch</div>
+            <div class="report-card-source">Source: PSA API · Employee Hours</div>
+          </div>
+          <div class="report-card-desc">
+            All Direct Hire Placement (DHP) company hours grouped by region and branch for the period.
+          </div>
+          <button class="btn-generate" data-report="dhp-hours">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 9. DHP Monthly Headcount by Region & Branch -->
+        <div class="report-card" data-report="dhp-headcount">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">DHP Headcount by Region & Branch</div>
+            <div class="report-card-source">Source: PSA API · Unique Headcount</div>
+          </div>
+          <div class="report-card-desc">
+            Unique employee headcount for all DHP companies grouped by region and branch for the period.
+          </div>
+          <button class="btn-generate" data-report="dhp-headcount">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 10. DHP Monthly Billing by Region & Branch -->
+        <div class="report-card" data-report="dhp-billing">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">DHP Billing by Region & Branch</div>
+            <div class="report-card-source">Source: PSA API · Invoice Register</div>
+          </div>
+          <div class="report-card-desc">
+            Total invoice billing for all DHP companies grouped by region and branch for the period.
+          </div>
+          <button class="btn-generate" data-report="dhp-billing">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+        <!-- 11. PSA Monthly Revenue by Region → Branch → Company -->
+        <div class="report-card" data-report="psa-revenue-breakdown">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+            </svg>
+          </div>
+          <div>
+            <div class="report-card-name">PSA Revenue Breakdown</div>
+            <div class="report-card-source">Source: PSA API · Invoice Register</div>
+          </div>
+          <div class="report-card-desc">
+            All PSA revenue grouped by Region → Branch → Company. Shows GSP and DHP revenue side by side with totals.
+          </div>
+          <button class="btn-generate" data-report="psa-revenue-breakdown">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+            Generate Report
+          </button>
+        </div>
+
+      </div><!-- /.reports-grid -->
+
+      <!-- Results section -->
+      <div id="results-section">
+        <div class="results-header">
+          <div class="results-title-group">
+            <div class="results-title" id="results-title">—</div>
+            <div class="results-meta" id="results-meta"></div>
+          </div>
+          <div class="results-actions">
+            <button class="btn btn-outlined" id="btn-export" style="font-size:.82rem;padding:7px 14px;gap:6px;display:inline-flex;align-items:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <div id="results-table-wrap">
+              <div class="loading-overlay">
+                <div class="spinner"></div> Loading report data…
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /#results-section -->
+
+    </div><!-- /.main-content -->
+  </div><!-- /.app-layout -->
+
+  <script type="module">
+    import { checkAuth, checkPageAccess } from './src/auth.js';
+    import { renderNavbar } from './src/components/navbar.js';
+    import { renderSidebar } from './src/components/sidebar.js';
+    import { initInactivityTimer } from './src/main.js';
+    import { supabase } from './src/supabaseClient.js';
+    import {
+      fetchInvoiceRegister,
+      fetchEmployeeHours,
+      fetchUniqueCountByCompany,
+      formatCurrency,
+    } from './src/apiClient.js';
+
+    await checkAuth();
+    await checkPageAccess('reports');
+    renderNavbar();
+    await renderSidebar();
+    initInactivityTimer();
+
+    /* ─── Date helpers ──────────────────────────────────────── */
+    function toDateStr(d) { return d.toISOString().split('T')[0]; }
+
+    function defaultDates() {
+      const end   = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 30);
+      return { start: toDateStr(start), end: toDateStr(end) };
+    }
+
+    const $start = document.getElementById('date-start');
+    const $end   = document.getElementById('date-end');
+
+    function resetDates() {
+      const { start, end } = defaultDates();
+      $start.value = start;
+      $end.value   = end;
+    }
+    resetDates();
+
+    document.getElementById('btn-reset-dates').addEventListener('click', resetDates);
+
+    /* ─── Supabase paginated fetch ──────────────────────────── */
+    async function fetchAll(from, selectCols, filters = []) {
+      const PAGE = 1000;
+      let page = 0;
+      let all  = [];
+      while (true) {
+        let q = supabase.from(from).select(selectCols).range(page * PAGE, (page + 1) * PAGE - 1);
+        for (const [method, ...args] of filters) q = q[method](...args);
+        const { data, error } = await q;
+        if (error) throw new Error(`${from}: ${error.message}`);
+        all = all.concat(data || []);
+        if ((data || []).length < PAGE) break;
+        page++;
+      }
+      return all;
+    }
+
+    /* ─── Sort state ────────────────────────────────────────── */
+    let sortCol   = null;
+    let sortDir   = 'asc';   // 'asc' | 'desc'
+    let lastRows  = [];
+    let lastCols  = [];
+    let lastMeta  = {};
+
+    /* ─── Table renderer ────────────────────────────────────── */
+    function renderTable(cols, rows) {
+      lastCols = cols;
+      lastRows = rows;
+
+      const wrap = document.getElementById('results-table-wrap');
+
+      if (!rows.length) {
+        wrap.innerHTML = `
+          <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z" /></svg>
+            <p>No data found for the selected date range.</p>
+          </div>`;
+        return;
+      }
+
+      // Sort
+      let sorted = [...rows];
+      if (sortCol !== null) {
+        sorted.sort((a, b) => {
+          const av = a[sortCol], bv = b[sortCol];
+          const an = parseFloat(av), bn = parseFloat(bv);
+          if (!isNaN(an) && !isNaN(bn)) return sortDir === 'asc' ? an - bn : bn - an;
+          return sortDir === 'asc'
+            ? String(av ?? '').localeCompare(String(bv ?? ''))
+            : String(bv ?? '').localeCompare(String(av ?? ''));
+        });
+      }
+
+      const headerHTML = cols.map((c, i) => {
+        let cls = '';
+        if (sortCol === i) cls = sortDir === 'asc' ? 'sort-asc' : 'sort-desc';
+        const icon = sortCol === i ? (sortDir === 'asc' ? '▲' : '▼') : '⇅';
+        return `<th class="${cls} ${c.numeric ? 'num-cell' : ''}" data-col="${i}">
+          ${c.label}<i class="sort-icon">${icon}</i>
+        </th>`;
+      }).join('');
+
+      const bodyHTML = sorted.map(row => {
+        const cells = cols.map(c => {
+          const val = row[c.key] ?? '—';
+          return `<td class="${c.numeric ? 'num-cell' : ''}">${c.render ? c.render(val, row) : val}</td>`;
+        }).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+
+      // Footer totals for numeric cols
+      const footCells = cols.map(c => {
+        if (!c.numeric || !c.total) return `<td></td>`;
+        const sum = rows.reduce((acc, r) => acc + (parseFloat(r[c.key]) || 0), 0);
+        return `<td class="num-cell">${c.totalFmt ? c.totalFmt(sum) : sum.toFixed(2)}</td>`;
+      }).join('');
+      const footRow = cols.some(c => c.total)
+        ? `<tfoot><tr>${footCells}</tr></tfoot>` : '';
+
+      wrap.innerHTML = `
+        <table class="rpt-table">
+          <thead><tr>${headerHTML}</tr></thead>
+          <tbody>${bodyHTML}</tbody>
+          ${footRow}
+        </table>`;
+
+      // Attach sort listeners
+      wrap.querySelectorAll('th[data-col]').forEach(th => {
+        th.addEventListener('click', () => {
+          const ci = parseInt(th.dataset.col);
+          if (sortCol === ci) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+          else { sortCol = ci; sortDir = 'asc'; }
+          renderTable(cols, rows);
+        });
+      });
+    }
+
+    /* ─── CSV export ────────────────────────────────────────── */
+    function exportCSV(cols, rows, filename = 'report.csv') {
+      const header = cols.map(c => `"${c.label}"`).join(',');
+      const lines  = rows.map(row =>
+        cols.map(c => {
+          const v = row[c.key] ?? '';
+          return typeof v === 'string' && v.includes(',') ? `"${v}"` : v;
+        }).join(',')
+      );
+      const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob), download: filename
+      });
+      a.click();
+    }
+
+    /* ─── Show results section ──────────────────────────────── */
+    function showResults(title, dateRange) {
+      const sec = document.getElementById('results-section');
+      sec.style.display = 'block';
+      document.getElementById('results-title').textContent = title;
+      document.getElementById('results-meta').textContent =
+        `Date range: ${dateRange.start} → ${dateRange.end}`;
+      document.getElementById('results-table-wrap').innerHTML =
+        `<div class="loading-overlay"><div class="spinner"></div> Fetching data…</div>`;
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       REPORT GENERATORS
+    ───────────────────────────────────────────────────────── */
+
+    /* 1. Employee Hours Summary */
+    async function genEmployeeHours(start, end) {
+      const [shifts, employees] = await Promise.all([
+        fetchAll('ts_shifts', 'employee_id,total_minutes', [
+          ['gte', 'time_in', start],
+          ['lte', 'time_in', end + 'T23:59:59'],
+        ]),
+        fetchAll('ts_employees', 'employee_id,name,primary_department,status'),
+      ]);
+
+      const empMap = Object.fromEntries(employees.map(e => [e.employee_id, e]));
+
+      const agg = {};
+      for (const s of shifts) {
+        if (!agg[s.employee_id]) agg[s.employee_id] = { shifts: 0, minutes: 0 };
+        agg[s.employee_id].shifts++;
+        agg[s.employee_id].minutes += parseFloat(s.total_minutes) || 0;
+      }
+
+      const rows = Object.entries(agg).map(([empId, a]) => {
+        const emp = empMap[empId] || {};
+        return {
+          name:   emp.name || empId,
+          dept:   emp.primary_department || '—',
+          status: emp.status || '—',
+          shifts: a.shifts,
+          hours:  (a.minutes / 60).toFixed(2),
+          avg:    (a.minutes / a.shifts / 60).toFixed(2),
+        };
+      });
+
+      const cols = [
+        { key: 'name',   label: 'Employee' },
+        { key: 'dept',   label: 'Department' },
+        { key: 'status', label: 'Status', render: v => {
+          const lc = (v || '').toLowerCase();
+          if (lc === 'active')   return `<span class="badge-active">Active</span>`;
+          if (lc === 'inactive') return `<span class="badge-inactive">Inactive</span>`;
+          return v;
+        }},
+        { key: 'shifts', label: 'Shifts',      numeric: true, total: true, totalFmt: n => Math.round(n) },
+        { key: 'hours',  label: 'Total Hours', numeric: true, total: true, totalFmt: n => n.toFixed(2) },
+        { key: 'avg',    label: 'Avg Hrs/Shift', numeric: true },
+      ];
+
+      return { cols, rows, filename: 'employee-hours.csv' };
+    }
+
+    /* 2. Department Hours Breakdown */
+    async function genDeptHours(start, end) {
+      const shifts = await fetchAll('ts_shifts', 'employee_id,department_id,total_minutes', [
+        ['gte', 'time_in', start],
+        ['lte', 'time_in', end + 'T23:59:59'],
+      ]);
+
+      // Also pull employee data so we can get department names where dept_id isn't descriptive
+      const employees = await fetchAll('ts_employees', 'employee_id,current_department,current_department_id');
+      const deptNameMap = Object.fromEntries(
+        employees.filter(e => e.current_department_id && e.current_department)
+                 .map(e => [String(e.current_department_id), e.current_department])
+      );
+
+      const agg = {};
+      for (const s of shifts) {
+        const deptId  = s.department_id ? String(s.department_id) : null;
+        const deptKey = deptId || '__none__';
+        if (!agg[deptKey]) agg[deptKey] = { deptId, shifts: 0, minutes: 0, employees: new Set() };
+        agg[deptKey].shifts++;
+        agg[deptKey].minutes  += parseFloat(s.total_minutes) || 0;
+        agg[deptKey].employees.add(s.employee_id);
+      }
+
+      const rows = Object.entries(agg).map(([key, a]) => ({
+        dept:      a.deptId ? (deptNameMap[a.deptId] || `Dept ${a.deptId}`) : 'No Department',
+        dept_id:   a.deptId || '—',
+        shifts:    a.shifts,
+        hours:     (a.minutes / 60).toFixed(2),
+        employees: a.employees.size,
+      }));
+
+      const cols = [
+        { key: 'dept',      label: 'Department' },
+        { key: 'dept_id',   label: 'Dept ID' },
+        { key: 'employees', label: 'Employees',   numeric: true },
+        { key: 'shifts',    label: 'Shifts',      numeric: true, total: true, totalFmt: n => Math.round(n) },
+        { key: 'hours',     label: 'Total Hours', numeric: true, total: true, totalFmt: n => n.toFixed(2) },
+      ];
+
+      return { cols, rows, filename: 'department-hours.csv' };
+    }
+
+    /* 3. Weekly Hours Trend */
+    async function genWeeklyTrend(start, end) {
+      const shifts = await fetchAll('ts_shifts', 'employee_id,total_minutes,time_in', [
+        ['gte', 'time_in', start],
+        ['lte', 'time_in', end + 'T23:59:59'],
+      ]);
+
+      function getWeekLabel(dateStr) {
+        if (!dateStr) return 'Unknown';
+        const d = new Date(dateStr);
+        // Sunday of that week
+        const sun = new Date(d);
+        sun.setDate(d.getDate() - d.getDay());
+        return `Week of ${toDateStr(sun)}`;
+      }
+
+      const agg = {};
+      for (const s of shifts) {
+        const week = getWeekLabel(s.time_in);
+        // For sorting, store the Sunday date
+        const d    = s.time_in ? new Date(s.time_in) : new Date();
+        const sun  = new Date(d); sun.setDate(d.getDate() - d.getDay());
+        const weekSort = toDateStr(sun);
+
+        if (!agg[week]) agg[week] = { weekSort, shifts: 0, minutes: 0, employees: new Set() };
+        agg[week].shifts++;
+        agg[week].minutes  += parseFloat(s.total_minutes) || 0;
+        agg[week].employees.add(s.employee_id);
+      }
+
+      const rows = Object.entries(agg)
+        .sort((a, b) => a[1].weekSort.localeCompare(b[1].weekSort))
+        .map(([week, a]) => ({
+          week,
+          shifts:    a.shifts,
+          hours:     (a.minutes / 60).toFixed(2),
+          employees: a.employees.size,
+        }));
+
+      const cols = [
+        { key: 'week',      label: 'Week' },
+        { key: 'employees', label: 'Unique Employees', numeric: true },
+        { key: 'shifts',    label: 'Shifts',           numeric: true, total: true, totalFmt: n => Math.round(n) },
+        { key: 'hours',     label: 'Total Hours',      numeric: true, total: true, totalFmt: n => n.toFixed(2) },
+      ];
+
+      return { cols, rows, filename: 'weekly-trend.csv' };
+    }
+
+    /* 4. Zero Hours Employees */
+    async function genZeroHours(start, end) {
+      const [shifts, employees] = await Promise.all([
+        fetchAll('ts_shifts', 'employee_id', [
+          ['gte', 'time_in', start],
+          ['lte', 'time_in', end + 'T23:59:59'],
+        ]),
+        fetchAll('ts_employees', 'employee_id,name,primary_department,status,email'),
+      ]);
+
+      const active = new Set(shifts.map(s => s.employee_id));
+      const rows = employees
+        .filter(e => !active.has(e.employee_id))
+        .map(e => ({
+          name:   e.name   || e.employee_id,
+          id:     e.employee_id,
+          dept:   e.primary_department || '—',
+          status: e.status || '—',
+          email:  e.email  || '—',
+        }));
+
+      const cols = [
+        { key: 'name',   label: 'Employee' },
+        { key: 'id',     label: 'Employee ID' },
+        { key: 'dept',   label: 'Department' },
+        { key: 'status', label: 'Status', render: v => {
+          const lc = (v || '').toLowerCase();
+          if (lc === 'active')   return `<span class="badge-active">Active</span>`;
+          if (lc === 'inactive') return `<span class="badge-inactive">Inactive</span>`;
+          return v;
+        }},
+        { key: 'email',  label: 'Email' },
+      ];
+
+      return { cols, rows, filename: 'zero-hours-employees.csv' };
+    }
+
+    /* 5. TempWorks Timecards */
+    async function genTwTimecards(start, end) {
+      const timecards = await fetchAll('tw_timecards',
+        'employee_id,customer_name,weekend_date,regular_hours,overtime_hours,doubletime_hours,total_hours,pay_rate,bill_rate,status',
+        [
+          ['gte', 'weekend_date', start],
+          ['lte', 'weekend_date', end],
+          ['order', 'weekend_date', { ascending: false }],
+        ]
+      );
+
+      // Pull employee names from tw_employees
+      const employees = await fetchAll('tw_employees', 'id,first_name,last_name,branch_name');
+      const empMap = Object.fromEntries(employees.map(e => [String(e.id), e]));
+
+      const rows = timecards.map(tc => {
+        const emp = empMap[String(tc.employee_id)] || {};
+        return {
+          employee:   emp.first_name ? `${emp.first_name} ${emp.last_name}` : String(tc.employee_id),
+          branch:     emp.branch_name   || '—',
+          customer:   tc.customer_name  || '—',
+          week_end:   tc.weekend_date   || '—',
+          reg:        parseFloat(tc.regular_hours   || 0).toFixed(2),
+          ot:         parseFloat(tc.overtime_hours  || 0).toFixed(2),
+          dt:         parseFloat(tc.doubletime_hours|| 0).toFixed(2),
+          total:      parseFloat(tc.total_hours     || 0).toFixed(2),
+          pay_rate:   tc.pay_rate  != null ? `$${parseFloat(tc.pay_rate).toFixed(2)}`  : '—',
+          bill_rate:  tc.bill_rate != null ? `$${parseFloat(tc.bill_rate).toFixed(2)}` : '—',
+          status:     tc.status || '—',
+        };
+      });
+
+      const cols = [
+        { key: 'employee',  label: 'Employee' },
+        { key: 'branch',    label: 'Branch' },
+        { key: 'customer',  label: 'Customer' },
+        { key: 'week_end',  label: 'Week End' },
+        { key: 'reg',       label: 'Reg Hrs',   numeric: true, total: true },
+        { key: 'ot',        label: 'OT Hrs',    numeric: true, total: true },
+        { key: 'dt',        label: 'DT Hrs',    numeric: true, total: true },
+        { key: 'total',     label: 'Total Hrs', numeric: true, total: true },
+        { key: 'pay_rate',  label: 'Pay Rate' },
+        { key: 'bill_rate', label: 'Bill Rate' },
+        { key: 'status',    label: 'Status', render: v => {
+          const lc = (v || '').toLowerCase();
+          if (lc === 'approved' || lc === 'invoiced') return `<span class="badge-active">${v}</span>`;
+          if (lc === 'open')     return `<span class="badge-warning">${v}</span>`;
+          return v;
+        }},
+      ];
+
+      return { cols, rows, filename: 'tw-timecards.csv' };
+    }
+
+    /* ─────────────────────────────────────────────────────────
+       PSA SHARED HELPERS
+    ───────────────────────────────────────────────────────── */
+
+    function isCorporateBranch(name) {
+      const n = (name || '').toLowerCase();
+      return n.includes('corporate') || n.includes('_corp');
+    }
+    function isDHP(companyName) {
+      return (companyName || '').toUpperCase().includes('DHP');
+    }
+
+    /** Fetch branch → region map from branch_settings table */
+    async function fetchBranchRegionMap() {
+      const { data } = await supabase.from('branch_settings').select('branch, region');
+      return Object.fromEntries((data || []).map(r => [r.branch, r.region || 'Unassigned']));
+    }
+
+    /* 6. PSA Hours & Headcount by Region */
+    async function genPsaHoursHeadcount(start, end) {
+      const [hoursData, headData, branchMap] = await Promise.all([
+        fetchEmployeeHours(start, end),
+        fetchUniqueCountByCompany(start, end),
+        fetchBranchRegionMap(),
+      ]);
+
+      const agg = {};
+      const key = (region, branch) => `${region}|||${branch}`;
+
+      for (const r of hoursData) {
+        if (isCorporateBranch(r.branchname)) continue;
+        const region = branchMap[r.branchname] || 'Unassigned';
+        const branch = r.branchname || 'Unknown';
+        const k = key(region, branch);
+        if (!agg[k]) agg[k] = { region, branch, gspHours: 0, dhpHours: 0, gspHead: 0, dhpHead: 0 };
+        const hrs = Number(r.hours || r.total_hours) || 0;
+        if (isDHP(r.customername || r.company_name)) agg[k].dhpHours += hrs;
+        else agg[k].gspHours += hrs;
+      }
+      for (const r of headData) {
+        if (isCorporateBranch(r.branchname || r.branch)) continue;
+        const bn = r.branchname || r.branch || 'Unknown';
+        const region = branchMap[bn] || 'Unassigned';
+        const k = key(region, bn);
+        if (!agg[k]) agg[k] = { region, branch: bn, gspHours: 0, dhpHours: 0, gspHead: 0, dhpHead: 0 };
+        const cnt = Number(r.unique_count || r.count || r.headcount) || 0;
+        if (isDHP(r.company_name || r.customername)) agg[k].dhpHead += cnt;
+        else agg[k].gspHead += cnt;
+      }
+
+      const rows = Object.values(agg)
+        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch))
+        .map(a => ({
+          region:      a.region,
+          branch:      a.branch,
+          gsp_hours:   a.gspHours.toFixed(2),
+          dhp_hours:   a.dhpHours.toFixed(2),
+          total_hours: (a.gspHours + a.dhpHours).toFixed(2),
+          gsp_head:    a.gspHead,
+          dhp_head:    a.dhpHead,
+          total_head:  a.gspHead + a.dhpHead,
+        }));
+
+      const cols = [
+        { key: 'region',      label: 'Region' },
+        { key: 'branch',      label: 'Branch' },
+        { key: 'gsp_hours',   label: 'GSP Hours',      numeric: true, total: true },
+        { key: 'dhp_hours',   label: 'DHP Hours',      numeric: true, total: true },
+        { key: 'total_hours', label: 'Total Hours',    numeric: true, total: true },
+        { key: 'gsp_head',    label: 'GSP Headcount',  numeric: true, total: true, totalFmt: n => Math.round(n) },
+        { key: 'dhp_head',    label: 'DHP Headcount',  numeric: true, total: true, totalFmt: n => Math.round(n) },
+        { key: 'total_head',  label: 'Total Headcount',numeric: true, total: true, totalFmt: n => Math.round(n) },
+      ];
+      return { cols, rows, filename: 'psa-hours-headcount.csv' };
+    }
+
+    /* 7. PSA Weekly Revenue by Branch */
+    async function genPsaWeeklyRevenue(start, end) {
+      const [invoices, branchMap] = await Promise.all([
+        fetchInvoiceRegister(start, end),
+        fetchBranchRegionMap(),
+      ]);
+
+      const agg = {};
+      for (const r of invoices) {
+        if (isCorporateBranch(r.branchname)) continue;
+        const region = branchMap[r.branchname] || 'Unassigned';
+        const branch = r.branchname || 'Unknown';
+        const week   = r.weekendbill || '—';
+        const k = `${region}|||${branch}|||${week}`;
+        if (!agg[k]) agg[k] = { region, branch, week, gspRev: 0, dhpRev: 0 };
+        const amt = Number(r.invoiceamount) || 0;
+        if (isDHP(r.customername)) agg[k].dhpRev += amt;
+        else agg[k].gspRev += amt;
+      }
+
+      const rows = Object.values(agg)
+        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch) || a.week.localeCompare(b.week))
+        .map(a => ({
+          region:    a.region,
+          branch:    a.branch,
+          week:      a.week,
+          gsp_rev:   a.gspRev.toFixed(2),
+          dhp_rev:   a.dhpRev.toFixed(2),
+          total_rev: (a.gspRev + a.dhpRev).toFixed(2),
+        }));
+
+      const fmtRev = v => formatCurrency(Number(v) || 0);
+      const cols = [
+        { key: 'region',    label: 'Region' },
+        { key: 'branch',    label: 'Branch' },
+        { key: 'week',      label: 'Week Ending' },
+        { key: 'gsp_rev',   label: 'GSP Revenue',   numeric: true, total: true, render: fmtRev },
+        { key: 'dhp_rev',   label: 'DHP Revenue',   numeric: true, total: true, render: fmtRev },
+        { key: 'total_rev', label: 'Total Revenue', numeric: true, total: true, render: fmtRev },
+      ];
+      return { cols, rows, filename: 'psa-weekly-revenue.csv' };
+    }
+
+    /* 8. DHP Hours by Region & Branch */
+    async function genDhpHours(start, end) {
+      const [hoursData, branchMap] = await Promise.all([
+        fetchEmployeeHours(start, end),
+        fetchBranchRegionMap(),
+      ]);
+
+      const agg = {};
+      for (const r of hoursData) {
+        if (isCorporateBranch(r.branchname)) continue;
+        if (!isDHP(r.customername || r.company_name)) continue;
+        const region = branchMap[r.branchname] || 'Unassigned';
+        const branch = r.branchname || 'Unknown';
+        const k = `${region}|||${branch}`;
+        if (!agg[k]) agg[k] = { region, branch, hours: 0 };
+        agg[k].hours += Number(r.hours || r.total_hours) || 0;
+      }
+
+      const rows = Object.values(agg)
+        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch))
+        .map(a => ({ region: a.region, branch: a.branch, hours: a.hours.toFixed(2) }));
+
+      const cols = [
+        { key: 'region', label: 'Region' },
+        { key: 'branch', label: 'Branch' },
+        { key: 'hours',  label: 'DHP Hours', numeric: true, total: true },
+      ];
+      return { cols, rows, filename: 'dhp-hours.csv' };
+    }
+
+    /* 9. DHP Headcount by Region & Branch */
+    async function genDhpHeadcount(start, end) {
+      const [headData, branchMap] = await Promise.all([
+        fetchUniqueCountByCompany(start, end),
+        fetchBranchRegionMap(),
+      ]);
+
+      const agg = {};
+      for (const r of headData) {
+        const bn = r.branchname || r.branch || 'Unknown';
+        if (isCorporateBranch(bn)) continue;
+        if (!isDHP(r.company_name || r.customername)) continue;
+        const region = branchMap[bn] || 'Unassigned';
+        const k = `${region}|||${bn}`;
+        if (!agg[k]) agg[k] = { region, branch: bn, headcount: 0 };
+        agg[k].headcount += Number(r.unique_count || r.count || r.headcount) || 0;
+      }
+
+      const rows = Object.values(agg)
+        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch))
+        .map(a => ({ region: a.region, branch: a.branch, headcount: a.headcount }));
+
+      const cols = [
+        { key: 'region',   label: 'Region' },
+        { key: 'branch',   label: 'Branch' },
+        { key: 'headcount',label: 'DHP Headcount', numeric: true, total: true, totalFmt: n => Math.round(n) },
+      ];
+      return { cols, rows, filename: 'dhp-headcount.csv' };
+    }
+
+    /* 10. DHP Billing by Region & Branch */
+    async function genDhpBilling(start, end) {
+      const [invoices, branchMap] = await Promise.all([
+        fetchInvoiceRegister(start, end),
+        fetchBranchRegionMap(),
+      ]);
+
+      const agg = {};
+      for (const r of invoices) {
+        if (isCorporateBranch(r.branchname)) continue;
+        if (!isDHP(r.customername)) continue;
+        const region = branchMap[r.branchname] || 'Unassigned';
+        const branch = r.branchname || 'Unknown';
+        const k = `${region}|||${branch}`;
+        if (!agg[k]) agg[k] = { region, branch, billing: 0 };
+        agg[k].billing += Number(r.invoiceamount) || 0;
+      }
+
+      const fmtRev = v => formatCurrency(Number(v) || 0);
+      const rows = Object.values(agg)
+        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch))
+        .map(a => ({ region: a.region, branch: a.branch, billing: a.billing.toFixed(2) }));
+
+      const cols = [
+        { key: 'region',  label: 'Region' },
+        { key: 'branch',  label: 'Branch' },
+        { key: 'billing', label: 'DHP Billing', numeric: true, total: true, render: fmtRev },
+      ];
+      return { cols, rows, filename: 'dhp-billing.csv' };
+    }
+
+    /* 11. PSA Revenue Breakdown by Region → Branch → Company */
+    async function genPsaRevenueBreakdown(start, end) {
+      const [invoices, branchMap] = await Promise.all([
+        fetchInvoiceRegister(start, end),
+        fetchBranchRegionMap(),
+      ]);
+
+      const agg = {};
+      for (const r of invoices) {
+        if (isCorporateBranch(r.branchname)) continue;
+        const region  = branchMap[r.branchname] || 'Unassigned';
+        const branch  = r.branchname   || 'Unknown';
+        const company = r.customername || 'Unknown';
+        const k = `${region}|||${branch}|||${company}`;
+        if (!agg[k]) agg[k] = { region, branch, company, gspRev: 0, dhpRev: 0 };
+        const amt = Number(r.invoiceamount) || 0;
+        if (isDHP(r.customername)) agg[k].dhpRev += amt;
+        else agg[k].gspRev += amt;
+      }
+
+      const fmtRev = v => formatCurrency(Number(v) || 0);
+      const rows = Object.values(agg)
+        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch) || b.gspRev + b.dhpRev - (a.gspRev + a.dhpRev))
+        .map(a => ({
+          region:    a.region,
+          branch:    a.branch,
+          company:   a.company,
+          gsp_rev:   a.gspRev.toFixed(2),
+          dhp_rev:   a.dhpRev.toFixed(2),
+          total_rev: (a.gspRev + a.dhpRev).toFixed(2),
+        }));
+
+      const cols = [
+        { key: 'region',    label: 'Region' },
+        { key: 'branch',    label: 'Branch' },
+        { key: 'company',   label: 'Company' },
+        { key: 'gsp_rev',   label: 'GSP Revenue',   numeric: true, total: true, render: fmtRev },
+        { key: 'dhp_rev',   label: 'DHP Revenue',   numeric: true, total: true, render: fmtRev },
+        { key: 'total_rev', label: 'Total Revenue', numeric: true, total: true, render: fmtRev },
+      ];
+      return { cols, rows, filename: 'psa-revenue-breakdown.csv' };
+    }
+
+    /* ─── Report registry ───────────────────────────────────── */
+    const REPORTS = {
+      'employee-hours':       { title: 'Employee Hours Summary',              fn: genEmployeeHours      },
+      'dept-hours':           { title: 'Department Hours Breakdown',          fn: genDeptHours          },
+      'weekly-trend':         { title: 'Weekly Hours Trend',                  fn: genWeeklyTrend        },
+      'zero-hours':           { title: 'Zero Hours Employees',                fn: genZeroHours          },
+      'tw-timecards':         { title: 'TempWorks Timecards',                 fn: genTwTimecards        },
+      'psa-hours-headcount':  { title: 'PSA Hours & Headcount by Region',     fn: genPsaHoursHeadcount  },
+      'psa-weekly-revenue':   { title: 'PSA Weekly Revenue by Branch',        fn: genPsaWeeklyRevenue   },
+      'dhp-hours':            { title: 'DHP Hours by Region & Branch',        fn: genDhpHours           },
+      'dhp-headcount':        { title: 'DHP Headcount by Region & Branch',    fn: genDhpHeadcount       },
+      'dhp-billing':          { title: 'DHP Billing by Region & Branch',      fn: genDhpBilling         },
+      'psa-revenue-breakdown':{ title: 'PSA Revenue Breakdown',               fn: genPsaRevenueBreakdown},
+    };
+
+    /* ─── Generate handler ──────────────────────────────────── */
+    let activeReport = null;
+
+    async function runReport(reportKey) {
+      const report = REPORTS[reportKey];
+      if (!report) return;
+
+      const dateRange = { start: $start.value, end: $end.value };
+      if (!dateRange.start || !dateRange.end) {
+        alert('Please select a start and end date.');
+        return;
+      }
+
+      // Mark active card
+      document.querySelectorAll('.report-card').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.report-card[data-report="${reportKey}"]`)?.classList.add('active');
+
+      // Disable all generate buttons
+      document.querySelectorAll('.btn-generate').forEach(b => b.disabled = true);
+
+      activeReport = reportKey;
+      sortCol = null; sortDir = 'asc';
+
+      showResults(report.title, dateRange);
+
+      try {
+        const { cols, rows, filename } = await report.fn(dateRange.start, dateRange.end);
+        lastMeta = { cols, rows, filename };
+        document.getElementById('results-meta').textContent =
+          `${rows.length.toLocaleString()} row${rows.length !== 1 ? 's' : ''} · Date range: ${dateRange.start} → ${dateRange.end}`;
+        renderTable(cols, rows);
+      } catch (err) {
+        document.getElementById('results-table-wrap').innerHTML =
+          `<div class="loading-overlay" style="color:#DC2626;">
+             ⚠ Error loading report: ${err.message}
+           </div>`;
+        console.error(err);
+      } finally {
+        document.querySelectorAll('.btn-generate').forEach(b => b.disabled = false);
+      }
+    }
+
+    /* ─── Event listeners ───────────────────────────────────── */
+    document.querySelectorAll('.btn-generate').forEach(btn => {
+      btn.addEventListener('click', () => runReport(btn.dataset.report));
+    });
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+      if (!lastMeta.cols) return;
+      exportCSV(lastMeta.cols, lastMeta.rows, lastMeta.filename);
+    });
+
+  </script>
+</body>
+</html>
