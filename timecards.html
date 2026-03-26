@@ -126,6 +126,12 @@
     .toast-success { background: #059669; }
     .toast-error { background: #DC2626; }
 
+    .tc-table th[data-sort] { cursor: pointer; user-select: none; }
+    .tc-table th[data-sort]:hover { background: #efefef; }
+    .sort-indicator { color: var(--text-secondary); font-size: 0.65rem; margin-left: 2px; }
+    .hide-zero-label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; cursor: pointer; }
+    .hide-zero-label input { cursor: pointer; }
+
     @media (max-width: 768px) {
       .stats-row { grid-template-columns: repeat(2, 1fr); }
       .filters-bar { flex-direction: column; }
@@ -147,7 +153,7 @@
       <!-- Stats -->
       <div class="stats-row">
         <div class="stat-card">
-          <div class="label">Total Timecards</div>
+          <div class="label">Total Employees</div>
           <div class="value" id="statTotal">0</div>
         </div>
         <div class="stat-card">
@@ -183,6 +189,9 @@
           <option value="denied">Denied</option>
         </select>
         <input type="text" id="searchInput" placeholder="Search employee name...">
+        <label class="hide-zero-label">
+          <input type="checkbox" id="hideZeroFilter"> Hide 0 hours
+        </label>
         <div class="spacer"></div>
         <select id="pageSizeFilter">
           <option value="100">Show 100</option>
@@ -208,22 +217,22 @@
             <thead>
               <tr>
                 <th style="width:30px;"><input type="checkbox" id="headerCheckbox" title="Select all"></th>
-                <th>Employee</th>
-                <th>Employer</th>
-                <th class="hours-cell">Mon</th>
-                <th class="hours-cell">Tue</th>
-                <th class="hours-cell">Wed</th>
-                <th class="hours-cell">Thu</th>
-                <th class="hours-cell">Fri</th>
-                <th class="hours-cell">Sat</th>
-                <th class="hours-cell">Sun</th>
-                <th class="hours-cell">Reg</th>
-                <th class="hours-cell">OT</th>
-                <th class="hours-cell">Total</th>
-                <th>Pay Rate</th>
-                <th>Bill Rate</th>
-                <th>TW Status</th>
-                <th>Approval</th>
+                <th data-sort="name">Employee<span class="sort-indicator"> ↕</span></th>
+                <th data-sort="department">Employer<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="mon">Mon<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="tue">Tue<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="wed">Wed<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="thu">Thu<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="fri">Fri<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="sat">Sat<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="sun">Sun<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="reg">Reg<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="ot">OT<span class="sort-indicator"> ↕</span></th>
+                <th class="hours-cell" data-sort="total">Total<span class="sort-indicator"> ↕</span></th>
+                <th data-sort="pay_rate">Pay Rate<span class="sort-indicator"> ↕</span></th>
+                <th data-sort="bill_rate">Bill Rate<span class="sort-indicator"> ↕</span></th>
+                <th data-sort="tw_status">TW Status<span class="sort-indicator"> ↕</span></th>
+                <th data-sort="approval">Approval<span class="sort-indicator"> ↕</span></th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -276,17 +285,17 @@ renderNavbar();
 /* ══════════════════════════════════════════════════════ */
 /* State                                                  */
 /* ══════════════════════════════════════════════════════ */
-let allTimecards = [];
-let employees = {};
+let allRows = [];           // One row per ts_employee
 let selectedIds = new Set();
 let currentPage = 0;
 let pageSize = 100;
-let tsEmployees = [];      // TimeStation employees
-let tsDepartments = [];    // TimeStation departments (employers)
-let tsEmpIdSet = new Set(); // Set of TempWorks IDs that exist in TimeStation
-let tsEmpDeptMap = {};     // TW employee ID -> TimeStation department name
-let twToTsMap = {};        // TW employee ID -> TS employee_id
-let shiftDailyHours = {};  // TW employee ID -> { mon:X, tue:X, ... } per weekend_date
+let tsEmployees = [];
+let twToTsMap = {};         // TW employee ID -> TS employee_id
+let tsToTwMap = {};         // TS employee_id -> TW employee ID (integer)
+let shiftDailyHours = {};   // TS employee_id -> { mon,tue,wed,thu,fri,sat,sun,total }
+let twEmployeeNames = {};   // TW employee ID -> { first_name, last_name }
+let sortCol = null;
+let sortDir = 'asc';
 
 /* ══════════════════════════════════════════════════════ */
 /* Toast                                                  */
@@ -319,25 +328,16 @@ async function loadWeeks() {
 }
 
 async function loadTimeStationData() {
-  // Load TimeStation employees and departments (once)
-  const [{ data: tsEmps }, { data: tsDepts }] = await Promise.all([
-    supabase.from('ts_employees').select('*'),
-    supabase.from('ts_departments').select('*')
-  ]);
-
+  const { data: tsEmps } = await supabase.from('ts_employees').select('*');
   tsEmployees = tsEmps || [];
-  tsDepartments = tsDepts || [];
 
-  // Build lookups
-  tsEmpIdSet.clear();
-  tsEmpDeptMap = {};
   twToTsMap = {};
+  tsToTwMap = {};
   tsEmployees.forEach(e => {
     if (e.custom_employee_id) {
       const twId = parseInt(e.custom_employee_id);
-      tsEmpIdSet.add(twId);
-      tsEmpDeptMap[twId] = e.primary_department || e.current_department || 'Unknown';
-      twToTsMap[twId] = e.employee_id; // TS employee_id (e.g. "emp_xxx")
+      twToTsMap[twId] = e.employee_id;
+      tsToTwMap[e.employee_id] = twId;
     }
   });
 }
@@ -347,37 +347,68 @@ async function loadTimecards(weekendDate) {
 
   document.getElementById('weekLabel').textContent = `Week Ending: ${new Date(weekendDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`;
 
-  const { data, error } = await supabase
+  // Load tw_timecards for pay rate, bill rate, status, approval data
+  const { data: tcData, error } = await supabase
     .from('tw_timecards')
     .select('*')
-    .eq('weekend_date', weekendDate)
-    .order('customer_name');
+    .eq('weekend_date', weekendDate);
 
   if (error) {
     showToast('Error loading timecards: ' + error.message, 'error');
     return;
   }
 
-  // Filter to only employees that exist in TimeStation
-  allTimecards = (data || []).filter(t => tsEmpIdSet.has(t.employee_id));
+  // Build map: TW employee ID -> tw_timecard
+  const twTimecardMap = {};
+  (tcData || []).forEach(tc => { twTimecardMap[tc.employee_id] = tc; });
 
-  // Load employee names for these timecards
-  const empIds = [...new Set(allTimecards.map(t => t.employee_id).filter(Boolean))];
-  if (empIds.length) {
+  // Load shifts for ALL ts_employees for this week
+  await loadShiftsForWeek(weekendDate);
+
+  // Load TW employee names for ts_employees that have a custom_employee_id
+  const twIds = tsEmployees.map(e => e.custom_employee_id ? parseInt(e.custom_employee_id) : null).filter(Boolean);
+  twEmployeeNames = {};
+  if (twIds.length) {
     const batchSize = 200;
-    employees = {};
-    for (let i = 0; i < empIds.length; i += batchSize) {
-      const batch = empIds.slice(i, i + batchSize);
+    for (let i = 0; i < twIds.length; i += batchSize) {
+      const batch = twIds.slice(i, i + batchSize);
       const { data: emps } = await supabase
         .from('tw_employees')
         .select('id, first_name, last_name')
         .in('id', batch);
-      (emps || []).forEach(e => { employees[e.id] = e; });
+      (emps || []).forEach(e => { twEmployeeNames[e.id] = e; });
     }
   }
 
-  // Load TimeStation shifts for this week and compute daily hours
-  await loadShiftsForWeek(weekendDate);
+  // Build allRows from ALL ts_employees
+  allRows = tsEmployees.map(e => {
+    const twId = e.custom_employee_id ? parseInt(e.custom_employee_id) : null;
+    const tc = twId ? (twTimecardMap[twId] || null) : null;
+    const twEmp = twId ? (twEmployeeNames[twId] || null) : null;
+
+    let name;
+    if (twEmp) {
+      name = `${twEmp.first_name} ${twEmp.last_name}`.trim();
+    } else if (e.first_name || e.last_name) {
+      name = `${e.first_name || ''} ${e.last_name || ''}`.trim();
+    } else {
+      name = `Employee ${e.employee_id}`;
+    }
+
+    const department = e.primary_department || e.current_department || (tc ? tc.customer_name : '') || '—';
+
+    return {
+      ts_employee_id: e.employee_id,
+      tw_employee_id: twId,
+      tw_timecard_id: tc ? tc.id : null,
+      name,
+      department,
+      pay_rate: tc ? Number(tc.pay_rate || 0) : 0,
+      bill_rate: tc ? Number(tc.bill_rate || 0) : 0,
+      tw_status: tc ? (tc.status || null) : null,
+      approval: tc ? (tc.employer_approval || 'pending') : null,
+    };
+  });
 
   populateCustomerFilter();
   selectedIds.clear();
@@ -387,58 +418,46 @@ async function loadTimecards(weekendDate) {
 async function loadShiftsForWeek(weekendDate) {
   shiftDailyHours = {};
 
-  // Weekend date is Sunday. Week runs Mon-Sun.
-  // Mon = 6 days before Sunday, Sun = the weekend date itself
+  // Weekend date is Sunday. Week runs Mon–Sun.
   const sunday = new Date(weekendDate + 'T12:00:00');
   const monday = new Date(sunday);
   monday.setDate(sunday.getDate() - 6);
 
-  // Get all TS employee IDs for our filtered timecards
-  const tsIds = [...new Set(allTimecards.map(t => twToTsMap[t.employee_id]).filter(Boolean))];
+  // Get ALL ts employee IDs
+  const tsIds = tsEmployees.map(e => e.employee_id).filter(Boolean);
   if (!tsIds.length) return;
 
-  // Fetch shifts in date range for these employees
-  const { data: shifts } = await supabase
-    .from('ts_shifts')
-    .select('*')
-    .in('employee_id', tsIds)
-    .gte('time_in', monday.toISOString().split('T')[0] + 'T00:00:00')
-    .lte('time_in', weekendDate + 'T23:59:59');
-
-  if (!shifts || !shifts.length) return;
-
-  // Build reverse map: TS employee_id -> TW employee_id
-  const tsToTwMap = {};
-  for (const [twId, tsId] of Object.entries(twToTsMap)) {
-    tsToTwMap[tsId] = parseInt(twId);
+  // Fetch shifts in batches
+  const batchSize = 500;
+  let allShifts = [];
+  for (let i = 0; i < tsIds.length; i += batchSize) {
+    const batch = tsIds.slice(i, i + batchSize);
+    const { data: shifts } = await supabase
+      .from('ts_shifts')
+      .select('employee_id, time_in, total_minutes')
+      .in('employee_id', batch)
+      .gte('time_in', monday.toISOString().split('T')[0] + 'T00:00:00')
+      .lte('time_in', weekendDate + 'T23:59:59');
+    if (shifts) allShifts = allShifts.concat(shifts);
   }
 
-  // Compute daily hours per TW employee
-  // Days: Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5, Sun=6
+  // Compute daily hours per TS employee_id
   const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-  for (const shift of shifts) {
-    const twId = tsToTwMap[shift.employee_id];
-    if (!twId) continue;
-
-    if (!shiftDailyHours[twId]) {
-      shiftDailyHours[twId] = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0, total: 0 };
+  for (const shift of allShifts) {
+    if (!shiftDailyHours[shift.employee_id]) {
+      shiftDailyHours[shift.employee_id] = { mon:0, tue:0, wed:0, thu:0, fri:0, sat:0, sun:0, total:0 };
     }
-
     const shiftDate = new Date(shift.time_in);
-    // getDay(): 0=Sun,1=Mon,...6=Sat -> convert to Mon=0,...Sun=6
-    const jsDay = shiftDate.getDay();
+    const jsDay = shiftDate.getDay(); // 0=Sun … 6=Sat
     const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
     const hours = (shift.total_minutes || 0) / 60;
-
-    shiftDailyHours[twId][dayNames[dayIdx]] += hours;
-    shiftDailyHours[twId].total += hours;
+    shiftDailyHours[shift.employee_id][dayNames[dayIdx]] += hours;
+    shiftDailyHours[shift.employee_id].total += hours;
   }
 }
 
 function populateCustomerFilter() {
-  // Use TimeStation departments as the employer filter
-  const deptNames = [...new Set(allTimecards.map(t => tsEmpDeptMap[t.employee_id]).filter(Boolean))].sort();
+  const deptNames = [...new Set(allRows.map(r => r.department).filter(d => d && d !== '—'))].sort();
   const sel = document.getElementById('customerFilter');
   sel.innerHTML = '<option value="">All Employers</option>' +
     deptNames.map(d => `<option value="${d}">${d}</option>`).join('');
@@ -447,47 +466,112 @@ function populateCustomerFilter() {
 /* ══════════════════════════════════════════════════════ */
 /* Render                                                 */
 /* ══════════════════════════════════════════════════════ */
-function getFilteredTimecards() {
+function getFilteredRows() {
   const customer = document.getElementById('customerFilter').value;
   const status = document.getElementById('statusFilter').value;
   const search = document.getElementById('searchInput').value.toLowerCase().trim();
+  const hideZero = document.getElementById('hideZeroFilter').checked;
 
-  return allTimecards.filter(t => {
-    if (customer && tsEmpDeptMap[t.employee_id] !== customer) return false;
-    if (status && (t.employer_approval || 'pending') !== status) return false;
+  return allRows.filter(r => {
+    if (customer && r.department !== customer) return false;
+    if (status && (r.approval || 'pending') !== status) return false;
     if (search) {
-      const emp = employees[t.employee_id];
-      const name = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : '';
-      if (!name.includes(search) && !String(t.employee_id).includes(search)) return false;
+      const name = r.name.toLowerCase();
+      if (!name.includes(search) && !String(r.tw_employee_id || '').includes(search) && !r.ts_employee_id.toLowerCase().includes(search)) return false;
+    }
+    if (hideZero) {
+      const sh = shiftDailyHours[r.ts_employee_id];
+      if (!sh || sh.total === 0) return false;
     }
     return true;
   });
 }
 
+function getSortValue(row, col) {
+  const sh = shiftDailyHours[row.ts_employee_id] || {};
+  const total = sh.total || 0;
+  switch (col) {
+    case 'name':       return row.name.toLowerCase();
+    case 'department': return row.department.toLowerCase();
+    case 'mon':        return sh.mon || 0;
+    case 'tue':        return sh.tue || 0;
+    case 'wed':        return sh.wed || 0;
+    case 'thu':        return sh.thu || 0;
+    case 'fri':        return sh.fri || 0;
+    case 'sat':        return sh.sat || 0;
+    case 'sun':        return sh.sun || 0;
+    case 'reg':        return total > 40 ? 40 : total;
+    case 'ot':         return total > 40 ? total - 40 : 0;
+    case 'total':      return total;
+    case 'pay_rate':   return row.pay_rate || 0;
+    case 'bill_rate':  return row.bill_rate || 0;
+    case 'tw_status':  return (row.tw_status || '').toLowerCase();
+    case 'approval':   return (row.approval || 'pending').toLowerCase();
+    default:           return 0;
+  }
+}
+
+function sortRows(rows) {
+  if (!sortCol) return rows;
+  return [...rows].sort((a, b) => {
+    const va = getSortValue(a, sortCol);
+    const vb = getSortValue(b, sortCol);
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+function setSort(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = 'asc';
+  }
+  render();
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('.tc-table th[data-sort]').forEach(th => {
+    const indicator = th.querySelector('.sort-indicator');
+    if (!indicator) return;
+    if (th.dataset.sort === sortCol) {
+      indicator.textContent = sortDir === 'asc' ? ' ↑' : ' ↓';
+    } else {
+      indicator.textContent = ' ↕';
+    }
+  });
+}
+
 function render() {
-  const filtered = getFilteredTimecards();
+  const filtered = getFilteredRows();
+  const sorted = sortRows(filtered);
   const tbody = document.getElementById('tableBody');
   const tfoot = document.getElementById('tableFoot');
 
+  updateSortHeaders();
+
   // Pagination
-  const totalFiltered = filtered.length;
+  const totalFiltered = sorted.length;
   const isShowAll = pageSize === 'all';
   const effectivePageSize = isShowAll ? totalFiltered : pageSize;
   const totalPages = isShowAll ? 1 : Math.max(1, Math.ceil(totalFiltered / pageSize));
   if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
   const start = currentPage * effectivePageSize;
-  const pageItems = filtered.slice(start, start + effectivePageSize);
+  const pageItems = sorted.slice(start, start + effectivePageSize);
 
-  // Stats (always based on ALL timecards, not just current page)
-  const pending = allTimecards.filter(t => (t.employer_approval || 'pending') === 'pending').length;
-  const approved = allTimecards.filter(t => t.employer_approval === 'approved').length;
-  const denied = allTimecards.filter(t => t.employer_approval === 'denied').length;
-  const totalHours = allTimecards.reduce((s, t) => {
-    const sh = shiftDailyHours[t.employee_id];
+  // Stats based on allRows
+  const rowsWithTc = allRows.filter(r => r.tw_timecard_id !== null);
+  const pending = rowsWithTc.filter(r => (r.approval || 'pending') === 'pending').length;
+  const approved = rowsWithTc.filter(r => r.approval === 'approved').length;
+  const denied = rowsWithTc.filter(r => r.approval === 'denied').length;
+  const totalHours = allRows.reduce((s, r) => {
+    const sh = shiftDailyHours[r.ts_employee_id];
     return s + (sh ? sh.total : 0);
   }, 0);
 
-  document.getElementById('statTotal').textContent = allTimecards.length;
+  document.getElementById('statTotal').textContent = allRows.length;
   document.getElementById('statPending').textContent = pending;
   document.getElementById('statApproved').textContent = approved;
   document.getElementById('statDenied').textContent = denied;
@@ -495,52 +579,47 @@ function render() {
 
   // Bulk bar
   const bulkBar = document.getElementById('bulkBar');
-  const pendingFiltered = filtered.filter(t => (t.employer_approval || 'pending') === 'pending');
+  const pendingFiltered = filtered.filter(r => r.tw_timecard_id && (r.approval || 'pending') === 'pending');
   bulkBar.style.display = pendingFiltered.length > 0 ? 'flex' : 'none';
   document.getElementById('bulkCount').textContent = selectedIds.size || pendingFiltered.length;
 
-  if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="18" class="empty-state"><h3>No timecards found</h3><p>Try adjusting your filters.</p></td></tr>';
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr><td colspan="18" class="empty-state"><h3>No employees found</h3><p>Try adjusting your filters.</p></td></tr>';
     tfoot.style.display = 'none';
+    document.getElementById('paginationControls').innerHTML = `<span>Showing 0 employees</span><span></span>`;
     return;
   }
 
-  // Totals
-  let totals = { d1: 0, d2: 0, d3: 0, d4: 0, d5: 0, d6: 0, d7: 0, reg: 0, ot: 0, total: 0 };
+  let totals = { d1:0, d2:0, d3:0, d4:0, d5:0, d6:0, d7:0, reg:0, ot:0, total:0 };
 
-  tbody.innerHTML = pageItems.map(t => {
-    const emp = employees[t.employee_id];
-    const empName = emp ? `${emp.first_name} ${emp.last_name}` : `Employee #${t.employee_id}`;
-    const approval = t.employer_approval || 'pending';
-
-    // Use TimeStation shift hours for daily breakdown
-    const sh = shiftDailyHours[t.employee_id] || { mon:0, tue:0, wed:0, thu:0, fri:0, sat:0, sun:0, total:0 };
+  tbody.innerHTML = pageItems.map(r => {
+    const sh = shiftDailyHours[r.ts_employee_id] || { mon:0, tue:0, wed:0, thu:0, fri:0, sat:0, sun:0, total:0 };
     const total = sh.total;
-
-    totals.d1 += sh.mon;
-    totals.d2 += sh.tue;
-    totals.d3 += sh.wed;
-    totals.d4 += sh.thu;
-    totals.d5 += sh.fri;
-    totals.d6 += sh.sat;
-    totals.d7 += sh.sun;
-    totals.reg += total > 40 ? 40 : total;
-    totals.ot += total > 40 ? total - 40 : 0;
-    totals.total += total;
-
     const reg = total > 40 ? 40 : total;
     const ot = total > 40 ? total - 40 : 0;
 
-    const checked = selectedIds.has(t.id) ? 'checked' : '';
-    const isPending = approval === 'pending';
+    totals.d1 += sh.mon; totals.d2 += sh.tue; totals.d3 += sh.wed; totals.d4 += sh.thu;
+    totals.d5 += sh.fri; totals.d6 += sh.sat; totals.d7 += sh.sun;
+    totals.reg += reg; totals.ot += ot; totals.total += total;
 
-    return `<tr data-id="${t.id}">
-      <td><input type="checkbox" class="row-check" data-id="${t.id}" ${checked} ${!isPending ? 'disabled' : ''}></td>
+    const approval = r.approval;
+    const isPending = approval === 'pending';
+    const checked = r.tw_timecard_id && selectedIds.has(r.tw_timecard_id) ? 'checked' : '';
+    const idDisplay = r.tw_employee_id ? `#${r.tw_employee_id}` : r.ts_employee_id;
+    const approvalBadge = approval
+      ? `<span class="badge badge-${approval}">${approval.charAt(0).toUpperCase() + approval.slice(1)}</span>`
+      : '—';
+    const twStatusBadge = r.tw_status
+      ? `<span class="badge badge-${r.tw_status.toLowerCase() === 'proofed' ? 'proofed' : 'pending'}">${escapeHtml(r.tw_status)}</span>`
+      : '—';
+
+    return `<tr>
+      <td><input type="checkbox" class="row-check" data-id="${r.tw_timecard_id || ''}" ${checked} ${(!r.tw_timecard_id || !isPending) ? 'disabled' : ''}></td>
       <td>
-        <div class="employee-name">${escapeHtml(empName)}</div>
-        <div class="employee-id">#${t.employee_id}</div>
+        <div class="employee-name">${escapeHtml(r.name)}</div>
+        <div class="employee-id">${idDisplay}</div>
       </td>
-      <td>${escapeHtml(tsEmpDeptMap[t.employee_id] || t.customer_name || '—')}</td>
+      <td>${escapeHtml(r.department)}</td>
       <td class="hours-cell ${fmtHoursClass(sh.mon)}">${fmtHours(sh.mon)}</td>
       <td class="hours-cell ${fmtHoursClass(sh.tue)}">${fmtHours(sh.tue)}</td>
       <td class="hours-cell ${fmtHoursClass(sh.wed)}">${fmtHours(sh.wed)}</td>
@@ -551,11 +630,11 @@ function render() {
       <td class="hours-cell hours-highlight">${fmtHours(reg)}</td>
       <td class="hours-cell ${ot > 0 ? 'hours-highlight' : 'hours-zero'}">${fmtHours(ot)}</td>
       <td class="hours-cell hours-highlight">${fmtHours(total)}</td>
-      <td>$${Number(t.pay_rate || 0).toFixed(2)}</td>
-      <td>$${Number(t.bill_rate || 0).toFixed(2)}</td>
-      <td><span class="badge badge-${(t.status || '').toLowerCase() === 'proofed' ? 'proofed' : 'pending'}">${escapeHtml(t.status || '—')}</span></td>
-      <td><span class="badge badge-${approval}">${approval.charAt(0).toUpperCase() + approval.slice(1)}</span></td>
-      <td>${renderActions(t.id, approval)}</td>
+      <td>${r.pay_rate > 0 ? `$${r.pay_rate.toFixed(2)}` : '—'}</td>
+      <td>${r.bill_rate > 0 ? `$${r.bill_rate.toFixed(2)}` : '—'}</td>
+      <td>${twStatusBadge}</td>
+      <td>${approvalBadge}</td>
+      <td>${r.tw_timecard_id ? renderActions(r.tw_timecard_id, approval) : '—'}</td>
     </tr>`;
   }).join('');
 
@@ -575,8 +654,10 @@ function render() {
   // Bind checkboxes
   document.querySelectorAll('.row-check').forEach(cb => {
     cb.addEventListener('change', () => {
-      if (cb.checked) selectedIds.add(parseInt(cb.dataset.id));
-      else selectedIds.delete(parseInt(cb.dataset.id));
+      const id = parseInt(cb.dataset.id);
+      if (!id) return;
+      if (cb.checked) selectedIds.add(id);
+      else selectedIds.delete(id);
       document.getElementById('bulkCount').textContent = selectedIds.size;
     });
   });
@@ -584,12 +665,12 @@ function render() {
   // Pagination controls
   const pagDiv = document.getElementById('paginationControls');
   if (isShowAll || totalPages <= 1) {
-    pagDiv.innerHTML = `<span>Showing all ${totalFiltered} of ${allTimecards.length} timecards</span><span></span>`;
+    pagDiv.innerHTML = `<span>Showing all ${totalFiltered} of ${allRows.length} employees</span><span></span>`;
   } else {
     const from = start + 1;
     const to = Math.min(start + effectivePageSize, totalFiltered);
     pagDiv.innerHTML = `
-      <span>Showing ${from}–${to} of ${totalFiltered} timecards</span>
+      <span>Showing ${from}–${to} of ${totalFiltered} employees</span>
       <span>
         <button id="prevPage" ${currentPage === 0 ? 'disabled' : ''}>Previous</button>
         <span style="margin:0 10px;">Page ${currentPage + 1} of ${totalPages}</span>
@@ -648,11 +729,8 @@ window.setApproval = async function(id, status) {
   }
 
   // Update local state
-  const tc = allTimecards.find(t => t.id === id);
-  if (tc) {
-    tc.employer_approval = status;
-    tc.employer_approval_at = status === 'pending' ? null : new Date().toISOString();
-  }
+  const row = allRows.find(r => r.tw_timecard_id === id);
+  if (row) row.approval = status;
   selectedIds.delete(id);
   render();
   showToast(`Timecard ${status === 'pending' ? 'reset to pending' : status}`);
@@ -661,7 +739,7 @@ window.setApproval = async function(id, status) {
 async function bulkSetApproval(status) {
   const ids = selectedIds.size > 0
     ? [...selectedIds]
-    : getFilteredTimecards().filter(t => (t.employer_approval || 'pending') === 'pending').map(t => t.id);
+    : getFilteredRows().filter(r => r.tw_timecard_id && (r.approval || 'pending') === 'pending').map(r => r.tw_timecard_id);
 
   if (!ids.length) return;
 
@@ -680,11 +758,8 @@ async function bulkSetApproval(status) {
 
   // Update local state
   ids.forEach(id => {
-    const tc = allTimecards.find(t => t.id === id);
-    if (tc) {
-      tc.employer_approval = status;
-      tc.employer_approval_at = new Date().toISOString();
-    }
+    const row = allRows.find(r => r.tw_timecard_id === id);
+    if (row) row.approval = status;
   });
   selectedIds.clear();
   render();
@@ -711,6 +786,7 @@ document.getElementById('statusFilter').addEventListener('change', () => {
 });
 
 document.getElementById('searchInput').addEventListener('input', () => { currentPage = 0; render(); });
+document.getElementById('hideZeroFilter').addEventListener('change', () => { currentPage = 0; render(); });
 
 document.getElementById('pageSizeFilter').addEventListener('change', (e) => {
   pageSize = e.target.value === 'all' ? 'all' : parseInt(e.target.value);
@@ -719,13 +795,18 @@ document.getElementById('pageSizeFilter').addEventListener('change', (e) => {
 });
 
 document.getElementById('headerCheckbox').addEventListener('change', (e) => {
-  const filtered = getFilteredTimecards().filter(t => (t.employer_approval || 'pending') === 'pending');
+  const filtered = getFilteredRows().filter(r => r.tw_timecard_id && (r.approval || 'pending') === 'pending');
   if (e.target.checked) {
-    filtered.forEach(t => selectedIds.add(t.id));
+    filtered.forEach(r => selectedIds.add(r.tw_timecard_id));
   } else {
     selectedIds.clear();
   }
   render();
+});
+
+// Sort header click listeners
+document.querySelectorAll('.tc-table th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => setSort(th.dataset.sort));
 });
 
 document.getElementById('selectAll').addEventListener('change', (e) => {
