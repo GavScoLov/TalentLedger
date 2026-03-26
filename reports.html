@@ -121,6 +121,50 @@
     .badge-inactive { background:#FEE2E2; color:#991B1B; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
     .badge-warning  { background:#FEF3C7; color:#92400E; padding:2px 10px; border-radius:999px; font-size:.72rem; font-weight:600; }
 
+    /* ── Print header (hidden on screen, shown when printing) ── */
+    .print-header { display: none; }
+
+    /* ── Print styles ────────────────────────────────────────── */
+    @media print {
+      @page { size: landscape; margin: 0.6in 0.5in; }
+
+      body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      /* Hide everything except the results */
+      .sidebar, .sidebar-overlay, .topbar,
+      .page-header, .date-filter-bar, .reports-grid,
+      .results-header, .loading-overlay { display: none !important; }
+
+      .main-content { margin: 0 !important; padding: 0 !important; overflow: visible !important; }
+      #results-section { display: block !important; }
+
+      /* Show print header */
+      .print-header { display: block !important; margin-bottom: 14px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+      .print-header-title { font-size: 16px; font-weight: 700; color: #000; }
+      .print-header-meta  { font-size: 10px; color: #555; margin-top: 3px; }
+
+      /* Table sizing for landscape */
+      .billing-tbl { font-size: 8px !important; width: 100% !important; }
+      .billing-tbl th, .billing-tbl td { padding: 3px 5px !important; }
+      .billing-region-hdr td, .billing-region-total td,
+      .billing-branch-hdr td, .billing-branch-total td,
+      .billing-grand-total td { padding: 4px 5px !important; }
+
+      /* Force background colors to print */
+      .billing-region-hdr, .billing-region-total,
+      .billing-branch-hdr, .billing-branch-total,
+      .billing-grand-total { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      /* Hide collapse buttons — not useful in print */
+      .collapse-btn { display: none !important; }
+
+      /* Generic table fallback */
+      .rpt-table { font-size: 8px !important; }
+      .rpt-table th, .rpt-table td { padding: 3px 6px !important; }
+
+      .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+    }
+
     /* ── Loading ─────────────────────────────────────────────── */
     .loading-overlay {
       display: flex; align-items: center; justify-content: center;
@@ -429,6 +473,12 @@
 
       <!-- Results section -->
       <div id="results-section">
+        <!-- Print-only header -->
+        <div class="print-header">
+          <div class="print-header-title" id="print-header-title"></div>
+          <div class="print-header-meta"  id="print-header-meta"></div>
+        </div>
+
         <div class="results-header">
           <div class="results-title-group">
             <div class="results-title" id="results-title">—</div>
@@ -438,6 +488,10 @@
             <button class="btn btn-outlined" id="btn-export" style="font-size:.82rem;padding:7px 14px;gap:6px;display:inline-flex;align-items:center;">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
               Export CSV
+            </button>
+            <button class="btn btn-outlined" id="btn-print" style="font-size:.82rem;padding:7px 14px;gap:6px;display:inline-flex;align-items:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" /></svg>
+              Print
             </button>
           </div>
         </div>
@@ -1373,6 +1427,16 @@
     document.getElementById('btn-export').addEventListener('click', () => {
       if (!lastMeta.cols) return;
       exportCSV(lastMeta.cols, lastMeta.rows, lastMeta.filename);
+    });
+
+    document.getElementById('btn-print').addEventListener('click', () => {
+      // Populate the print-only header with the current report title + meta
+      document.getElementById('print-header-title').textContent =
+        document.getElementById('results-title').textContent;
+      document.getElementById('print-header-meta').textContent =
+        'TalentLedger  ·  ' + document.getElementById('results-meta').textContent +
+        '  ·  Printed ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      window.print();
     });
 
   </script>
