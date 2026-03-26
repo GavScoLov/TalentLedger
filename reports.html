@@ -133,6 +133,24 @@
       animation: spin .7s linear infinite;
     }
 
+    /* ── PSA Billing hierarchical table ─────────────────────── */
+    .billing-tbl { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .billing-tbl th {
+      padding: 10px 14px; text-align: left; font-weight: 600; font-size: 0.72rem;
+      text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary);
+      background: #f8f8f8; border-bottom: 2px solid var(--border-color); white-space: nowrap;
+    }
+    .billing-tbl th.r { text-align: right; }
+    .billing-tbl td { padding: 9px 14px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+    .billing-tbl .r { text-align: right; font-variant-numeric: tabular-nums; }
+    .billing-region-hdr td { font-weight: 700; font-size: 0.88rem; letter-spacing: 0.4px; padding: 10px 14px; }
+    .billing-branch-hdr td { font-weight: 600; font-size: 0.82rem; padding: 8px 14px 8px 26px; }
+    .billing-data-row td:first-child { padding-left: 42px; color: var(--text-primary); }
+    .billing-data-row:hover td { background: rgba(0,0,0,.025); }
+    .billing-branch-total td { font-weight: 600; font-size: 0.82rem; padding: 8px 14px 8px 26px; }
+    .billing-region-total td { font-weight: 700; font-size: 0.88rem; padding: 10px 14px; }
+    .billing-grand-total td { font-weight: 700; font-size: 0.9rem; padding: 12px 14px; background: #1F2937; color: #fff; }
+
     /* ── Section label ──────────────────────────────────────── */
     .reports-section-label {
       grid-column: 1 / -1;
@@ -389,11 +407,11 @@
             </svg>
           </div>
           <div>
-            <div class="report-card-name">PSA Revenue Breakdown</div>
+            <div class="report-card-name">PSA Billing</div>
             <div class="report-card-source">Source: PSA API · Invoice Register</div>
           </div>
           <div class="report-card-desc">
-            All PSA revenue grouped by Region → Branch → Company. Shows GSP and DHP revenue side by side with totals.
+            Color-coded by region. Each week shown individually with GSP and DHP split. Includes branch and region subtotals.
           </div>
           <button class="btn-generate" data-report="psa-revenue-breakdown">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
@@ -1043,47 +1061,171 @@
       return { cols, rows, filename: 'dhp-billing.csv' };
     }
 
-    /* 11. PSA Revenue Breakdown by Region → Branch → Company */
+    /* ─── Region color system ───────────────────────────────── */
+    const REGION_COLOR_MAP = {
+      'GA': { bg: '#EA8938', light: '#FEF3E6', text: '#7C3D08', white: '#fff' },
+      'IL': { bg: '#3B82F6', light: '#EFF6FF', text: '#1E3A8A', white: '#fff' },
+    };
+    const EXTRA_PALETTE = [
+      { bg: '#8B5CF6', light: '#F5F3FF', text: '#4C1D95', white: '#fff' },
+      { bg: '#10B981', light: '#ECFDF5', text: '#064E3B', white: '#fff' },
+      { bg: '#F59E0B', light: '#FFFBEB', text: '#78350F', white: '#fff' },
+      { bg: '#EF4444', light: '#FEF2F2', text: '#7F1D1D', white: '#fff' },
+      { bg: '#06B6D4', light: '#ECFEFF', text: '#164E63', white: '#fff' },
+      { bg: '#EC4899', light: '#FDF2F8', text: '#831843', white: '#fff' },
+    ];
+    const _assignedColors = {};
+    let _paletteIdx = 0;
+
+    function regionColor(region) {
+      if (_assignedColors[region]) return _assignedColors[region];
+      const c = REGION_COLOR_MAP[region] || EXTRA_PALETTE[_paletteIdx++ % EXTRA_PALETTE.length];
+      _assignedColors[region] = c;
+      return c;
+    }
+
+    /* ─── PSA Billing hierarchical renderer ─────────────────── */
+    function renderBillingTable(hierarchy, grandGsp, grandDhp) {
+      let html = `<table class="billing-tbl">
+        <thead><tr>
+          <th>Region / Branch / Company</th>
+          <th>Week Ending</th>
+          <th class="r">GSP Revenue</th>
+          <th class="r">DHP Revenue</th>
+          <th class="r">Total Revenue</th>
+        </tr></thead>
+        <tbody>`;
+
+      for (const region of Object.keys(hierarchy).sort()) {
+        const c     = regionColor(region);
+        const branches = hierarchy[region];
+
+        // Region header
+        html += `<tr class="billing-region-hdr" style="background:${c.bg};color:${c.white};">
+          <td colspan="5">${region}</td>
+        </tr>`;
+
+        let regionGsp = 0, regionDhp = 0;
+
+        for (const branch of Object.keys(branches).sort()) {
+          const companies = branches[branch];
+
+          // Branch header
+          html += `<tr class="billing-branch-hdr" style="background:${c.light};color:${c.text};">
+            <td colspan="5">${branch}</td>
+          </tr>`;
+
+          let branchGsp = 0, branchDhp = 0;
+
+          for (const company of Object.keys(companies).sort()) {
+            const weeks = companies[company];
+            for (const week of Object.keys(weeks).sort()) {
+              const { gsp, dhp } = weeks[week];
+              branchGsp += gsp; branchDhp += dhp;
+              html += `<tr class="billing-data-row" style="border-left:3px solid ${c.bg};">
+                <td>${company}</td>
+                <td>${week}</td>
+                <td class="r">${formatCurrency(gsp)}</td>
+                <td class="r">${formatCurrency(dhp)}</td>
+                <td class="r" style="font-weight:600;">${formatCurrency(gsp + dhp)}</td>
+              </tr>`;
+            }
+          }
+
+          regionGsp += branchGsp; regionDhp += branchDhp;
+
+          // Branch subtotal
+          html += `<tr class="billing-branch-total" style="background:${c.light};color:${c.text};border-left:3px solid ${c.bg};">
+            <td colspan="2">↳ ${branch} Total</td>
+            <td class="r">${formatCurrency(branchGsp)}</td>
+            <td class="r">${formatCurrency(branchDhp)}</td>
+            <td class="r" style="font-weight:700;">${formatCurrency(branchGsp + branchDhp)}</td>
+          </tr>`;
+        }
+
+        // Region total
+        html += `<tr class="billing-region-total" style="background:${c.bg};color:${c.white};">
+          <td colspan="2">${region} Total</td>
+          <td class="r">${formatCurrency(regionGsp)}</td>
+          <td class="r">${formatCurrency(regionDhp)}</td>
+          <td class="r" style="font-weight:700;">${formatCurrency(regionGsp + regionDhp)}</td>
+        </tr>`;
+      }
+
+      // Grand total
+      html += `<tr class="billing-grand-total">
+        <td colspan="2">Grand Total</td>
+        <td class="r">${formatCurrency(grandGsp)}</td>
+        <td class="r">${formatCurrency(grandDhp)}</td>
+        <td class="r">${formatCurrency(grandGsp + grandDhp)}</td>
+      </tr>`;
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    /* 11. PSA Billing — Region → Branch → Company × Week */
     async function genPsaRevenueBreakdown(start, end) {
       const [invoices, branchMap] = await Promise.all([
         fetchInvoiceRegister(start, end),
         fetchBranchRegionMap(),
       ]);
 
-      const agg = {};
+      // hierarchy: region → branch → company → week → { gsp, dhp }
+      const hierarchy = {};
+      let grandGsp = 0, grandDhp = 0;
+
       for (const r of invoices) {
         if (isCorporateBranch(r.branchname)) continue;
         const region  = branchMap[r.branchname] || 'Unassigned';
         const branch  = r.branchname   || 'Unknown';
         const company = r.customername || 'Unknown';
-        const k = `${region}|||${branch}|||${company}`;
-        if (!agg[k]) agg[k] = { region, branch, company, gspRev: 0, dhpRev: 0 };
-        const amt = Number(r.invoiceamount) || 0;
-        if (isDHP(r.customername)) agg[k].dhpRev += amt;
-        else agg[k].gspRev += amt;
+        const week    = r.weekendbill  || '—';
+        const amt     = Number(r.invoiceamount) || 0;
+        const dhp     = isDHP(r.customername);
+
+        hierarchy[region]                          ??= {};
+        hierarchy[region][branch]                  ??= {};
+        hierarchy[region][branch][company]         ??= {};
+        hierarchy[region][branch][company][week]   ??= { gsp: 0, dhp: 0 };
+
+        if (dhp) { hierarchy[region][branch][company][week].dhp += amt; grandDhp += amt; }
+        else      { hierarchy[region][branch][company][week].gsp += amt; grandGsp += amt; }
       }
 
-      const fmtRev = v => formatCurrency(Number(v) || 0);
-      const rows = Object.values(agg)
-        .sort((a, b) => a.region.localeCompare(b.region) || a.branch.localeCompare(b.branch) || b.gspRev + b.dhpRev - (a.gspRev + a.dhpRev))
-        .map(a => ({
-          region:    a.region,
-          branch:    a.branch,
-          company:   a.company,
-          gsp_rev:   a.gspRev.toFixed(2),
-          dhp_rev:   a.dhpRev.toFixed(2),
-          total_rev: (a.gspRev + a.dhpRev).toFixed(2),
-        }));
+      // Flat rows for CSV export (sorted)
+      const csvRows = [];
+      for (const region of Object.keys(hierarchy).sort()) {
+        for (const branch of Object.keys(hierarchy[region]).sort()) {
+          for (const company of Object.keys(hierarchy[region][branch]).sort()) {
+            for (const week of Object.keys(hierarchy[region][branch][company]).sort()) {
+              const { gsp, dhp } = hierarchy[region][branch][company][week];
+              csvRows.push({ region, branch, company, week,
+                gsp_rev:   gsp.toFixed(2),
+                dhp_rev:   dhp.toFixed(2),
+                total_rev: (gsp + dhp).toFixed(2),
+              });
+            }
+          }
+        }
+      }
 
       const cols = [
         { key: 'region',    label: 'Region' },
         { key: 'branch',    label: 'Branch' },
         { key: 'company',   label: 'Company' },
-        { key: 'gsp_rev',   label: 'GSP Revenue',   numeric: true, total: true, render: fmtRev },
-        { key: 'dhp_rev',   label: 'DHP Revenue',   numeric: true, total: true, render: fmtRev },
-        { key: 'total_rev', label: 'Total Revenue', numeric: true, total: true, render: fmtRev },
+        { key: 'week',      label: 'Week Ending' },
+        { key: 'gsp_rev',   label: 'GSP Revenue' },
+        { key: 'dhp_rev',   label: 'DHP Revenue' },
+        { key: 'total_rev', label: 'Total Revenue' },
       ];
-      return { cols, rows, filename: 'psa-revenue-breakdown.csv' };
+
+      return {
+        cols,
+        rows: csvRows,
+        filename: 'psa-billing.csv',
+        customRender: () => renderBillingTable(hierarchy, grandGsp, grandDhp),
+      };
     }
 
     /* ─── Report registry ───────────────────────────────────── */
@@ -1098,7 +1240,7 @@
       'dhp-hours':            { title: 'DHP Hours by Region & Branch',        fn: genDhpHours           },
       'dhp-headcount':        { title: 'DHP Headcount by Region & Branch',    fn: genDhpHeadcount       },
       'dhp-billing':          { title: 'DHP Billing by Region & Branch',      fn: genDhpBilling         },
-      'psa-revenue-breakdown':{ title: 'PSA Revenue Breakdown',               fn: genPsaRevenueBreakdown},
+      'psa-revenue-breakdown':{ title: 'PSA Billing',                          fn: genPsaRevenueBreakdown},
     };
 
     /* ─── Generate handler ──────────────────────────────────── */
@@ -1127,11 +1269,16 @@
       showResults(report.title, dateRange);
 
       try {
-        const { cols, rows, filename } = await report.fn(dateRange.start, dateRange.end);
+        const { cols, rows, filename, customRender } = await report.fn(dateRange.start, dateRange.end);
         lastMeta = { cols, rows, filename };
         document.getElementById('results-meta').textContent =
           `${rows.length.toLocaleString()} row${rows.length !== 1 ? 's' : ''} · Date range: ${dateRange.start} → ${dateRange.end}`;
-        renderTable(cols, rows);
+        if (customRender) {
+          document.getElementById('results-table-wrap').innerHTML =
+            `<div class="table-wrap">${customRender()}</div>`;
+        } else {
+          renderTable(cols, rows);
+        }
       } catch (err) {
         document.getElementById('results-table-wrap').innerHTML =
           `<div class="loading-overlay" style="color:#DC2626;">
