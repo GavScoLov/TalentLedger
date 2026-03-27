@@ -83,7 +83,7 @@
                 font-size: 18px; text-align: center; font-weight: 700; color: #000;
                 border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;
             }
-            .print-chart-page img { width: 100%; max-height: 600px; object-fit: contain; }
+            .print-chart-page img { width: 100%; max-height: 440px; object-fit: contain; }
             .print-header {
                 display: block !important; font-size: 22px; text-align: center; font-weight: 700;
                 padding: 12px 0 4px; color: #000; border-bottom: 2px solid #333; margin-bottom: 8px;
@@ -130,19 +130,22 @@
         /* Hidden elements only shown in print */
         .print-header, .print-sub-header, .print-total-bar, .print-chart-page { display: none; }
 
-        /* Print chart stats (lives inside .print-chart-page so hidden on screen automatically) */
-        .pcs-overall { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 10px; }
-        .pcs-card { border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px; text-align: center; }
-        .pcs-card-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 3px; letter-spacing: 0.4px; }
-        .pcs-card-value { font-size: 15px; font-weight: 700; color: #111; }
-        .pcs-year-grid { display: grid; gap: 8px; margin-top: 6px; }  /* columns set inline based on year count */
-        .pcs-year-block { border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px; background: #fafafa; }
-        .pcs-year-title { font-size: 11px; font-weight: 700; color: #EA8938; border-bottom: 1px solid #eee; margin-bottom: 6px; padding-bottom: 4px; }
-        .pcs-year-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 11px; }
-        .pcs-yl { color: #666; }
-        .pcs-yv { font-weight: 700; color: #111; }
-        .pcs-yv.stat-positive { color: #16a34a; }
-        .pcs-yv.stat-negative { color: #dc2626; }
+        /* Print chart stats — compact strip + optional year table */
+        .pcs-strip { display: flex; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; margin-bottom: 6px; }
+        .pcs-card { flex: 1; padding: 4px 8px; text-align: center; border-right: 1px solid #ddd; }
+        .pcs-card:last-child { border-right: none; }
+        .pcs-card-label { font-size: 8px; font-weight: 700; text-transform: uppercase; color: #888; letter-spacing: 0.4px; }
+        .pcs-card-value { font-size: 12px; font-weight: 700; color: #111; line-height: 1.2; }
+        .pcs-card-value.stat-positive { color: #16a34a; }
+        .pcs-card-value.stat-negative { color: #dc2626; }
+        .pcs-year-tbl { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 6px; }
+        .pcs-year-tbl th { background: #EA8938 !important; color: #fff !important; padding: 3px 8px; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .pcs-year-tbl th:first-child { text-align: left; background: #555 !important; }
+        .pcs-year-tbl td { padding: 2px 8px; border-bottom: 1px solid #eee; }
+        .pcs-year-tbl td:first-child { color: #555; font-weight: 700; font-size: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .pcs-year-tbl td:not(:first-child) { text-align: center; font-weight: 700; }
+        .pcs-yr-pos { color: #16a34a; }
+        .pcs-yr-neg { color: #dc2626; }
     </style>
 </head>
 <body>
@@ -542,18 +545,19 @@
             const series = lastTimeSeries;
             if (!series.length) return '';
 
-            const overall  = computeStats(series, lastForecastCount);
-            const trendCls = overall.pctChange >= 0 ? 'stat-positive' : 'stat-negative';
-            const trendStr = (overall.pctChange >= 0 ? '+' : '') + overall.pctChange.toFixed(2) + '%';
+            const o   = computeStats(series, lastForecastCount);
+            const otc = o.pctChange >= 0 ? 'stat-positive' : 'stat-negative';
+            const ots = (o.pctChange >= 0 ? '+' : '') + o.pctChange.toFixed(2) + '%';
 
-            let html = `<div class="pcs-overall">
-                <div class="pcs-card"><div class="pcs-card-label">Average</div><div class="pcs-card-value">${formatNumber(overall.avg, 2)} hrs</div></div>
-                <div class="pcs-card"><div class="pcs-card-label">Trend %</div><div class="pcs-card-value ${trendCls}">${trendStr}</div></div>
-                <div class="pcs-card"><div class="pcs-card-label">Intervals</div><div class="pcs-card-value">${overall.totalIntervals} <span style="font-size:10px;font-weight:400;color:#666">(${overall.actualCount} actual)</span></div></div>
-                <div class="pcs-card"><div class="pcs-card-label">Total Hours</div><div class="pcs-card-value">${formatNumber(overall.total, 2)} hrs</div></div>
+            // Compact strip — always shown
+            let html = `<div class="pcs-strip">
+                <div class="pcs-card"><div class="pcs-card-label">Average</div><div class="pcs-card-value">${formatNumber(o.avg, 2)} hrs</div></div>
+                <div class="pcs-card"><div class="pcs-card-label">Trend %</div><div class="pcs-card-value ${otc}">${ots}</div></div>
+                <div class="pcs-card"><div class="pcs-card-label">Intervals</div><div class="pcs-card-value">${o.totalIntervals}<span style="font-size:9px;font-weight:400;color:#888"> (${o.actualCount} actual)</span></div></div>
+                <div class="pcs-card"><div class="pcs-card-label">Total Hours</div><div class="pcs-card-value">${formatNumber(o.total, 2)} hrs</div></div>
             </div>`;
 
-            // Group by year
+            // Group by year — only add table when multi-year
             const byYear = {};
             for (const [key, val] of series) {
                 const yr = key.substring(0, 4);
@@ -563,27 +567,24 @@
             const years = Object.keys(byYear).sort();
 
             if (years.length > 1) {
-                const cols = Math.min(years.length, 4);
-                html += `<div class="pcs-year-grid" style="grid-template-columns:repeat(${cols},1fr)">`;
-                for (const yr of years) {
-                    const ys  = computeStats(byYear[yr]);
-                    const yc  = ys.pctChange >= 0 ? 'stat-positive' : 'stat-negative';
-                    const yts = (ys.pctChange >= 0 ? '+' : '') + ys.pctChange.toFixed(2) + '%';
-                    html += `<div class="pcs-year-block">
-                        <div class="pcs-year-title">${yr}</div>
-                        <div class="pcs-year-stats">
-                            <div><span class="pcs-yl">Avg</span></div>
-                            <div><span class="pcs-yv">${formatNumber(ys.avg, 2)} hrs</span></div>
-                            <div><span class="pcs-yl">Trend %</span></div>
-                            <div><span class="pcs-yv ${yc}">${yts}</span></div>
-                            <div><span class="pcs-yl">Intervals</span></div>
-                            <div><span class="pcs-yv">${ys.actualCount}</span></div>
-                            <div><span class="pcs-yl">Total</span></div>
-                            <div><span class="pcs-yv">${formatNumber(ys.total, 2)} hrs</span></div>
-                        </div>
-                    </div>`;
-                }
-                html += '</div>';
+                const yrStats = years.map(yr => ({ yr, ...computeStats(byYear[yr]) }));
+                const hdr = years.map(yr => `<th>${yr}</th>`).join('');
+                const row = (label, fn) =>
+                    `<tr><td>${label}</td>${yrStats.map(fn).join('')}</tr>`;
+
+                html += `<table class="pcs-year-tbl">
+                    <thead><tr><th>Metric</th>${hdr}</tr></thead>
+                    <tbody>
+                        ${row('Average', s => `<td>${formatNumber(s.avg, 2)} hrs</td>`)}
+                        ${row('Trend %', s => {
+                            const c = s.pctChange >= 0 ? 'pcs-yr-pos' : 'pcs-yr-neg';
+                            const v = (s.pctChange >= 0 ? '+' : '') + s.pctChange.toFixed(2) + '%';
+                            return `<td class="${c}">${v}</td>`;
+                        })}
+                        ${row('Intervals', s => `<td>${s.actualCount}</td>`)}
+                        ${row('Total', s => `<td>${formatNumber(s.total, 2)} hrs</td>`)}
+                    </tbody>
+                </table>`;
             }
 
             return html;
