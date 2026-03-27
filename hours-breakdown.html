@@ -129,6 +129,20 @@
 
         /* Hidden elements only shown in print */
         .print-header, .print-sub-header, .print-total-bar, .print-chart-page { display: none; }
+
+        /* Print chart stats (lives inside .print-chart-page so hidden on screen automatically) */
+        .pcs-overall { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 10px; }
+        .pcs-card { border: 1px solid #ccc; border-radius: 6px; padding: 8px 12px; text-align: center; }
+        .pcs-card-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 3px; letter-spacing: 0.4px; }
+        .pcs-card-value { font-size: 15px; font-weight: 700; color: #111; }
+        .pcs-year-grid { display: grid; gap: 8px; margin-top: 6px; }  /* columns set inline based on year count */
+        .pcs-year-block { border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px; background: #fafafa; }
+        .pcs-year-title { font-size: 11px; font-weight: 700; color: #EA8938; border-bottom: 1px solid #eee; margin-bottom: 6px; padding-bottom: 4px; }
+        .pcs-year-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 11px; }
+        .pcs-yl { color: #666; }
+        .pcs-yv { font-weight: 700; color: #111; }
+        .pcs-yv.stat-positive { color: #16a34a; }
+        .pcs-yv.stat-negative { color: #dc2626; }
     </style>
 </head>
 <body>
@@ -230,6 +244,7 @@
             </div>
             <div class="print-chart-page" id="print-chart-page">
                 <h2 id="print-chart-title"></h2>
+                <div id="print-chart-stats"></div>
                 <img id="print-chart-img" src="" alt="Chart">
             </div>
         </div>
@@ -266,6 +281,8 @@
         let rawHoursByCompany = [];
         let rawBillingByCompany = [];
         let mainChart = null;
+        let lastTimeSeries = [];
+        let lastForecastCount = 0;
 
         // ── Init ──────────────────────────────────────────────────
         document.getElementById('start_date').value = getDefaultStartDate();
@@ -478,6 +495,8 @@
 
         // ── Update Stats Bar ─────────────────────────────────────
         function updateStats(timeSeries, forecastCount) {
+            lastTimeSeries    = timeSeries;
+            lastForecastCount = forecastCount;
             const values = timeSeries.map(([, v]) => v);
             const total = values.reduce((s, v) => s + v, 0);
             const avg = values.length > 0 ? total / values.length : 0;
@@ -500,6 +519,74 @@
             document.getElementById('stat-intervals').textContent = totalIntervals;
             document.getElementById('stat-intervals-detail').textContent = `${actualCount} actual / ${forecastCount} forecast`;
             document.getElementById('stat-total').textContent = formatNumber(total, 2) + ' hrs';
+        }
+
+        // ── Stats computation helper (reusable for per-year) ─────
+        function computeStats(series, forecastCount = 0) {
+            const values       = series.map(([, v]) => v);
+            const total        = values.reduce((s, v) => s + v, 0);
+            const avg          = values.length > 0 ? total / values.length : 0;
+            const actualCount  = values.length;
+            const totalIntervals = actualCount + forecastCount;
+            let pctChange = 0;
+            if (values.length >= 2) {
+                const start = values[0];
+                if (Math.abs(start) > 0.01 && totalIntervals > 0)
+                    pctChange = ((avg / start) - 1) / totalIntervals * 100;
+            }
+            return { avg, total, actualCount, totalIntervals, pctChange };
+        }
+
+        // ── Build print-chart-stats HTML ──────────────────────────
+        function buildPrintChartStats() {
+            const series = lastTimeSeries;
+            if (!series.length) return '';
+
+            const overall  = computeStats(series, lastForecastCount);
+            const trendCls = overall.pctChange >= 0 ? 'stat-positive' : 'stat-negative';
+            const trendStr = (overall.pctChange >= 0 ? '+' : '') + overall.pctChange.toFixed(2) + '%';
+
+            let html = `<div class="pcs-overall">
+                <div class="pcs-card"><div class="pcs-card-label">Average</div><div class="pcs-card-value">${formatNumber(overall.avg, 2)} hrs</div></div>
+                <div class="pcs-card"><div class="pcs-card-label">Trend %</div><div class="pcs-card-value ${trendCls}">${trendStr}</div></div>
+                <div class="pcs-card"><div class="pcs-card-label">Intervals</div><div class="pcs-card-value">${overall.totalIntervals} <span style="font-size:10px;font-weight:400;color:#666">(${overall.actualCount} actual)</span></div></div>
+                <div class="pcs-card"><div class="pcs-card-label">Total Hours</div><div class="pcs-card-value">${formatNumber(overall.total, 2)} hrs</div></div>
+            </div>`;
+
+            // Group by year
+            const byYear = {};
+            for (const [key, val] of series) {
+                const yr = key.substring(0, 4);
+                if (!byYear[yr]) byYear[yr] = [];
+                byYear[yr].push([key, val]);
+            }
+            const years = Object.keys(byYear).sort();
+
+            if (years.length > 1) {
+                const cols = Math.min(years.length, 4);
+                html += `<div class="pcs-year-grid" style="grid-template-columns:repeat(${cols},1fr)">`;
+                for (const yr of years) {
+                    const ys  = computeStats(byYear[yr]);
+                    const yc  = ys.pctChange >= 0 ? 'stat-positive' : 'stat-negative';
+                    const yts = (ys.pctChange >= 0 ? '+' : '') + ys.pctChange.toFixed(2) + '%';
+                    html += `<div class="pcs-year-block">
+                        <div class="pcs-year-title">${yr}</div>
+                        <div class="pcs-year-stats">
+                            <div><span class="pcs-yl">Avg</span></div>
+                            <div><span class="pcs-yv">${formatNumber(ys.avg, 2)} hrs</span></div>
+                            <div><span class="pcs-yl">Trend %</span></div>
+                            <div><span class="pcs-yv ${yc}">${yts}</span></div>
+                            <div><span class="pcs-yl">Intervals</span></div>
+                            <div><span class="pcs-yv">${ys.actualCount}</span></div>
+                            <div><span class="pcs-yl">Total</span></div>
+                            <div><span class="pcs-yv">${formatNumber(ys.total, 2)} hrs</span></div>
+                        </div>
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            return html;
         }
 
         // ── Date Label Formatter ─────────────────────────────────
@@ -810,6 +897,7 @@
                 const report = getReportType();
                 document.getElementById('print-chart-title').textContent = reportTitles[report] || 'Hours Breakdown';
             }
+            document.getElementById('print-chart-stats').innerHTML = buildPrintChartStats();
             setTimeout(() => window.print(), 100);
         });
 
