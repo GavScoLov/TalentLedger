@@ -407,7 +407,33 @@
             const reportLabels = { GSR: 'General Staffing Hours', DHR: 'Direct Hire Hours' };
 
             renderTable(report, tableData, groupBy);
-            renderTimeChart(timeSeries, reportLabels[report]);
+
+            if (report === 'DHR') {
+                // Build per-company series so each DHP company gets its own bar/line
+                const dhrCompanyAgg = {};
+                const dhrWeekSet   = new Set();
+                rawHoursByCompany.forEach(r => {
+                    const isDHP = (r.company_name || '').toUpperCase().includes('DHP');
+                    if (!isDHP) return;
+                    if (isCorporateBranch(r.branch)) return;
+                    if (branch !== 'all' && r.branch !== branch) return;
+                    if (search && !(r.company_name || '').toLowerCase().includes(search)) return;
+                    const weekend = r.weekend_bill || '';
+                    if (!weekend) return;
+                    let key;
+                    if (interval === 'weekly')       key = weekend;
+                    else if (interval === 'monthly') key = weekend.substring(0, 7);
+                    else                             key = weekend.substring(0, 4);
+                    const company = r.company_name || 'Unknown';
+                    dhrWeekSet.add(key);
+                    if (!dhrCompanyAgg[company]) dhrCompanyAgg[company] = {};
+                    dhrCompanyAgg[company][key] = (dhrCompanyAgg[company][key] || 0) + (Number(r.total_hours) || 0);
+                });
+                const dhrSortedWeeks = [...dhrWeekSet].sort();
+                renderTimeChartByCompany(dhrSortedWeeks, dhrCompanyAgg, timeSeries);
+            } else {
+                renderTimeChart(timeSeries, reportLabels[report]);
+            }
         }
 
         // ── Render Table ──────────────────────────────────────────
@@ -657,6 +683,107 @@
                         y: { beginAtZero: false, ticks: { callback: v => formatNumber(v, 0), color: '#6B7280' }, grid: { color: '#E8E8E8' } },
                     },
                     layout: { padding: { top: 30 } },
+                },
+            });
+        }
+
+        // ── DHR: Per-Company Time-Series Chart ───────────────────
+        function renderTimeChartByCompany(sortedWeeks, companyAgg, totalSeries) {
+            const ctx       = document.getElementById('mainChart').getContext('2d');
+            if (mainChart) mainChart.destroy();
+
+            const graphType = document.getElementById('graph_type').value;
+            const interval  = document.getElementById('interval_select').value;
+
+            updateStats(totalSeries, 0);
+
+            const allLabels = sortedWeeks.map(k => formatDateLabel(k, interval));
+            const companies = Object.keys(companyAgg).sort();
+
+            // Pie: total per company across the whole period
+            if (graphType === 'pie') {
+                const totals    = companies.map(c => Object.values(companyAgg[c]).reduce((s, v) => s + v, 0));
+                const pieColors = companies.map((_, i) => `hsl(${i * 37 % 360}, 65%, 55%)`);
+                mainChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: { labels: companies, datasets: [{ data: totals, backgroundColor: pieColors }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { font: { size: 11 } } }, datalabels: { display: false } },
+                    },
+                });
+                return;
+            }
+
+            const isLine  = graphType === 'line';
+            const palette = [
+                '#3B82F6','#EF4444','#10B981','#F59E0B','#8B5CF6',
+                '#EC4899','#06B6D4','#F97316','#6366F1','#14B8A6',
+                '#D97706','#7C3AED','#059669','#DC2626','#2563EB',
+            ];
+
+            const datasets = companies.map((company, i) => {
+                const hex  = palette[i % palette.length];
+                const data = sortedWeeks.map(w => companyAgg[company][w] || 0);
+                return {
+                    label:           company,
+                    data,
+                    backgroundColor: hex + 'BF',   // 75 % opacity
+                    borderColor:     hex,
+                    borderWidth:     isLine ? 2 : 0,
+                    tension:         0.3,
+                    pointRadius:     isLine ? 3 : 0,
+                    fill:            false,
+                    stack:           isLine ? undefined : 'dhr',
+                };
+            });
+
+            // Total trendline across all companies
+            if (sortedWeeks.length >= 2) {
+                const totals = sortedWeeks.map(w =>
+                    companies.reduce((s, c) => s + (companyAgg[c][w] || 0), 0));
+                const n = totals.length;
+                let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                for (let i = 0; i < n; i++) { sumX += i; sumY += totals[i]; sumXY += i * totals[i]; sumX2 += i * i; }
+                const slope     = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                const intercept = (sumY - slope * sumX) / n;
+                datasets.push({
+                    label:       'Trend',
+                    data:        Array.from({ length: n }, (_, i) => slope * i + intercept),
+                    borderColor: slope >= 0 ? 'rgba(50,205,50,0.85)' : 'rgba(220,38,38,0.85)',
+                    borderWidth: 2, borderDash: [4, 4], pointRadius: 0,
+                    fill: false, tension: 0, type: 'line', stack: undefined,
+                });
+            }
+
+            mainChart = new Chart(ctx, {
+                type: isLine ? 'line' : 'bar',
+                data: { labels: allLabels, datasets },
+                plugins: [ChartDataLabels],
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+                        tooltip: {
+                            mode: 'index', intersect: false,
+                            callbacks: { label: c => `${c.dataset.label}: ${formatNumber(c.parsed.y, 2)} hrs` },
+                        },
+                        datalabels: { display: false },
+                    },
+                    scales: {
+                        x: {
+                            stacked: !isLine,
+                            ticks: { color: '#6B7280', maxRotation: 45 },
+                            grid:  { color: '#E8E8E8' },
+                        },
+                        y: {
+                            stacked: !isLine,
+                            beginAtZero: true,
+                            ticks: { callback: v => formatNumber(v, 0), color: '#6B7280' },
+                            grid:  { color: '#E8E8E8' },
+                        },
+                    },
+                    layout: { padding: { top: 10 } },
                 },
             });
         }
