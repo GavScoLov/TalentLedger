@@ -267,65 +267,79 @@
            TAB 3: WORKERS
       ════════════════════════════════════════════════ -->
       <div class="tab-panel" id="tab-workers">
-        <!-- Create worker form -->
+        <!-- Import from TempWorks -->
         <div class="form-section">
-          <h3>Add New Worker</h3>
-          <div class="form-grid">
-            <div class="form-field">
-              <label>Full Name</label>
-              <input type="text" id="wk-name" placeholder="Jane Smith">
-            </div>
-            <div class="form-field">
-              <label>Employee ID</label>
-              <input type="text" id="wk-empid" placeholder="EMP042" autocapitalize="characters">
-            </div>
-            <div class="form-field">
-              <label>Email (optional)</label>
-              <input type="email" id="wk-email" placeholder="jane@example.com">
-            </div>
-            <div class="form-field">
-              <label>Password</label>
-              <input type="password" id="wk-password" placeholder="Min 8 characters">
-            </div>
-            <div class="form-field">
-              <label>PIN (4–6 digits)</label>
-              <input type="password" id="wk-pin" placeholder="••••" maxlength="6" inputmode="numeric">
-            </div>
-            <div class="form-field">
-              <label>Company</label>
-              <input type="text" id="wk-company" placeholder="Acme Corp">
-            </div>
-            <div class="form-field">
-              <label>Role</label>
-              <input type="text" id="wk-role" placeholder="General Labor">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+            <h3 style="margin:0;">Import from TempWorks</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="tw-search" class="filter-input" placeholder="Search by name…" oninput="filterTWList()" style="width:200px;">
+              <button class="btn btn-primary" onclick="loadTWEmployees()" style="font-size:.82rem;padding:8px 16px;">↺ Refresh</button>
             </div>
           </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" onclick="createWorker()" style="font-size:.85rem;padding:9px 20px;">Add Worker</button>
-            <span class="error-msg"   id="wk-error"></span>
-            <span class="success-msg" id="wk-success"></span>
+          <div class="table-wrap" style="max-height:300px;overflow-y:auto;">
+            <table class="data-table">
+              <thead><tr>
+                <th>Name</th>
+                <th>TS Employee ID</th>
+                <th>Company / Dept</th>
+                <th>Action</th>
+              </tr></thead>
+              <tbody id="tw-import-tbody">
+                <tr><td colspan="4" class="empty-state">Click Refresh to load TempWorks employees.</td></tr>
+              </tbody>
+            </table>
           </div>
           <p style="font-size:0.75rem;color:var(--text-secondary);margin-top:10px;">
-            Passwords and PINs are hashed server-side (bcrypt). They are never stored in plaintext.
+            Showing TempWorks employees not yet added as workers. PINs are hashed server-side (bcrypt).
           </p>
         </div>
 
-        <!-- Workers list -->
+        <!-- Active workers list -->
         <div class="table-wrap">
           <table class="data-table">
             <thead><tr>
               <th>Name</th>
               <th>Employee ID</th>
-              <th>Email</th>
               <th>Company</th>
               <th>Role</th>
               <th>Status</th>
               <th>Actions</th>
             </tr></thead>
             <tbody id="workers-tbody">
-              <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+              <tr><td colspan="6" class="empty-state">Loading…</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ── PIN modal ── -->
+      <div id="pin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,0.2);overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid #F3F4F6;">
+            <div style="font-size:1rem;font-weight:700;color:#111827;" id="pin-modal-title">Set Worker PIN</div>
+            <button onclick="closePinModal()" style="background:none;border:none;font-size:1.2rem;color:#9CA3AF;cursor:pointer;">✕</button>
+          </div>
+          <div style="padding:18px 22px;">
+            <input type="hidden" id="pin-modal-worker-id">
+            <input type="hidden" id="pin-modal-tw-data">
+            <div style="margin-bottom:14px;">
+              <div style="font-size:0.75rem;font-weight:600;color:#6B7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Worker Name</div>
+              <div style="font-size:0.95rem;font-weight:600;color:#111827;" id="pin-modal-name"></div>
+            </div>
+            <div class="form-field" style="margin-bottom:12px;">
+              <label>PIN (4–6 digits) <span style="color:#dc2626">*</span></label>
+              <input type="password" id="pin-modal-pin" placeholder="••••" maxlength="6" inputmode="numeric">
+            </div>
+            <div class="form-field">
+              <label>Password (optional)</label>
+              <input type="password" id="pin-modal-password" placeholder="Min 8 characters">
+            </div>
+            <div class="error-msg" id="pin-modal-error" style="margin-top:8px;"></div>
+          </div>
+          <div style="padding:14px 22px;border-top:1px solid #F3F4F6;display:flex;gap:10px;justify-content:flex-end;">
+            <button class="btn btn-outlined" onclick="closePinModal()" style="font-size:.85rem;">Cancel</button>
+            <button class="btn btn-primary" id="pin-modal-save" onclick="savePinModal()" style="font-size:.85rem;">Save</button>
+          </div>
         </div>
       </div>
 
@@ -368,7 +382,7 @@
     document.getElementById('tab-' + tab).classList.add('active');
     if (tab === 'sessions') loadSessions();
     if (tab === 'events')   loadEvents();
-    if (tab === 'workers')  loadWorkers();
+    if (tab === 'workers')  { loadWorkers(); loadTWEmployees(); }
   };
 
   // ══════════════════════════════════════════════════════════
@@ -551,68 +565,187 @@
   };
 
   // ══════════════════════════════════════════════════════════
-  // WORKERS TAB
+  // WORKERS TAB — Import from TempWorks
   // ══════════════════════════════════════════════════════════
-  window.createWorker = async function() {
-    const name     = document.getElementById('wk-name').value.trim();
-    const empId    = document.getElementById('wk-empid').value.trim().toUpperCase();
-    const email    = document.getElementById('wk-email').value.trim() || null;
-    const password = document.getElementById('wk-password').value;
-    const pin      = document.getElementById('wk-pin').value;
-    const company  = document.getElementById('wk-company').value.trim() || null;
-    const role     = document.getElementById('wk-role').value.trim() || null;
+  let twImportList = [];  // full list of importable TW employees
 
-    if (!name || !empId)     { msg('wk-error', 'Name and Employee ID are required.'); return; }
-    if (!password && !pin)   { msg('wk-error', 'At least one of Password or PIN is required.'); return; }
-    if (pin && !/^\d{4,6}$/.test(pin)) { msg('wk-error', 'PIN must be 4–6 digits.'); return; }
-    if (password && password.length < 8) { msg('wk-error', 'Password must be at least 8 characters.'); return; }
+  window.loadTWEmployees = async function() {
+    const tbody = document.getElementById('tw-import-tbody');
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Loading…</td></tr>';
 
-    // Hash via Supabase RPC (server-side bcrypt)
-    const { data: hashed, error: hashErr } = await supabase.rpc('hash_worker_credentials', {
-      p_password: password || null,
-      p_pin:      pin      || null,
-    });
+    // 1. Load existing workers so we can filter them out
+    const { data: existingWorkers } = await supabase
+      .from('workers').select('employee_id');
+    const importedIds = new Set((existingWorkers || []).map(w => w.employee_id).filter(Boolean));
 
-    if (hashErr) { msg('wk-error', 'Server error: ' + hashErr.message); return; }
+    // 2. Load ts_employees (have TS ID + link to TW via custom_employee_id)
+    const { data: tsEmps } = await supabase
+      .from('ts_employees')
+      .select('employee_id, first_name, last_name, custom_employee_id, primary_department, current_department');
 
-    const { error } = await supabase.from('workers').insert({
-      name, employee_id: empId, email,
-      password_hash: hashed.password_hash || null,
-      pin_hash:      hashed.pin_hash      || null,
-      company, role, is_active: true,
-    });
+    // 3. Load tw_employees for names
+    const twIds = (tsEmps || [])
+      .map(e => e.custom_employee_id ? parseInt(e.custom_employee_id) : null)
+      .filter(Boolean);
 
-    if (error) { msg('wk-error', error.message); return; }
+    let twNameMap = {};
+    if (twIds.length) {
+      const { data: twEmps } = await supabase
+        .from('tw_employees')
+        .select('id, first_name, last_name')
+        .in('id', twIds);
+      (twEmps || []).forEach(e => { twNameMap[e.id] = e; });
+    }
 
-    msg('wk-success', `Worker "${name}" added.`, 'success');
-    ['wk-name','wk-empid','wk-email','wk-password','wk-pin','wk-company','wk-role']
-      .forEach(id => document.getElementById(id).value = '');
-    loadWorkers();
+    // 4. Build list — exclude already-imported employees
+    twImportList = (tsEmps || [])
+      .filter(e => !importedIds.has(String(e.employee_id)))
+      .map(e => {
+        const twId  = e.custom_employee_id ? parseInt(e.custom_employee_id) : null;
+        const twEmp = twId ? twNameMap[twId] : null;
+        const name  = twEmp
+          ? `${twEmp.first_name} ${twEmp.last_name}`.trim()
+          : (e.first_name || e.last_name)
+            ? `${e.first_name || ''} ${e.last_name || ''}`.trim()
+            : `Employee ${e.employee_id}`;
+        const dept  = e.primary_department || e.current_department || '—';
+        return { name, tsId: String(e.employee_id), dept };
+      })
+      .filter(e => e.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    renderTWList(twImportList);
+  };
+
+  function renderTWList(list) {
+    const tbody = document.getElementById('tw-import-tbody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">All TempWorks employees are already added, or none found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(e => `<tr>
+      <td style="font-weight:600">${e.name}</td>
+      <td style="font-family:monospace;font-size:.82rem">${e.tsId}</td>
+      <td style="color:var(--text-secondary)">${e.dept}</td>
+      <td>
+        <button class="btn btn-primary" style="font-size:.75rem;padding:4px 12px;"
+          onclick='openImportModal(${JSON.stringify(e)})'>+ Add</button>
+      </td>
+    </tr>`).join('');
+  }
+
+  window.filterTWList = function() {
+    const q = document.getElementById('tw-search').value.toLowerCase().trim();
+    renderTWList(q ? twImportList.filter(e => e.name.toLowerCase().includes(q) || e.tsId.toLowerCase().includes(q)) : twImportList);
+  };
+
+  // ── PIN Modal (used for both import and update) ───────────
+  window.openImportModal = function(twData) {
+    document.getElementById('pin-modal-worker-id').value = '';
+    document.getElementById('pin-modal-tw-data').value   = JSON.stringify(twData);
+    document.getElementById('pin-modal-name').textContent = twData.name;
+    document.getElementById('pin-modal-title').textContent = 'Add Worker — Set PIN';
+    document.getElementById('pin-modal-pin').value      = '';
+    document.getElementById('pin-modal-password').value = '';
+    document.getElementById('pin-modal-error').textContent = '';
+    document.getElementById('pin-modal-error').classList.remove('show');
+    document.getElementById('pin-modal').style.display = 'flex';
+  };
+
+  window.openSetPinModal = function(workerId, workerName) {
+    document.getElementById('pin-modal-worker-id').value = workerId;
+    document.getElementById('pin-modal-tw-data').value   = '';
+    document.getElementById('pin-modal-name').textContent = workerName;
+    document.getElementById('pin-modal-title').textContent = 'Update PIN / Password';
+    document.getElementById('pin-modal-pin').value      = '';
+    document.getElementById('pin-modal-password').value = '';
+    document.getElementById('pin-modal-error').textContent = '';
+    document.getElementById('pin-modal-error').classList.remove('show');
+    document.getElementById('pin-modal').style.display = 'flex';
+  };
+
+  window.closePinModal = function() {
+    document.getElementById('pin-modal').style.display = 'none';
+  };
+
+  window.savePinModal = async function() {
+    const pin      = document.getElementById('pin-modal-pin').value;
+    const password = document.getElementById('pin-modal-password').value;
+    const workerId = document.getElementById('pin-modal-worker-id').value;
+    const twRaw    = document.getElementById('pin-modal-tw-data').value;
+    const errEl    = document.getElementById('pin-modal-error');
+
+    const showErr = t => { errEl.textContent = t; errEl.classList.add('show'); };
+
+    if (!pin && !password)         { showErr('Enter at least a PIN or Password.'); return; }
+    if (pin && !/^\d{4,6}$/.test(pin)) { showErr('PIN must be 4–6 digits.'); return; }
+    if (password && password.length < 8) { showErr('Password must be at least 8 characters.'); return; }
+
+    const saveBtn = document.getElementById('pin-modal-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+    try {
+      const { data: hashed, error: hashErr } = await supabase.rpc('hash_worker_credentials', {
+        p_password: password || null,
+        p_pin:      pin      || null,
+      });
+      if (hashErr) throw hashErr;
+
+      if (workerId) {
+        // Updating existing worker's PIN/password
+        const patch = {};
+        if (hashed.pin_hash)      patch.pin_hash      = hashed.pin_hash;
+        if (hashed.password_hash) patch.password_hash = hashed.password_hash;
+        const { error } = await supabase.from('workers').update(patch).eq('id', workerId);
+        if (error) throw error;
+      } else {
+        // Importing new worker from TW
+        const tw = JSON.parse(twRaw);
+        const { error } = await supabase.from('workers').insert({
+          name:          tw.name,
+          employee_id:   tw.tsId,
+          company:       tw.dept !== '—' ? tw.dept : null,
+          password_hash: hashed.password_hash || null,
+          pin_hash:      hashed.pin_hash      || null,
+          is_active:     true,
+        });
+        if (error) throw error;
+      }
+
+      closePinModal();
+      loadWorkers();
+      loadTWEmployees();  // refresh import list
+    } catch (err) {
+      showErr(err.message || 'Server error.');
+    } finally {
+      saveBtn.disabled = false; saveBtn.textContent = 'Save';
+    }
   };
 
   window.loadWorkers = async function() {
     const tbody = document.getElementById('workers-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading…</td></tr>';
 
     const { data, error } = await supabase.from('workers')
-      .select('id, name, employee_id, email, company, role, is_active, created_at')
-      .order('created_at', { ascending: false });
+      .select('id, name, employee_id, company, role, is_active, created_at')
+      .order('name');
 
     if (error || !data?.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">${error ? 'Error.' : 'No workers yet.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${error ? 'Error loading workers.' : 'No workers yet. Import from TempWorks above.'}</td></tr>`;
       return;
     }
 
     tbody.innerHTML = data.map(w => `<tr>
       <td style="font-weight:600">${w.name}</td>
-      <td style="font-family:monospace">${w.employee_id || '—'}</td>
-      <td>${w.email || '—'}</td>
+      <td style="font-family:monospace;font-size:.82rem">${w.employee_id || '—'}</td>
       <td>${w.company || '—'}</td>
       <td>${w.role || '—'}</td>
       <td>${w.is_active
             ? '<span class="badge badge-in">Active</span>'
             : '<span class="badge badge-out">Inactive</span>'}</td>
-      <td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
+          onclick="openSetPinModal('${w.id}', '${w.name.replace(/'/g,"\\'")}')">Set PIN</button>
         <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
           onclick="toggleWorkerActive('${w.id}', ${w.is_active})">
           ${w.is_active ? 'Deactivate' : 'Activate'}
