@@ -33,6 +33,7 @@ export default defineConfig(({ mode }) => {
           reports:        resolve(__dirnameESM, 'reports.html'),
           workerCheckin:  resolve(__dirnameESM, 'worker-checkin.html'),
           workerSessions: resolve(__dirnameESM, 'worker-sessions.html'),
+          scheduler:      resolve(__dirnameESM, 'scheduler.html'),
         },
       },
     },

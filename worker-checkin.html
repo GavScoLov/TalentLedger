@@ -127,6 +127,28 @@
     }
     .checkin-detail strong { color: var(--text); font-weight: 600; }
 
+    /* ── Today's shifts ── */
+    .shifts-today {
+      background: var(--bg); border-radius: 10px; padding: 14px 16px;
+      margin-bottom: 20px; text-align: left;
+    }
+    .shifts-today-label {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--muted); margin-bottom: 10px;
+    }
+    .shift-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid var(--border);
+    }
+    .shift-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .shift-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .shift-info { flex: 1; min-width: 0; }
+    .shift-name { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+    .shift-time-str { font-size: 0.76rem; color: var(--muted); }
+    .shifts-none { font-size: 0.82rem; color: var(--muted); font-style: italic; }
+
     /* ── Success screen ── */
     .success-icon {
       width: 72px; height: 72px; border-radius: 50%;
@@ -191,6 +213,7 @@
         <div class="status-badge out" id="status-badge">Not Checked In</div>
 
         <div class="checkin-detail" id="checkin-detail" style="display:none;"></div>
+        <div class="shifts-today" id="shifts-today" style="display:none;"></div>
 
         <button class="btn btn-checkin"  id="btn-checkin"  onclick="handleAction()" style="display:none;">✓ Check In</button>
         <button class="btn btn-checkout" id="btn-checkout" onclick="handleAction()" style="display:none;">→ Check Out</button>
@@ -254,6 +277,13 @@
 
     function fmt(ts) {
       return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    function fmtTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${h % 12 || 12}:${m.toString().padStart(2,'0')} ${ampm}`;
     }
 
     function elapsed(ts) {
@@ -349,7 +379,33 @@
         btnOut.style.display = 'none';
       }
 
+      // Render today's shifts
+      renderShiftsToday(data.shifts_today || []);
+
       showScreen('action');
+    }
+
+    function renderShiftsToday(shifts) {
+      const container = document.getElementById('shifts-today');
+      if (!shifts || shifts.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+      container.style.display = '';
+      let html = '<div class="shifts-today-label">Today\'s Shifts</div>';
+      for (const s of shifts) {
+        const color = s.color || '#EA8938';
+        html += `
+          <div class="shift-item">
+            <div class="shift-dot" style="background:${color}"></div>
+            <div class="shift-info">
+              <div class="shift-name">${s.title || 'Shift'}${s.event_name ? ' — ' + s.event_name : ''}</div>
+              <div class="shift-time-str">${fmtTime(s.start_time)} – ${fmtTime(s.end_time)}</div>
+            </div>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
     }
 
     // ── Action (check in or out) ─────────────────────────────
@@ -419,6 +475,7 @@
       cachedCreds = null;
       document.getElementById('input-identifier').value = '';
       document.getElementById('input-credential').value = '';
+      document.getElementById('shifts-today').style.display = 'none';
       clearError();
       showScreen('login');
     }

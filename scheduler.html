@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scheduler – TalentLedger</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    /* ── Layout ── */
+    body { background: var(--surface-2, #F3F4F6); }
+    .page-body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .page-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+
+    /* ── Toolbar ── */
+    .scheduler-toolbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 24px; background: #fff;
+      border-bottom: 1px solid #E5E7EB; flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .toolbar-week {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .week-nav {
+      display: flex; align-items: center; border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden;
+    }
+    .week-nav button {
+      background: #fff; border: none; padding: 7px 12px; cursor: pointer;
+      font-size: 1rem; color: #374151; transition: background 0.15s;
+    }
+    .week-nav button:hover { background: #F9FAFB; }
+    .week-range {
+      font-size: 0.95rem; font-weight: 600; color: #111827; min-width: 200px; text-align: center;
+    }
+    .btn-today {
+      padding: 7px 14px; border: 1px solid #E5E7EB; border-radius: 8px;
+      background: #fff; font-size: 0.85rem; font-weight: 600; color: #374151;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .btn-today:hover { background: #F9FAFB; }
+    .toolbar-filters { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .toolbar-filters select, .toolbar-filters input {
+      padding: 7px 10px; border: 1px solid #E5E7EB; border-radius: 8px;
+      font-size: 0.85rem; color: #374151; background: #fff; outline: none;
+    }
+    .toolbar-filters select:focus, .toolbar-filters input:focus { border-color: #EA8938; }
+    .btn-add-shift {
+      padding: 8px 16px; background: #EA8938; color: #fff; border: none;
+      border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-add-shift:hover { background: #C7712A; }
+
+    /* ── Grid wrapper ── */
+    .grid-wrapper {
+      flex: 1; overflow: auto; position: relative;
+    }
+
+    /* ── Scheduler grid ── */
+    .scheduler-grid {
+      display: grid;
+      grid-template-columns: 200px repeat(7, 1fr);
+      min-width: 900px;
+    }
+
+    /* ── Header row ── */
+    .grid-header {
+      position: sticky; top: 0; z-index: 20;
+      display: contents;
+    }
+    .grid-header-cell {
+      background: #fff; border-bottom: 2px solid #E5E7EB;
+      padding: 10px 12px; font-size: 0.78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: #6B7280; position: sticky; top: 0; z-index: 20;
+    }
+    .grid-header-cell.worker-col { color: #374151; background: #F9FAFB; }
+    .grid-header-cell.today-col {
+      background: #FEF3E6; color: #EA8938; border-bottom-color: #EA8938;
+    }
+    .day-header-name { font-size: 0.9rem; font-weight: 700; color: #111827; }
+    .day-header-date { font-size: 0.72rem; color: #9CA3AF; margin-top: 1px; }
+    .today-col .day-header-name { color: #EA8938; }
+    .today-col .day-header-date { color: #EA8938; opacity: 0.7; }
+
+    /* ── Worker rows ── */
+    .worker-name-cell {
+      background: #F9FAFB; border-right: 1px solid #E5E7EB;
+      border-bottom: 1px solid #F3F4F6;
+      padding: 12px 14px; display: flex; flex-direction: column;
+      justify-content: center; min-height: 72px;
+      position: sticky; left: 0; z-index: 10;
+    }
+    .worker-name { font-size: 0.88rem; font-weight: 600; color: #111827; }
+    .worker-role { font-size: 0.74rem; color: #9CA3AF; margin-top: 2px; }
+
+    /* ── Day cells ── */
+    .day-cell {
+      border-right: 1px solid #F3F4F6; border-bottom: 1px solid #F3F4F6;
+      padding: 6px; min-height: 72px; cursor: pointer;
+      transition: background 0.12s; position: relative;
+    }
+    .day-cell:hover { background: #FFFBF5; }
+    .day-cell.today-col { background: #FFFDF8; }
+    .day-cell.today-col:hover { background: #FEF3E6; }
+
+    /* ── Shift blocks ── */
+    .shift-block {
+      border-radius: 6px; padding: 5px 8px; margin-bottom: 4px;
+      font-size: 0.76rem; font-weight: 600; cursor: pointer;
+      transition: filter 0.12s, transform 0.1s;
+      border-left: 3px solid rgba(0,0,0,0.15);
+      line-height: 1.3; user-select: none;
+    }
+    .shift-block:hover { filter: brightness(0.92); transform: translateY(-1px); }
+    .shift-block .shift-time { font-size: 0.68rem; opacity: 0.75; font-weight: 500; }
+    .shift-block.status-cancelled { opacity: 0.45; text-decoration: line-through; }
+
+    /* ── Add shift hint ── */
+    .add-hint {
+      color: #D1D5DB; font-size: 0.75rem; text-align: center;
+      padding: 10px 0; display: none;
+    }
+    .day-cell:hover .add-hint { display: block; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      grid-column: 1 / -1; padding: 60px; text-align: center;
+      color: #9CA3AF; font-size: 0.95rem;
+    }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      grid-column: 1 / -1; padding: 60px; text-align: center; color: #9CA3AF;
+    }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 16px;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal {
+      background: #fff; border-radius: 16px; width: 100%; max-width: 480px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.25); overflow: hidden;
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 24px 16px; border-bottom: 1px solid #F3F4F6;
+    }
+    .modal-title { font-size: 1.05rem; font-weight: 700; color: #111827; }
+    .modal-close {
+      background: none; border: none; font-size: 1.2rem; color: #9CA3AF;
+      cursor: pointer; padding: 4px; line-height: 1;
+    }
+    .modal-close:hover { color: #374151; }
+    .modal-body { padding: 20px 24px; }
+    .modal-footer {
+      padding: 16px 24px; border-top: 1px solid #F3F4F6;
+      display: flex; gap: 10px; justify-content: flex-end;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; font-size: 0.75rem; font-weight: 600; color: #6B7280;
+      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 10px 12px; border: 1.5px solid #E5E7EB;
+      border-radius: 8px; font-size: 0.9rem; color: #111827; outline: none;
+      font-family: inherit; transition: border-color 0.15s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: #EA8938; box-shadow: 0 0 0 3px rgba(234,137,56,0.15);
+    }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .color-swatches {
+      display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0;
+    }
+    .color-swatch {
+      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+      border: 3px solid transparent; transition: transform 0.12s, border-color 0.12s;
+    }
+    .color-swatch:hover { transform: scale(1.15); }
+    .color-swatch.selected { border-color: #111827; transform: scale(1.1); }
+    .btn-modal {
+      padding: 10px 20px; border-radius: 8px; font-size: 0.88rem;
+      font-weight: 700; cursor: pointer; border: none; transition: background 0.15s;
+    }
+    .btn-modal-primary { background: #EA8938; color: #fff; }
+    .btn-modal-primary:hover { background: #C7712A; }
+    .btn-modal-secondary { background: #F3F4F6; color: #374151; }
+    .btn-modal-secondary:hover { background: #E5E7EB; }
+    .btn-modal-danger { background: #FEE2E2; color: #DC2626; }
+    .btn-modal-danger:hover { background: #FECACA; }
+    .modal-footer-left { margin-right: auto; }
+
+    /* ── Status pills in modal ── */
+    .status-select-wrapper { position: relative; }
+  </style>
+</head>
+<body>
+  <div id="navbar-container"></div>
+  <div class="page-body" style="flex-direction:row;">
+    <div id="sidebar-container"></div>
+    <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+      <div class="scheduler-toolbar">
+        <div class="toolbar-week">
+          <div class="week-nav">
+            <button onclick="navigateWeek(-1)">&#8249;</button>
+            <span class="week-range" id="week-range-label">Loading…</span>
+            <button onclick="navigateWeek(1)">&#8250;</button>
+          </div>
+          <button class="btn-today" onclick="goToToday()">Today</button>
+        </div>
+        <div class="toolbar-filters">
+          <input type="text" id="filter-search" placeholder="Search worker…" oninput="applyFilter()" style="width:160px;">
+          <select id="filter-status" onchange="applyFilter()">
+            <option value="">All statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button class="btn-add-shift" onclick="openCreateModal()">+ Add Shift</button>
+        </div>
+      </div>
+
+      <div class="grid-wrapper">
+        <div class="scheduler-grid" id="scheduler-grid">
+          <div class="loading-overlay">Loading schedule…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Shift Modal ── -->
+  <div class="modal-backdrop hidden" id="shift-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Add Shift</div>
+        <button class="modal-close" onclick="closeModal()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modal-shift-id">
+        <div class="form-group">
+          <label>Worker</label>
+          <select id="modal-worker-id" onchange="onWorkerChange()">
+            <option value="">Select worker…</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="modal-date">
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="modal-status">
+              <option value="scheduled">Scheduled</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start Time</label>
+            <input type="time" id="modal-start">
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input type="time" id="modal-end">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Title / Role</label>
+            <input type="text" id="modal-title-field" placeholder="e.g. Forklift Operator">
+          </div>
+          <div class="form-group">
+            <label>Event (optional)</label>
+            <select id="modal-event-id">
+              <option value="">No event</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="modal-notes" placeholder="Any additional notes…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <div class="color-swatches" id="color-swatches"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="modal-footer-left" id="modal-delete-area"></div>
+        <button class="btn-modal btn-modal-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn-modal btn-modal-primary" id="modal-save-btn" onclick="saveShift()">Save Shift</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { checkAuth, checkPageAccess } from './src/auth.js';
+    import { renderSidebar } from './src/components/sidebar.js';
+    import { renderNavbar  } from './src/components/navbar.js';
+    import { supabase      } from './src/supabaseClient.js';
+
+    await checkAuth();
+    await checkPageAccess('scheduler');
+    renderNavbar(document.getElementById('navbar-container'));
+    renderSidebar(document.getElementById('sidebar-container'), 'scheduler');
+
+    // ── Constants ────────────────────────────────────────────
+    const COLORS = [
+      '#EA8938','#3B82F6','#10B981','#8B5CF6','#EF4444',
+      '#F59E0B','#06B6D4','#EC4899','#6366F1','#14B8A6',
+      '#F97316','#84CC16','#A855F7','#0EA5E9','#D946EF',
+    ];
+    const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // ── State ─────────────────────────────────────────────────
+    let weekStart  = getWeekStart(new Date());  // Monday of current week
+    let allWorkers = [];
+    let allEvents  = [];
+    let allShifts  = [];
+    let filteredWorkers = [];
+    let selectedColor = COLORS[0];
+
+    // ── Init ──────────────────────────────────────────────────
+    buildColorSwatches();
+    await Promise.all([loadWorkers(), loadEvents()]);
+    populateWorkerSelect();
+    populateEventSelect();
+    await loadShifts();
+    renderGrid();
+
+    // ── Date helpers ─────────────────────────────────────────
+    function getWeekStart(d) {
+      const dt = new Date(d);
+      const day = dt.getDay(); // 0=Sun
+      const diff = day === 0 ? -6 : 1 - day; // shift to Monday
+      dt.setDate(dt.getDate() + diff);
+      dt.setHours(0,0,0,0);
+      return dt;
+    }
+
+    function addDays(d, n) {
+      const dt = new Date(d);
+      dt.setDate(dt.getDate() + n);
+      return dt;
+    }
+
+    function toDateStr(d) {
+      return d.toISOString().slice(0,10);
+    }
+
+    function fmtDate(d) {
+      return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+
+    function fmtTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12  = h % 12 || 12;
+      return `${h12}:${m.toString().padStart(2,'0')} ${ampm}`;
+    }
+
+    function isToday(d) {
+      return toDateStr(d) === toDateStr(new Date());
+    }
+
+    // ── Navigation ───────────────────────────────────────────
+    window.navigateWeek = async (dir) => {
+      weekStart = addDays(weekStart, dir * 7);
+      await loadShifts();
+      renderGrid();
+    };
+
+    window.goToToday = async () => {
+      weekStart = getWeekStart(new Date());
+      await loadShifts();
+      renderGrid();
+    };
+
+    function updateWeekLabel() {
+      const end = addDays(weekStart, 6);
+      const sameMonth = weekStart.getMonth() === end.getMonth();
+      const sameYear  = weekStart.getFullYear() === end.getFullYear();
+      let label;
+      if (sameMonth && sameYear) {
+        label = `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()}–${end.getDate()}, ${weekStart.getFullYear()}`;
+      } else if (sameYear) {
+        label = `${fmtDate(weekStart)} – ${fmtDate(end)}, ${weekStart.getFullYear()}`;
+      } else {
+        label = `${fmtDate(weekStart)}, ${weekStart.getFullYear()} – ${fmtDate(end)}, ${end.getFullYear()}`;
+      }
+      document.getElementById('week-range-label').textContent = label;
+    }
+
+    // ── Data loading ─────────────────────────────────────────
+    async function loadWorkers() {
+      const { data, error } = await supabase
+        .from('workers')
+        .select('id, name, role, is_active')
+        .eq('is_active', true)
+        .order('name');
+      if (!error) allWorkers = data || [];
+    }
+
+    async function loadEvents() {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, name, event_date')
+        .not('status', 'eq', 'cancelled')
+        .order('event_date', { ascending: false })
+        .limit(100);
+      if (!error) allEvents = data || [];
+    }
+
+    async function loadShifts() {
+      const from = toDateStr(weekStart);
+      const to   = toDateStr(addDays(weekStart, 6));
+      const { data, error } = await supabase
+        .from('shifts')
+        .select('*, workers(name, role)')
+        .gte('shift_date', from)
+        .lte('shift_date', to)
+        .order('start_time');
+      if (!error) allShifts = data || [];
+    }
+
+    // ── Filter ───────────────────────────────────────────────
+    window.applyFilter = () => {
+      renderGrid();
+    };
+
+    function getFilteredWorkers() {
+      const search = document.getElementById('filter-search').value.toLowerCase().trim();
+      if (!search) return allWorkers;
+      return allWorkers.filter(w => w.name.toLowerCase().includes(search));
+    }
+
+    function getFilteredShifts() {
+      const status = document.getElementById('filter-status').value;
+      if (!status) return allShifts;
+      return allShifts.filter(s => s.status === status);
+    }
+
+    // ── Render grid ──────────────────────────────────────────
+    function renderGrid() {
+      updateWeekLabel();
+      const grid = document.getElementById('scheduler-grid');
+      grid.innerHTML = '';
+
+      const workers = getFilteredWorkers();
+      const shifts  = getFilteredShifts();
+
+      // Build shift lookup: workerId+date → [shifts]
+      const shiftMap = {};
+      for (const s of shifts) {
+        const key = `${s.worker_id}__${s.shift_date}`;
+        if (!shiftMap[key]) shiftMap[key] = [];
+        shiftMap[key].push(s);
+      }
+
+      // Days of week
+      const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+      // ── Header ──
+      // Worker column header
+      const workerHead = el('div', 'grid-header-cell worker-col', 'Workers');
+      workerHead.style.cssText = 'min-width:200px; position:sticky; left:0; z-index:30;';
+      grid.appendChild(workerHead);
+
+      for (const day of days) {
+        const todayClass = isToday(day) ? ' today-col' : '';
+        const cell = el('div', 'grid-header-cell' + todayClass);
+        cell.innerHTML = `<div class="day-header-name">${DAYS[day.getDay()]}</div><div class="day-header-date">${fmtDate(day)}</div>`;
+        grid.appendChild(cell);
+      }
+
+      // ── Worker rows ──
+      if (workers.length === 0) {
+        const empty = el('div', 'empty-state', 'No workers found. Add workers in the Worker Sessions tab.');
+        empty.style.gridColumn = '1 / -1';
+        grid.appendChild(empty);
+        return;
+      }
+
+      for (const worker of workers) {
+        // Worker name cell (sticky left)
+        const nameCell = el('div', 'worker-name-cell');
+        nameCell.innerHTML = `
+          <div class="worker-name">${escHtml(worker.name)}</div>
+          ${worker.role ? `<div class="worker-role">${escHtml(worker.role)}</div>` : ''}
+        `;
+        grid.appendChild(nameCell);
+
+        // Day cells
+        for (const day of days) {
+          const dateStr = toDateStr(day);
+          const todayClass = isToday(day) ? ' today-col' : '';
+          const cell = el('div', 'day-cell' + todayClass);
+          cell.dataset.workerId = worker.id;
+          cell.dataset.date     = dateStr;
+
+          const dayShifts = shiftMap[`${worker.id}__${dateStr}`] || [];
+          for (const shift of dayShifts) {
+            const block = buildShiftBlock(shift);
+            cell.appendChild(block);
+          }
+
+          // "+" hint on hover
+          const hint = el('div', 'add-hint', '+ Add shift');
+          cell.appendChild(hint);
+
+          cell.addEventListener('click', e => {
+            if (e.target.closest('.shift-block')) return;
+            openCreateModal(worker.id, dateStr);
+          });
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function buildShiftBlock(shift) {
+      const bg    = shift.color || '#EA8938';
+      const light = hexToLight(bg);
+      const block = el('div', `shift-block status-${shift.status}`);
+      block.style.cssText = `background:${light}; color:${bg};`;
+      block.innerHTML = `
+        <div>${escHtml(shift.title || 'Shift')}</div>
+        <div class="shift-time">${fmtTime(shift.start_time)}–${fmtTime(shift.end_time)}</div>
+      `;
+      block.addEventListener('click', e => { e.stopPropagation(); openEditModal(shift); });
+      return block;
+    }
+
+    // Convert hex to a light background version
+    function hexToLight(hex) {
+      try {
+        const r = parseInt(hex.slice(1,3),16);
+        const g = parseInt(hex.slice(3,5),16);
+        const b = parseInt(hex.slice(5,7),16);
+        return `rgba(${r},${g},${b},0.15)`;
+      } catch { return '#FEF3E6'; }
+    }
+
+    // ── Modal helpers ─────────────────────────────────────────
+    function populateWorkerSelect() {
+      const sel = document.getElementById('modal-worker-id');
+      sel.innerHTML = '<option value="">Select worker…</option>';
+      for (const w of allWorkers) {
+        const opt = document.createElement('option');
+        opt.value = w.id;
+        opt.textContent = w.name + (w.role ? ` — ${w.role}` : '');
+        sel.appendChild(opt);
+      }
+    }
+
+    function populateEventSelect() {
+      const sel = document.getElementById('modal-event-id');
+      sel.innerHTML = '<option value="">No event</option>';
+      for (const ev of allEvents) {
+        const opt = document.createElement('option');
+        opt.value = ev.id;
+        opt.textContent = `${ev.name} (${ev.event_date})`;
+        sel.appendChild(opt);
+      }
+    }
+
+    window.onWorkerChange = () => {};  // hook for future use
+
+    function buildColorSwatches() {
+      const container = document.getElementById('color-swatches');
+      for (const c of COLORS) {
+        const sw = document.createElement('div');
+        sw.className = 'color-swatch' + (c === selectedColor ? ' selected' : '');
+        sw.style.background = c;
+        sw.title = c;
+        sw.addEventListener('click', () => {
+          selectedColor = c;
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+          sw.classList.add('selected');
+        });
+        container.appendChild(sw);
+      }
+    }
+
+    function setSwatchSelected(color) {
+      selectedColor = color || COLORS[0];
+      document.querySelectorAll('.color-swatch').forEach(s => {
+        s.classList.toggle('selected', s.style.background === hexToRgb(selectedColor) || s.title === selectedColor);
+      });
+    }
+
+    function hexToRgb(hex) {
+      try {
+        const r = parseInt(hex.slice(1,3),16);
+        const g = parseInt(hex.slice(3,5),16);
+        const b = parseInt(hex.slice(5,7),16);
+        return `rgb(${r}, ${g}, ${b})`;
+      } catch { return hex; }
+    }
+
+    // ── Open create modal ─────────────────────────────────────
+    window.openCreateModal = (workerId = '', dateStr = '') => {
+      document.getElementById('modal-title').textContent = 'Add Shift';
+      document.getElementById('modal-shift-id').value = '';
+      document.getElementById('modal-worker-id').value = workerId || '';
+      document.getElementById('modal-date').value = dateStr || toDateStr(new Date());
+      document.getElementById('modal-start').value = '08:00';
+      document.getElementById('modal-end').value   = '17:00';
+      document.getElementById('modal-title-field').value = '';
+      document.getElementById('modal-event-id').value = '';
+      document.getElementById('modal-status').value = 'scheduled';
+      document.getElementById('modal-notes').value = '';
+      setSwatchSelected(COLORS[0]);
+      document.getElementById('modal-delete-area').innerHTML = '';
+      document.getElementById('shift-modal').classList.remove('hidden');
+    };
+
+    // ── Open edit modal ────────────────────────────────────────
+    function openEditModal(shift) {
+      document.getElementById('modal-title').textContent = 'Edit Shift';
+      document.getElementById('modal-shift-id').value = shift.id;
+      document.getElementById('modal-worker-id').value = shift.worker_id || '';
+      document.getElementById('modal-date').value = shift.shift_date;
+      document.getElementById('modal-start').value = shift.start_time;
+      document.getElementById('modal-end').value   = shift.end_time;
+      document.getElementById('modal-title-field').value = shift.title || '';
+      document.getElementById('modal-event-id').value = shift.event_id || '';
+      document.getElementById('modal-status').value = shift.status || 'scheduled';
+      document.getElementById('modal-notes').value = shift.notes || '';
+      setSwatchSelected(shift.color || COLORS[0]);
+      // Delete button
+      const delArea = document.getElementById('modal-delete-area');
+      delArea.innerHTML = '';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-modal btn-modal-danger';
+      delBtn.textContent = 'Delete';
+      delBtn.onclick = () => deleteShift(shift.id);
+      delArea.appendChild(delBtn);
+      document.getElementById('shift-modal').classList.remove('hidden');
+    }
+
+    window.closeModal = () => {
+      document.getElementById('shift-modal').classList.add('hidden');
+    };
+
+    // Close on backdrop click
+    document.getElementById('shift-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('shift-modal')) closeModal();
+    });
+
+    // ── Save shift ────────────────────────────────────────────
+    window.saveShift = async () => {
+      const shiftId  = document.getElementById('modal-shift-id').value;
+      const workerId = document.getElementById('modal-worker-id').value;
+      const date     = document.getElementById('modal-date').value;
+      const start    = document.getElementById('modal-start').value;
+      const end      = document.getElementById('modal-end').value;
+      const title    = document.getElementById('modal-title-field').value.trim();
+      const eventId  = document.getElementById('modal-event-id').value || null;
+      const status   = document.getElementById('modal-status').value;
+      const notes    = document.getElementById('modal-notes').value.trim();
+
+      if (!workerId) { alert('Please select a worker.'); return; }
+      if (!date || !start || !end) { alert('Please fill in date and times.'); return; }
+      if (start >= end) { alert('End time must be after start time.'); return; }
+
+      const btn = document.getElementById('modal-save-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      try {
+        const payload = {
+          worker_id:  workerId,
+          event_id:   eventId,
+          shift_date: date,
+          start_time: start,
+          end_time:   end,
+          title:      title || null,
+          notes:      notes || null,
+          color:      selectedColor,
+          status,
+        };
+
+        let error;
+        if (shiftId) {
+          ({ error } = await supabase.from('shifts').update(payload).eq('id', shiftId));
+        } else {
+          ({ error } = await supabase.from('shifts').insert(payload));
+        }
+        if (error) throw error;
+
+        closeModal();
+        await loadShifts();
+        renderGrid();
+      } catch (err) {
+        alert('Error saving shift: ' + (err.message || err));
+      } finally {
+        btn.disabled = false; btn.textContent = 'Save Shift';
+      }
+    };
+
+    // ── Delete shift ──────────────────────────────────────────
+    async function deleteShift(id) {
+      if (!confirm('Delete this shift?')) return;
+      const { error } = await supabase.from('shifts').delete().eq('id', id);
+      if (error) { alert('Error: ' + error.message); return; }
+      closeModal();
+      await loadShifts();
+      renderGrid();
+    }
+
+    // ── Utility ───────────────────────────────────────────────
+    function el(tag, cls, text) {
+      const d = document.createElement(tag);
+      if (cls)  d.className   = cls;
+      if (text) d.textContent = text;
+      return d;
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+  </script>
+</body>
+</html>
