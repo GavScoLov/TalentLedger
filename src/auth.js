@@ -117,20 +117,29 @@ export async function getAllUsers() {
 
 // Admin: update a user's role
 export async function updateUserRole(userId, role) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .update({ role })
-    .eq('id', userId);
+    .eq('id', userId)
+    .select('id');
   if (error) throw error;
+  // If RLS silently blocks the update, data will be empty
+  if (!data || data.length === 0) {
+    throw new Error('Update was blocked — check Supabase RLS policies on the profiles table (see supabase-migration.sql for the fix).');
+  }
 }
 
 // Admin: update a user's allowed pages
 export async function updateUserPages(userId, pages) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .update({ allowed_pages: pages })
-    .eq('id', userId);
+    .eq('id', userId)
+    .select('id');
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Update was blocked — check Supabase RLS policies on the profiles table (see supabase-migration.sql for the fix).');
+  }
 }
 
 // Admin: delete a user's profile (does not delete auth user)
