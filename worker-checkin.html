@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worker Check-In / Check-Out</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange:       #EA8938;
+      --orange-dark:  #C7712A;
+      --orange-light: #FEF3E6;
+      --green:        #16a34a;
+      --red:          #dc2626;
+      --text:         #111827;
+      --muted:        #6B7280;
+      --border:       #E5E7EB;
+      --bg:           #F3F4F6;
+      --white:        #fff;
+      --radius:       12px;
+      --font:         'Inter', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 36px 36px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+    }
+
+    /* ── Logo / Header ── */
+    .brand {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .brand-icon {
+      width: 56px; height: 56px;
+      background: var(--orange);
+      border-radius: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 800; color: #fff;
+      margin-bottom: 12px;
+    }
+    .brand-name { font-size: 1.35rem; font-weight: 700; color: var(--text); }
+    .brand-sub  { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── Mode toggle ── */
+    .mode-toggle {
+      display: flex; border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden; margin-bottom: 24px;
+    }
+    .mode-btn {
+      flex: 1; padding: 9px; font-size: 0.82rem; font-weight: 600;
+      font-family: var(--font); cursor: pointer; border: none;
+      background: var(--white); color: var(--muted); transition: all 0.2s;
+    }
+    .mode-btn.active { background: var(--orange); color: #fff; }
+
+    /* ── Form ── */
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .field input {
+      width: 100%; padding: 13px 16px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-family: var(--font); font-size: 1rem;
+      color: var(--text); outline: none; transition: border-color 0.2s;
+    }
+    .field input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(234,137,56,0.15); }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      font-family: var(--font); font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.2px;
+    }
+    .btn-primary  { background: var(--orange); color: #fff; }
+    .btn-primary:hover  { background: var(--orange-dark); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-checkin  { background: var(--green);  color: #fff; font-size: 1.1rem; padding: 18px; }
+    .btn-checkin:hover { filter: brightness(0.9); }
+    .btn-checkout { background: var(--red);    color: #fff; font-size: 1.1rem; padding: 18px; }
+    .btn-checkout:hover { filter: brightness(0.9); }
+    .btn-ghost {
+      background: none; border: 1.5px solid var(--border); color: var(--muted);
+      margin-top: 12px; font-size: 0.88rem; padding: 10px;
+    }
+    .btn-ghost:hover { background: var(--bg); }
+
+    /* ── Error ── */
+    .error-box {
+      background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px;
+      padding: 12px 14px; color: var(--red); font-size: 0.85rem; font-weight: 500;
+      margin-bottom: 16px; display: none;
+    }
+    .error-box.show { display: block; }
+
+    /* ── Status panel (shown after login) ── */
+    .status-panel { text-align: center; }
+    .status-greeting { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .status-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 28px; }
+
+    .status-badge {
+      display: inline-block; padding: 8px 18px; border-radius: 999px;
+      font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 20px;
+    }
+    .status-badge.in  { background: #DCFCE7; color: var(--green); }
+    .status-badge.out { background: #FEF3E6; color: var(--orange); }
+
+    .checkin-detail {
+      background: var(--bg); border-radius: 10px; padding: 16px;
+      margin-bottom: 24px; font-size: 0.88rem; color: var(--muted); line-height: 1.8;
+    }
+    .checkin-detail strong { color: var(--text); font-weight: 600; }
+
+    /* ── Success screen ── */
+    .success-icon {
+      width: 72px; height: 72px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 32px; margin-bottom: 16px;
+    }
+    .success-icon.in  { background: #DCFCE7; color: var(--green); }
+    .success-icon.out { background: #FEE2E2; color: var(--red); }
+    .success-title { font-size: 1.6rem; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+    .success-name  { font-size: 1.1rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+    .success-time  { font-size: 0.88rem; color: var(--muted); margin-bottom: 28px; }
+    .success-countdown { font-size: 0.8rem; color: var(--muted); margin-top: 14px; }
+
+    /* ── Screens ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- ── Screen 1: Login ── -->
+    <div class="screen active" id="screen-login">
+      <div class="brand">
+        <div class="brand-icon">TL</div>
+        <div class="brand-name">TalentLedger</div>
+        <div class="brand-sub">Worker Check-In / Check-Out</div>
+      </div>
+
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-mode-pass" onclick="setMode('password')">Password</button>
+        <button class="mode-btn"        id="btn-mode-pin"  onclick="setMode('pin')">PIN</button>
+      </div>
+
+      <div class="error-box" id="login-error"></div>
+
+      <div class="field">
+        <label id="label-identifier">Email</label>
+        <input type="text" id="input-identifier" placeholder="you@example.com" autocomplete="off" autocapitalize="off">
+      </div>
+      <div class="field">
+        <label id="label-credential">Password</label>
+        <input type="password" id="input-credential" placeholder="••••••••">
+      </div>
+
+      <button class="btn btn-primary" id="btn-login" onclick="handleLogin()">Continue</button>
+    </div>
+
+    <!-- ── Screen 2: Action ── -->
+    <div class="screen" id="screen-action">
+      <div class="status-panel">
+        <div class="status-greeting" id="action-greeting">Welcome!</div>
+        <div class="status-sub" id="action-sub"></div>
+
+        <div class="status-badge out" id="status-badge">Not Checked In</div>
+
+        <div class="checkin-detail" id="checkin-detail" style="display:none;"></div>
+
+        <button class="btn btn-checkin"  id="btn-checkin"  onclick="handleAction()" style="display:none;">✓ Check In</button>
+        <button class="btn btn-checkout" id="btn-checkout" onclick="handleAction()" style="display:none;">→ Check Out</button>
+        <button class="btn btn-ghost" onclick="resetToLogin()">← Different Worker</button>
+      </div>
+    </div>
+
+    <!-- ── Screen 3: Success ── -->
+    <div class="screen" id="screen-success">
+      <div style="text-align:center;">
+        <div class="success-icon" id="success-icon">✓</div>
+        <div class="success-title" id="success-title">Checked In!</div>
+        <div class="success-name"  id="success-name"></div>
+        <div class="success-time"  id="success-time"></div>
+        <button class="btn btn-primary" onclick="resetToLogin()">New Check-In</button>
+        <div class="success-countdown" id="countdown-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const supabase = createClient(
+      'https://txhyfogbyzwueazhrqax.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4aHlmb2dieXp3dWVhemhycWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzI5MzcsImV4cCI6MjA4OTAwODkzN30.XYaUiGtgutQVsYpNekLuLJ8LHVlWZhRtRnAvL7_IAfQ'
+    );
+
+    // ── State ────────────────────────────────────────────────
+    let currentMode = 'password';
+    let cachedCreds = null;   // { identifier, credential, isPin } — in-memory only
+    let countdownTimer = null;
+
+    // ── Expose functions to inline onclick handlers ──────────
+    window.setMode      = setMode;
+    window.handleLogin  = handleLogin;
+    window.handleAction = handleAction;
+    window.resetToLogin = resetToLogin;
+
+    // ── Helpers ──────────────────────────────────────────────
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + id).classList.add('active');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    function clearError() {
+      document.getElementById('login-error').classList.remove('show');
+    }
+
+    function setLoading(btnId, loading) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = loading;
+      btn.innerHTML = loading ? '<span class="spinner"></span>' : btn.dataset.label;
+    }
+
+    function fmt(ts) {
+      return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    function elapsed(ts) {
+      const mins = Math.round((Date.now() - new Date(ts)) / 60000);
+      if (mins < 60) return `${mins}m`;
+      const h = Math.floor(mins / 60), m = mins % 60;
+      return `${h}h ${m}m`;
+    }
+
+    // ── Mode toggle ──────────────────────────────────────────
+    function setMode(mode) {
+      currentMode = mode;
+      const isPin = mode === 'pin';
+      document.getElementById('btn-mode-pass').classList.toggle('active', !isPin);
+      document.getElementById('btn-mode-pin').classList.toggle('active', isPin);
+      document.getElementById('label-identifier').textContent = isPin ? 'Employee ID' : 'Email';
+      document.getElementById('label-credential').textContent = isPin ? 'PIN' : 'Password';
+      document.getElementById('input-identifier').placeholder = isPin ? 'EMP042' : 'you@example.com';
+      document.getElementById('input-credential').placeholder = isPin ? '••••' : '••••••••';
+      clearError();
+    }
+
+    // ── Enter key on inputs ──────────────────────────────────
+    document.getElementById('input-credential').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+
+    // Store labels before setting spinner
+    document.getElementById('btn-login').dataset.label = 'Continue';
+
+    // ── Login / Status check ─────────────────────────────────
+    async function handleLogin() {
+      clearError();
+      const identifier = document.getElementById('input-identifier').value.trim();
+      const credential = document.getElementById('input-credential').value;
+      const isPin = currentMode === 'pin';
+
+      if (!identifier || !credential) { showError('Please fill in all fields.'); return; }
+
+      setLoading('btn-login', true);
+      try {
+        const { data, error } = await supabase.rpc('worker_get_status', {
+          p_identifier: identifier,
+          p_credential: credential,
+          p_is_pin:     isPin,
+        });
+        if (error) throw error;
+        if (!data.success) { showError(data.error || 'Invalid credentials.'); return; }
+
+        // Cache credentials in memory for the action call
+        cachedCreds = { identifier, credential, isPin };
+
+        showActionScreen(data);
+      } catch (err) {
+        showError('Connection error. Please try again.');
+        console.error(err);
+      } finally {
+        setLoading('btn-login', false);
+      }
+    }
+
+    // ── Show action screen ───────────────────────────────────
+    function showActionScreen(data) {
+      const checkedIn = data.is_checked_in;
+      const session   = data.session;
+
+      document.getElementById('action-greeting').textContent = `Hello, ${data.worker_name.split(' ')[0]}!`;
+      document.getElementById('action-sub').textContent      = data.worker_name;
+
+      const badge = document.getElementById('status-badge');
+      const detail = document.getElementById('checkin-detail');
+      const btnIn  = document.getElementById('btn-checkin');
+      const btnOut = document.getElementById('btn-checkout');
+
+      if (checkedIn && session) {
+        badge.textContent = 'Currently Checked In';
+        badge.className   = 'status-badge in';
+        detail.style.display = '';
+        detail.innerHTML = `
+          <strong>Checked in:</strong> ${fmt(session.check_in_time)}<br>
+          <strong>Duration:</strong> ${elapsed(session.check_in_time)}<br>
+          ${data.event_name ? `<strong>Event:</strong> ${data.event_name}` : ''}
+        `;
+        btnIn.style.display  = 'none';
+        btnOut.style.display = '';
+        btnOut.dataset.label = '→ Check Out';
+      } else {
+        badge.textContent = 'Not Checked In';
+        badge.className   = 'status-badge out';
+        detail.style.display = 'none';
+        btnIn.style.display  = '';
+        btnIn.dataset.label  = '✓ Check In';
+        btnOut.style.display = 'none';
+      }
+
+      showScreen('action');
+    }
+
+    // ── Action (check in or out) ─────────────────────────────
+    async function handleAction() {
+      if (!cachedCreds) { resetToLogin(); return; }
+
+      const isCheckingIn = document.getElementById('btn-checkin').style.display !== 'none';
+      const activeBtn = isCheckingIn ? 'btn-checkin' : 'btn-checkout';
+      document.getElementById(activeBtn).disabled = true;
+      document.getElementById(activeBtn).innerHTML = '<span class="spinner"></span>';
+
+      try {
+        const { data, error } = await supabase.rpc('worker_check_in_out', {
+          p_identifier: cachedCreds.identifier,
+          p_credential: cachedCreds.credential,
+          p_is_pin:     cachedCreds.isPin,
+          p_event_id:   null,
+        });
+        if (error) throw error;
+        if (!data.success) {
+          alert(data.error || 'Something went wrong.');
+          resetToLogin();
+          return;
+        }
+
+        showSuccessScreen(data);
+      } catch (err) {
+        alert('Connection error. Please try again.');
+        console.error(err);
+        document.getElementById(activeBtn).disabled = false;
+        document.getElementById(activeBtn).innerHTML =
+          document.getElementById(activeBtn).dataset.label;
+      }
+    }
+
+    // ── Success screen ───────────────────────────────────────
+    function showSuccessScreen(data) {
+      const isIn   = data.action === 'check_in';
+      const ts     = isIn ? data.session.check_in_time : data.session.check_out_time;
+      const hours  = data.session.hours_worked;
+
+      document.getElementById('success-icon').textContent  = isIn ? '✓' : '✔';
+      document.getElementById('success-icon').className    = `success-icon ${isIn ? 'in' : 'out'}`;
+      document.getElementById('success-title').textContent = isIn ? 'Checked In!' : 'Checked Out!';
+      document.getElementById('success-name').textContent  = data.worker_name;
+      document.getElementById('success-time').textContent  =
+        isIn
+          ? `${fmt(ts)} · ${new Date(ts).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+          : `Duration: ${hours} hrs · Out at ${fmt(ts)}`;
+
+      showScreen('success');
+
+      // Auto-reset after 8 seconds
+      let secs = 8;
+      const el = document.getElementById('countdown-msg');
+      el.textContent = `Returning to login in ${secs}s…`;
+      countdownTimer = setInterval(() => {
+        secs--;
+        if (secs <= 0) { clearInterval(countdownTimer); resetToLogin(); }
+        else el.textContent = `Returning to login in ${secs}s…`;
+      }, 1000);
+    }
+
+    // ── Reset ────────────────────────────────────────────────
+    function resetToLogin() {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      cachedCreds = null;
+      document.getElementById('input-identifier').value = '';
+      document.getElementById('input-credential').value = '';
+      clearError();
+      showScreen('login');
+    }
+  </script>
+</body>
+</html>
