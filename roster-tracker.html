@@ -261,22 +261,25 @@
             .summary-stat-value { font-size: 1.05rem !important; }
             .summary-stat-label { font-size: 0.58rem !important; }
 
-            /* ── Row 2: Speedometer | Distribution
-                  Row 3: Success Activity | Weekly ────────────── */
+            /* ── Row 2: Speedometer | Distribution (side by side)
+                  Row 3: Success Activity   (full width)
+                  Row 4: Weekly Activity    (full width)  ──────── */
             .dashboard-grid {
                 display: grid !important;
                 grid-template-columns: 1fr 1fr !important;
-                grid-template-rows: 195px 185px !important;
+                grid-template-rows: 175px 155px 155px !important;
                 gap: 5px !important;
             }
 
             /* Row 2 */
-            .card-speedometer  { grid-column: 1 !important; grid-row: 1 !important; height: 195px !important; }
-            .card-distribution { grid-column: 2 !important; grid-row: 1 !important; height: 195px !important; }
+            .card-speedometer  { grid-column: 1 !important;      grid-row: 1 !important; height: 175px !important; }
+            .card-distribution { grid-column: 2 !important;      grid-row: 1 !important; height: 175px !important; }
 
-            /* Row 3 */
-            .card-mini-pie { grid-column: 1 !important; grid-row: 2 !important; height: 185px !important; }
-            .card-weekly   { grid-column: 2 !important; grid-row: 2 !important; height: 185px !important; }
+            /* Row 3 — Success Activity spans full width */
+            .card-mini-pie { grid-column: 1 / -1 !important; grid-row: 2 !important; height: 155px !important; }
+
+            /* Row 4 — Weekly Activity spans full width */
+            .card-weekly   { grid-column: 1 / -1 !important; grid-row: 3 !important; height: 155px !important; }
 
             /* Card shell */
             .card {
@@ -311,7 +314,7 @@
                 align-items: center !important; padding: 0 !important;
             }
             .pie-cell h4 { font-size: 0.56rem !important; margin: 0 0 2px !important; text-align: center !important; }
-            .pie-canvas-wrap { width: 72px !important; height: 72px !important; max-width: 72px !important; margin: 0 auto 2px !important; }
+            .pie-canvas-wrap { width: 100px !important; height: 100px !important; max-width: 100px !important; margin: 0 auto 2px !important; }
             .grade-legend { gap: 2px !important; }
             .legend-item  { font-size: 0.5rem !important; }
             .legend-color { width: 6px !important; height: 6px !important; }

@@ -640,12 +640,15 @@
                                 const val = context.parsed?.y ?? context.parsed;
                                 return val !== null && val !== undefined && val !== 0;
                             },
-                            anchor: graphType === 'bar' ? 'end' : 'end',
-                            align: graphType === 'bar' ? 'top' : 'top',
-                            color: '#333',
+                            // Bar: centered inside the bar, rotated vertically
+                            // Line: above the point
+                            anchor:   graphType === 'bar' ? 'center' : 'end',
+                            align:    graphType === 'bar' ? 'center' : 'top',
+                            rotation: graphType === 'bar' ? -90 : 0,
+                            clamp:    true,
+                            color:    graphType === 'bar' ? 'rgba(0,0,0,0.65)' : '#333',
                             font: { size: 10, weight: '600' },
-                            formatter: (value) => formatNumber(value, 1),
-                            rotation: graphType === 'bar' ? -45 : 0,
+                            formatter: (value) => formatNumber(value, 2),
                             offset: 2,
                         },
                     },
