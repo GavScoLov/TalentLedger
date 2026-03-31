@@ -79,7 +79,8 @@
     .state-msg .icon { font-size: 2.5rem; margin-bottom: 10px; }
     .spinner-row { text-align: center; padding: 40px; }
     .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #E5E7EB; border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes spin  { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
 
     /* ── Push status ── */
     .push-ok  { color: #16a34a; font-size: .72rem; }
@@ -123,7 +124,7 @@
           <option value="">All Departments</option>
         </select>
         <div class="toolbar-spacer"></div>
-        <button class="btn-refresh" onclick="loadTimesheets()">↻ Refresh from TimeStation</button>
+        <button class="btn-refresh" onclick="refreshAll()">↻ Refresh from TimeStation</button>
         <button class="btn-approve-all" onclick="approveAll()">✓ Approve All Visible</button>
       </div>
 
@@ -164,11 +165,12 @@
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   // ── State ─────────────────────────────────────────────────
-  let weekStart  = getMondayOf(new Date());
-  let employees  = [];      // from ts_employees
-  let approvals  = {};      // ts_shift_id → approval row
-  let shiftData  = {};      // employee_id → [shifts]
-  let loading    = false;
+  let weekStart    = getMondayOf(new Date());
+  let employees    = [];      // from TimeStation API
+  let allEmployees = [];      // full unfiltered list from TS API
+  let approvals    = {};      // ts_shift_id → approval row
+  let shiftData    = {};      // employee_id → [shifts]
+  let loading      = false;
 
   // ── Date helpers ──────────────────────────────────────────
   function getMondayOf(d) {
@@ -221,6 +223,14 @@
     return new Date(val).toISOString();
   }
 
+  // ── Hard refresh (re-fetch employees + shifts) ────────────
+  window.refreshAll = async () => {
+    allEmployees = [];          // clear cache so employees reload fresh from TS
+    await loadEmployeesFromTS();
+    await loadDepartments();
+    await loadTimesheets();
+  };
+
   // ── Navigation ────────────────────────────────────────────
   window.navigateWeek = async (dir) => {
     weekStart = addDays(weekStart, dir * 7);
@@ -236,14 +246,37 @@
     document.getElementById('week-label').textContent = fmtWeekLabel();
   }
 
-  // ── Load departments into filter ──────────────────────────
+  // ── Load all employees + departments from TimeStation API ─
+  async function loadEmployeesFromTS() {
+    try {
+      const res = await fetch('/api/ts/employees');
+      if (!res.ok) throw new Error(`TS API ${res.status}`);
+      const json = await res.json();
+      // TS returns { employees: [...] } — field names vary by account setup
+      const raw = json.employees || json.data || json || [];
+      allEmployees = raw
+        .filter(e => {
+          // Include active employees (or all if no status field)
+          const s = (e.status || e.employee_status || '').toLowerCase();
+          return !s || s === 'active' || s === '1';
+        })
+        .map(e => ({
+          id:   String(e.employee_id || e.id || ''),
+          name: `${e.first_name || e.firstName || ''} ${e.last_name || e.lastName || ''}`.trim()
+                || e.name
+                || `Employee ${e.employee_id || e.id}`,
+          dept: e.department || e.primary_department || e.company || '',
+        }))
+        .filter(e => e.id);
+    } catch (err) {
+      console.warn('Could not load employees from TimeStation:', err.message);
+      allEmployees = [];
+    }
+  }
+
   async function loadDepartments() {
-    const { data } = await supabase
-      .from('ts_employees')
-      .select('primary_department')
-      .not('primary_department', 'is', null);
-    if (!data) return;
-    const depts = [...new Set(data.map(r => r.primary_department).filter(Boolean))].sort();
+    if (!allEmployees.length) await loadEmployeesFromTS();
+    const depts = [...new Set(allEmployees.map(e => e.dept).filter(Boolean))].sort();
     const sel = document.getElementById('dept-filter');
     sel.innerHTML = '<option value="">All Departments</option>'
       + depts.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
@@ -262,21 +295,17 @@
     const endStr   = toDateStr(addDays(weekStart, 6));
 
     try {
-      // 1. Load employees from Supabase
-      let q = supabase.from('ts_employees')
-        .select('employee_id, first_name, last_name, primary_department')
-        .eq('status', 'Active');
-      if (dept) q = q.eq('primary_department', dept);
-      const { data: emps } = await q.order('first_name').limit(200);
-      employees = (emps || []).map(e => ({
-        id:   e.employee_id,
-        name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Employee ${e.employee_id}`,
-        dept: e.primary_department || '',
-      }));
+      // 1. Load employees directly from TimeStation API
+      if (!allEmployees.length) await loadEmployeesFromTS();
+      employees = allEmployees.filter(e => !dept || e.dept === dept);
 
       if (!employees.length) {
         document.getElementById('content-area').innerHTML =
-          '<div class="state-msg"><div class="icon">👥</div>No active employees found for this filter.</div>';
+          '<div class="state-msg"><div class="icon">👥</div>'
+          + (allEmployees.length
+              ? 'No employees match this department filter.'
+              : 'No employees returned from TimeStation. Check your API key and proxy configuration.')
+          + '</div>';
         return;
       }
 
@@ -346,13 +375,14 @@
         if (!dayShifts.length) return '';
 
         return dayShifts.map(shift => {
-          const sid     = String(shift.shift_id);
-          const appr    = approvals[sid];
-          const timeIn  = appr?.edited_time_in  || appr?.original_time_in  || shift.in?.time  || null;
-          const timeOut = appr?.edited_time_out || appr?.original_time_out || shift.out?.time || null;
-          const mins    = appr?.total_minutes ?? shift.total_minutes ?? 0;
-          const status  = appr?.status || 'pending';
-          const edited  = !!(appr?.edited_time_in || appr?.edited_time_out);
+          const sid      = String(shift.shift_id);
+          const appr     = approvals[sid];
+          const timeIn   = appr?.edited_time_in  || appr?.original_time_in  || shift.in?.time  || null;
+          const timeOut  = appr?.edited_time_out || appr?.original_time_out || shift.out?.time || null;
+          const isOpen   = !timeOut;   // currently checked in, no clock-out yet
+          const mins     = appr?.total_minutes ?? shift.total_minutes ?? 0;
+          const status   = appr?.status || 'pending';
+          const edited   = !!(appr?.edited_time_in || appr?.edited_time_out);
 
           empMins   += mins;
           totalMins += mins;
@@ -369,13 +399,24 @@
               ? `<span class="push-pending">↑ Pending sync</span>`
               : '';
 
-          const badge = status === 'approved'
-            ? '<span class="badge badge-approved">Approved</span>'
-            : edited || status === 'edited'
-              ? '<span class="badge badge-edited">Edited</span>'
-              : '<span class="badge badge-pending">Pending</span>';
+          let badge;
+          if (isOpen) {
+            // Live / currently clocked in — calculate elapsed
+            const elapsedMins = timeIn ? Math.round((Date.now() - new Date(timeIn)) / 60000) : 0;
+            badge = `<span class="badge" style="background:#DCFCE7;color:#15803d;animation:pulse 2s infinite;">● Live</span>`
+                  + (elapsedMins > 0 ? ` <span style="font-size:.72rem;color:#6B7280;">${fmtMins(elapsedMins)} so far</span>` : '');
+          } else if (status === 'approved') {
+            badge = '<span class="badge badge-approved">Approved</span>';
+          } else if (edited || status === 'edited') {
+            badge = '<span class="badge badge-edited">Edited</span>';
+          } else {
+            badge = '<span class="badge badge-pending">Pending</span>';
+          }
 
-          const approveBtnDisabled = status === 'approved' ? 'style="opacity:.4;pointer-events:none;"' : '';
+          // Open shifts can't be approved yet
+          const approveBtnDisabled = (status === 'approved' || isOpen)
+            ? 'style="opacity:.4;pointer-events:none;"' : '';
+          const editBtnDisabled    = isOpen ? 'style="opacity:.4;pointer-events:none;" title="Cannot edit an open shift"' : '';
 
           return `<tr id="row-${sid}">
             <td>${dayLabel}</td>
@@ -391,12 +432,12 @@
                 <button class="btn-cancel-edit" onclick="cancelEdit('${sid}')">Cancel</button>
               </div>
             </td>
-            <td id="disp-out-${sid}">${fmtTime(timeOut)}</td>
-            <td>${fmtMins(mins)}</td>
+            <td id="disp-out-${sid}">${isOpen ? '<span style="color:#16a34a;font-size:.8rem;font-weight:600;">Still clocked in</span>' : fmtTime(timeOut)}</td>
+            <td>${isOpen ? '—' : fmtMins(mins)}</td>
             <td id="badge-${sid}">${badge} ${pushStatus}</td>
             <td>
               <div class="action-btns">
-                <button class="btn-edit" onclick="startEdit('${sid}')">Edit</button>
+                <button class="btn-edit" onclick="startEdit('${sid}')" ${editBtnDisabled}>Edit</button>
                 <button class="btn-approve" id="appbtn-${sid}" onclick="approveShift('${sid}')" ${approveBtnDisabled}>Approve</button>
               </div>
             </td>
@@ -553,7 +594,9 @@
 
   // ── Init ─────────────────────────────────────────────────
   updateWeekLabel();
-  await loadDepartments();
+  await loadEmployeesFromTS();   // prime the employee list first
+  await loadDepartments();       // populate dept filter from TS data
+  await loadTimesheets();        // auto-load current week
 </script>
 </body>
 </html>
