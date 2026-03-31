@@ -269,7 +269,7 @@
 
     try {
       // 1. Fetch ALL shifts for the week in a single call
-      const res = await fetch(`/api/ts/shifts?start_date=${startStr}&end_date=${endStr}`);
+      const res = await fetch(`/api/ts?endpoint=/shifts&start_date=${startStr}&end_date=${endStr}`);
       if (!res.ok) throw new Error(`TimeStation API error ${res.status}: ${await res.text().catch(()=>'')}`);
       const json = await res.json();
       const allShifts = json.shifts || [];

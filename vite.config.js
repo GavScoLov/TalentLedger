@@ -42,17 +42,24 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
+        // /api/ts?endpoint=/shifts&... → TimeStation API with Basic Auth injected.
+        // In production this is handled by api/ts.js (Vercel serverless function).
         '/api/ts': {
           target: 'https://api.mytimestation.com/v1.2',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/ts/, ''),
           configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              const apiKey = env.TIMESTATION_API_KEY || '';
-              const encoded = Buffer.from(apiKey + ':').toString('base64');
-              proxyReq.setHeader('Authorization', `Basic ${encoded}`);
-              proxyReq.setHeader('Accept', 'application/json');
-            });
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const reqUrl = new URL(req.url, 'http://localhost')
+              const endpoint = reqUrl.searchParams.get('endpoint') || ''
+              reqUrl.searchParams.delete('endpoint')
+              const remaining = reqUrl.searchParams.toString()
+              proxyReq.path = endpoint + (remaining ? '?' + remaining : '')
+
+              const apiKey = env.TIMESTATION_API_KEY || ''
+              const encoded = Buffer.from(apiKey + ':').toString('base64')
+              proxyReq.setHeader('Authorization', `Basic ${encoded}`)
+              proxyReq.setHeader('Accept', 'application/json')
+            })
           },
         },
         '/api/psa': {
