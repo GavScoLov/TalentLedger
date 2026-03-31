@@ -223,9 +223,10 @@
     return new Date(val).toISOString();
   }
 
-  // ── Hard refresh ─────────────────────────────────────────
+  // ── Hard refresh (clears employee cache → re-fetches from TS) ──
   window.refreshAll = async () => {
     allEmployees = [];
+    populateDeptFilter(false);
     await loadTimesheets();
   };
 
@@ -253,10 +254,47 @@
       + depts.map(d => `<option value="${escHtml(d)}"${d===prev?' selected':''}>${escHtml(d)}</option>`).join('');
   }
 
+  // ── Load employee list (TS API → Supabase fallback) ──────
+  async function fetchEmployeeList() {
+    // Try TimeStation /employees first
+    try {
+      const res = await fetch('/api/ts?endpoint=/employees');
+      if (res.ok) {
+        const json = await res.json();
+        const raw  = json.employees || json.data || (Array.isArray(json) ? json : []);
+        if (raw.length) {
+          return raw
+            .filter(e => {
+              const s = String(e.status || e.employee_status || '').toLowerCase();
+              return !s || s === 'active' || s === '1';
+            })
+            .map(e => ({
+              id:   String(e.employee_id || e.id || ''),
+              name: `${e.first_name || e.firstName || ''} ${e.last_name || e.lastName || ''}`.trim()
+                    || e.name || `Employee ${e.employee_id || e.id}`,
+              dept: e.department || e.primary_department || e.company || '',
+            }))
+            .filter(e => e.id);
+        }
+      }
+    } catch { /* fall through */ }
+
+    // Fallback: Supabase ts_employees table (populated by n8n sync)
+    console.info('TS /employees unavailable — falling back to ts_employees Supabase table');
+    const { data } = await supabase
+      .from('ts_employees')
+      .select('employee_id, first_name, last_name, primary_department')
+      .eq('status', 'Active')
+      .order('first_name')
+      .limit(300);
+    return (data || []).map(e => ({
+      id:   String(e.employee_id),
+      name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Employee ${e.employee_id}`,
+      dept: e.primary_department || '',
+    })).filter(e => e.id);
+  }
+
   // ── Load timesheets ───────────────────────────────────────
-  // Strategy: fetch ALL shifts for the week in ONE call (no employee_id filter),
-  // then extract employees + departments from the shift records themselves.
-  // This avoids needing a separate /employees endpoint that doesn't exist.
   window.loadTimesheets = async function() {
     if (loading) return;
     loading = true;
@@ -268,57 +306,48 @@
     const endStr   = toDateStr(addDays(weekStart, 6));
 
     try {
-      // 1. Fetch ALL shifts for the week in a single call
-      const res = await fetch(`/api/ts?endpoint=/shifts&start_date=${startStr}&end_date=${endStr}`);
-      if (!res.ok) throw new Error(`TimeStation API error ${res.status}: ${await res.text().catch(()=>'')}`);
-      const json = await res.json();
-      const allShifts = json.shifts || [];
-
-      // 2. Build employee list + shiftData map from the shift records
-      const empMap = {};
-      shiftData    = {};
-      for (const s of allShifts) {
-        const eid = String(s.employee_id || '');
-        if (!eid) continue;
-
-        // Build employee entry from whatever fields TS provides on the shift
-        if (!empMap[eid]) {
-          empMap[eid] = {
-            id:   eid,
-            name: s.employee_name
-                  || (`${s.first_name||''} ${s.last_name||''}`.trim())
-                  || `Employee ${eid}`,
-            dept: s.department || s.company || s.group || '',
-          };
-        }
-
-        if (!shiftData[eid]) shiftData[eid] = [];
-        shiftData[eid].push(s);
-      }
-
-      // 3. Update employee cache (only repopulate if we got fresh data)
-      if (Object.keys(empMap).length) {
-        allEmployees = Object.values(empMap).sort((a,b) => a.name.localeCompare(b.name));
+      // 1. Get employee list (refresh cache on explicit refresh, otherwise reuse)
+      if (!allEmployees.length) {
+        allEmployees = await fetchEmployeeList();
         populateDeptFilter(true);
       }
 
-      // 4. Filter employees by selected department
+      if (!allEmployees.length) {
+        document.getElementById('content-area').innerHTML =
+          '<div class="state-msg"><div class="icon">👥</div>'
+          + 'No employees found. Make sure the TimeStation API key is set in Vercel, '
+          + 'or run the n8n sync to populate the ts_employees table.</div>';
+        return;
+      }
+
+      // 2. Filter by selected department
       const dept = document.getElementById('dept-filter').value;
       employees = allEmployees.filter(e => !dept || e.dept === dept);
 
-      if (!employees.length && !allShifts.length) {
-        document.getElementById('content-area').innerHTML =
-          '<div class="state-msg"><div class="icon">📋</div>No shifts found for this week in TimeStation.</div>';
-        return;
-      }
       if (!employees.length) {
         document.getElementById('content-area').innerHTML =
           '<div class="state-msg"><div class="icon">👥</div>No employees match this department filter.</div>';
         return;
       }
 
-      // 5. Load existing approvals from Supabase for these shifts
-      const allShiftIds = allShifts.map(s => String(s.shift_id));
+      // 3. Fetch shifts from TimeStation per employee (parallel)
+      shiftData = {};
+      await Promise.all(employees.map(async emp => {
+        try {
+          const res = await fetch(
+            `/api/ts?endpoint=/shifts&employee_id=${encodeURIComponent(emp.id)}&start_date=${startStr}&end_date=${endStr}`
+          );
+          if (res.ok) {
+            const json = await res.json();
+            shiftData[emp.id] = json.shifts || [];
+          } else {
+            shiftData[emp.id] = [];
+          }
+        } catch { shiftData[emp.id] = []; }
+      }));
+
+      // 4. Load existing approvals from Supabase
+      const allShiftIds = Object.values(shiftData).flat().map(s => String(s.shift_id));
       approvals = {};
       if (allShiftIds.length) {
         const { data: appData } = await supabase

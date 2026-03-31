@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   // Whitelist allowed endpoints to prevent open proxy abuse
-  const allowedEndpoints = ['/shifts'];
+  const allowedEndpoints = ['/shifts', '/employees'];
   if (!allowedEndpoints.includes(endpoint)) {
     return res.status(403).json({ error: 'Endpoint not allowed' });
   }
