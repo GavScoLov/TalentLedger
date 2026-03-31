@@ -246,6 +246,28 @@
     let currentMode = 'password';
     let cachedCreds = null;   // { identifier, credential, isPin } — in-memory only
     let countdownTimer = null;
+    let cachedGPS = null;     // { lat, lng } captured at check-in/out — in-memory only
+
+    // ── GPS helpers ───────────────────────────────────────────
+    function getGPS() {
+      return new Promise(resolve => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          ()  => resolve(null),
+          { timeout: 8000, maximumAge: 60000 }
+        );
+      });
+    }
+
+    function haversineMiles(lat1, lng1, lat2, lng2) {
+      const R = 3958.8;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2
+              + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
 
     // ── Expose functions to inline onclick handlers ──────────
     window.setMode      = setMode;
@@ -417,12 +439,17 @@
       document.getElementById(activeBtn).disabled = true;
       document.getElementById(activeBtn).innerHTML = '<span class="spinner"></span>';
 
+      // Capture GPS silently — non-blocking, proceed even if denied
+      cachedGPS = await getGPS();
+
       try {
         const { data, error } = await supabase.rpc('worker_check_in_out', {
           p_identifier: cachedCreds.identifier,
           p_credential: cachedCreds.credential,
           p_is_pin:     cachedCreds.isPin,
           p_event_id:   null,
+          p_lat:        cachedGPS?.lat ?? null,
+          p_lng:        cachedGPS?.lng ?? null,
         });
         if (error) throw error;
         if (!data.success) {

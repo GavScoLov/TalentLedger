@@ -141,7 +141,7 @@
         <button class="tab-btn active" onclick="switchTab('sessions')">
           <span class="live-dot"></span>Live Sessions
         </button>
-        <button class="tab-btn" onclick="switchTab('events')">Events</button>
+        <button class="tab-btn" onclick="switchTab('review')">Review</button>
         <button class="tab-btn" onclick="switchTab('workers')">Workers</button>
       </div>
 
@@ -174,92 +174,91 @@
       </div>
 
       <!-- ════════════════════════════════════════════════
-           TAB 2: EVENTS
+           TAB 2: REVIEW
       ════════════════════════════════════════════════ -->
-      <div class="tab-panel" id="tab-events">
-        <!-- Create event form -->
-        <div class="form-section">
-          <h3>Create New Event</h3>
-          <div class="form-grid">
-            <div class="form-field">
-              <label>Invoice #</label>
-              <input type="text" id="ev-invoice" placeholder="INV-2026-001">
-            </div>
-            <div class="form-field">
-              <label>Event Name</label>
-              <input type="text" id="ev-name" placeholder="Warehouse Staffing - March">
-            </div>
-            <div class="form-field">
-              <label>Company / Client</label>
-              <input type="text" id="ev-company" placeholder="Acme Corp">
-            </div>
-            <div class="form-field">
-              <label>Event Date</label>
-              <input type="date" id="ev-date">
-            </div>
-            <div class="form-field">
-              <label>Start Time</label>
-              <input type="time" id="ev-start">
-            </div>
-            <div class="form-field">
-              <label>End Time</label>
-              <input type="time" id="ev-end">
-            </div>
-            <div class="form-field">
-              <label>Workers Needed</label>
-              <input type="number" id="ev-workers" min="1" value="1">
-            </div>
-            <div class="form-field">
-              <label>Role / Type</label>
-              <input type="text" id="ev-role" placeholder="General Labor">
-            </div>
-            <div class="form-field">
-              <label>Location</label>
-              <input type="text" id="ev-location" placeholder="123 Main St">
-            </div>
-            <div class="form-field" style="grid-column:1/-1">
-              <label>Description</label>
-              <textarea id="ev-desc" placeholder="Any additional details…"></textarea>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-primary" onclick="createEvent()" style="font-size:.85rem;padding:9px 20px;">Create Event</button>
-            <span class="error-msg"   id="ev-error"></span>
-            <span class="success-msg" id="ev-success"></span>
-          </div>
-        </div>
-
-        <!-- Events list -->
+      <div class="tab-panel" id="tab-review">
         <div class="action-bar">
-          <select class="filter-select" id="ev-filter-status" onchange="loadEvents()">
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+          <input type="date" class="filter-input" id="review-date" style="max-width:160px;">
+          <select class="filter-select" id="review-company" onchange="loadReview()" style="max-width:200px;">
+            <option value="">All Companies</option>
           </select>
           <div class="action-bar-spacer"></div>
-          <button class="btn btn-outlined" onclick="loadEvents()" style="font-size:.82rem;padding:7px 14px;">↻ Refresh</button>
+          <button class="btn btn-outlined" onclick="loadReview()" style="font-size:.82rem;padding:7px 14px;">↻ Refresh</button>
         </div>
         <div class="table-wrap">
           <table class="data-table">
             <thead><tr>
-              <th>Invoice #</th>
-              <th>Event Name</th>
+              <th>Worker</th>
               <th>Company</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Role</th>
-              <th>Workers Needed</th>
-              <th>Assigned</th>
-              <th>Status</th>
+              <th>Clock In</th>
+              <th>Lunch Start</th>
+              <th>Lunch End</th>
+              <th>Clock Out</th>
+              <th>Hours</th>
+              <th>GPS</th>
+              <th>Flag</th>
               <th>Actions</th>
             </tr></thead>
-            <tbody id="events-tbody">
-              <tr><td colspan="10" class="empty-state">Loading…</td></tr>
+            <tbody id="review-tbody">
+              <tr><td colspan="10" class="empty-state">Select a date to review sessions.</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- ── Review edit modal ── -->
+      <div id="review-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;align-items:center;justify-content:center;padding:16px;">
+        <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;box-shadow:0 20px 50px rgba(0,0,0,0.25);overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid #F3F4F6;">
+            <div style="font-size:1rem;font-weight:700;color:#111827;">Edit Session</div>
+            <button onclick="closeReviewModal()" style="background:none;border:none;font-size:1.2rem;color:#9CA3AF;cursor:pointer;">✕</button>
+          </div>
+          <div style="padding:18px 22px;">
+            <input type="hidden" id="rm-session-id">
+            <div style="font-size:.95rem;font-weight:600;color:#111827;margin-bottom:16px;" id="rm-worker-name"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div class="form-field">
+                <label>Clock In</label>
+                <input type="datetime-local" id="rm-clock-in">
+              </div>
+              <div class="form-field">
+                <label>Clock Out</label>
+                <input type="datetime-local" id="rm-clock-out">
+              </div>
+              <div class="form-field">
+                <label>Lunch Start</label>
+                <input type="datetime-local" id="rm-lunch-start">
+              </div>
+              <div class="form-field">
+                <label>Lunch End</label>
+                <input type="datetime-local" id="rm-lunch-end">
+              </div>
+            </div>
+            <div class="form-field" style="margin-top:14px;">
+              <label>Flag</label>
+              <select id="rm-flag">
+                <option value="">None</option>
+                <option value="ok">OK ✓</option>
+                <option value="late">Late</option>
+                <option value="absent">Absent</option>
+                <option value="flagged">Flagged</option>
+              </select>
+            </div>
+            <div class="form-field" style="margin-top:14px;">
+              <label>Notes</label>
+              <textarea id="rm-notes" style="resize:vertical;min-height:60px;padding:8px 11px;border:1px solid var(--border-color);border-radius:6px;font-family:var(--font);font-size:.875rem;" placeholder="Internal notes…"></textarea>
+            </div>
+            <div class="error-msg" id="rm-error" style="margin-top:8px;"></div>
+          </div>
+          <div style="padding:14px 22px;border-top:1px solid #F3F4F6;display:flex;gap:10px;justify-content:space-between;align-items:center;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:500;cursor:pointer;">
+              <input type="checkbox" id="rm-reviewed"> Mark as Reviewed
+            </label>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-outlined" onclick="closeReviewModal()" style="font-size:.85rem;">Cancel</button>
+              <button class="btn btn-primary" id="rm-save-btn" onclick="saveReview()" style="font-size:.85rem;">Save</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -381,7 +380,7 @@
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
     if (tab === 'sessions') loadSessions();
-    if (tab === 'events')   loadEvents();
+    if (tab === 'review')   loadReview();
     if (tab === 'workers')  { loadWorkers(); loadTWEmployees(); }
   };
 
@@ -454,114 +453,148 @@
   };
 
   // ══════════════════════════════════════════════════════════
-  // EVENTS TAB
+  // REVIEW TAB
   // ══════════════════════════════════════════════════════════
-  window.createEvent = async function() {
-    const invoice  = document.getElementById('ev-invoice').value.trim();
-    const name     = document.getElementById('ev-name').value.trim();
-    const company  = document.getElementById('ev-company').value.trim();
-    const date     = document.getElementById('ev-date').value;
-    const start    = document.getElementById('ev-start').value;
-    const end      = document.getElementById('ev-end').value;
-    const needed   = parseInt(document.getElementById('ev-workers').value) || 1;
-    const role     = document.getElementById('ev-role').value.trim();
-    const location = document.getElementById('ev-location').value.trim();
-    const desc     = document.getElementById('ev-desc').value.trim();
+  const reviewDateInput = document.getElementById('review-date');
+  reviewDateInput.value = new Date().toISOString().split('T')[0];
+  reviewDateInput.addEventListener('change', loadReview);
 
-    if (!invoice || !name || !date) { msg('ev-error', 'Invoice #, Event Name, and Date are required.'); return; }
+  function toLocalDT(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
 
-    const { error } = await supabase.from('events').insert({
-      invoice_number: invoice, name, company, event_date: date,
-      start_time: start || null, end_time: end || null,
-      workers_needed: needed, role, location, description: desc,
-      status: 'open',
-    });
+  function flagBadge(flag) {
+    const map = { ok:'background:#D1FAE5;color:#065F46', late:'background:#FEF9C3;color:#854D0E', absent:'background:#FEE2E2;color:#991B1B', flagged:'background:#FDE8D8;color:#C2410C' };
+    if (!flag) return '<span style="color:#9CA3AF;font-size:.75rem;">—</span>';
+    return `<span style="padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:700;text-transform:uppercase;${map[flag]||''}">${flag}</span>`;
+  }
 
-    if (error) { msg('ev-error', error.message); return; }
-
-    msg('ev-success', `Event "${name}" created.`, 'success');
-    ['ev-invoice','ev-name','ev-company','ev-date','ev-start','ev-end','ev-role','ev-location','ev-desc']
-      .forEach(id => document.getElementById(id).value = '');
-    document.getElementById('ev-workers').value = '1';
-    loadEvents();
-    loadStats();
-  };
-
-  window.loadEvents = async function() {
-    const statusFilter = document.getElementById('ev-filter-status').value;
-    const tbody = document.getElementById('events-tbody');
+  window.loadReview = async function() {
+    const date    = reviewDateInput.value;
+    const company = document.getElementById('review-company').value;
+    const tbody   = document.getElementById('review-tbody');
     tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Loading…</td></tr>';
 
-    let q = supabase.from('events').select('*, event_assignments(id)').order('event_date', { ascending: false });
-    if (statusFilter) q = q.eq('status', statusFilter);
+    let q = supabase.from('worker_sessions')
+      .select('*, workers(name, company), events(name)')
+      .eq('date', date)
+      .order('check_in_time');
     const { data, error } = await q;
 
     if (error || !data?.length) {
-      tbody.innerHTML = `<tr><td colspan="10" class="empty-state">${error ? 'Error.' : 'No events found.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-state">${error ? 'Error.' : 'No sessions for this date.'}</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = data.map(e => `<tr>
-      <td style="font-weight:600;font-family:monospace">${e.invoice_number}</td>
-      <td style="font-weight:600">${e.name}</td>
-      <td>${e.company || '—'}</td>
-      <td>${fmtDate(e.event_date)}</td>
-      <td style="white-space:nowrap">${e.start_time || '—'} – ${e.end_time || '—'}</td>
-      <td>${e.role || '—'}</td>
-      <td style="text-align:center">${e.workers_needed}</td>
-      <td style="text-align:center">${e.event_assignments?.length ?? 0}</td>
-      <td>${statusBadge(e.status)}</td>
-      <td>
-        <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;" onclick="openAssignModal('${e.id}','${e.name.replace(/'/g,"\\'")}')">Assign</button>
-        <select onchange="updateEventStatus('${e.id}',this.value)" style="font-size:.75rem;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;margin-left:4px;">
-          <option value="">Status…</option>
-          <option value="pending">Pending</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </td>
-    </tr>`).join('');
+    // Populate company filter
+    const companies = [...new Set(data.map(r => r.workers?.company).filter(Boolean))].sort();
+    const sel = document.getElementById('review-company');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Companies</option>' + companies.map(c => `<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
+
+    const filtered = company ? data.filter(r => r.workers?.company === company) : data;
+
+    tbody.innerHTML = filtered.map(r => {
+      const workerName = r.workers?.name || r.worker_name;
+      const co         = r.workers?.company || '—';
+      const hasGPS     = r.clock_in_lat != null;
+      const gpsText    = hasGPS
+        ? `<a href="https://www.google.com/maps?q=${r.clock_in_lat},${r.clock_in_lng}" target="_blank" style="font-size:.75rem;color:#2563EB;">View</a>`
+        : '<span style="color:#9CA3AF;font-size:.75rem;">—</span>';
+      const reviewedIcon = r.reviewed
+        ? '<span style="color:#16a34a;font-weight:700;">✓</span>'
+        : '';
+      return `<tr style="${r.reviewed ? 'opacity:.7;' : ''}">
+        <td style="font-weight:600">${workerName} ${reviewedIcon}</td>
+        <td style="font-size:.82rem">${co}</td>
+        <td style="font-size:.82rem">${fmt(r.check_in_time)}</td>
+        <td style="font-size:.82rem">${r.lunch_start ? fmt(r.lunch_start) : '—'}</td>
+        <td style="font-size:.82rem">${r.lunch_end   ? fmt(r.lunch_end)   : '—'}</td>
+        <td style="font-size:.82rem">${r.check_out_time ? fmt(r.check_out_time) : '<span class="badge badge-in">Active</span>'}</td>
+        <td style="font-size:.82rem">${r.hours_worked != null ? r.hours_worked + ' hrs' : '—'}</td>
+        <td>${gpsText}</td>
+        <td>${flagBadge(r.review_flag)}</td>
+        <td>
+          <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
+            onclick='openReviewModal(${JSON.stringify({
+              id: r.id,
+              worker_name: workerName,
+              check_in_time: r.check_in_time,
+              check_out_time: r.check_out_time,
+              lunch_start: r.lunch_start,
+              lunch_end: r.lunch_end,
+              review_flag: r.review_flag,
+              review_notes: r.review_notes,
+              reviewed: r.reviewed,
+            })})'>Edit</button>
+        </td>
+      </tr>`;
+    }).join('');
   };
 
-  window.updateEventStatus = async function(eventId, status) {
-    if (!status) return;
-    await supabase.from('events').update({ status }).eq('id', eventId);
-    loadEvents(); loadStats();
+  window.openReviewModal = function(s) {
+    document.getElementById('rm-session-id').value    = s.id;
+    document.getElementById('rm-worker-name').textContent = s.worker_name;
+    document.getElementById('rm-clock-in').value      = toLocalDT(s.check_in_time);
+    document.getElementById('rm-clock-out').value     = toLocalDT(s.check_out_time);
+    document.getElementById('rm-lunch-start').value   = toLocalDT(s.lunch_start);
+    document.getElementById('rm-lunch-end').value     = toLocalDT(s.lunch_end);
+    document.getElementById('rm-flag').value          = s.review_flag || '';
+    document.getElementById('rm-notes').value         = s.review_notes || '';
+    document.getElementById('rm-reviewed').checked    = !!s.reviewed;
+    document.getElementById('rm-error').textContent   = '';
+    document.getElementById('rm-error').classList.remove('show');
+    document.getElementById('review-modal').style.display = 'flex';
   };
 
-  // ── Assign Worker Modal ───────────────────────────────────
-  let assignEventId = null;
-  window.openAssignModal = async function(eventId, eventName) {
-    assignEventId = eventId;
-    const name = prompt(`Assign a worker to "${eventName}"\n\nEnter the worker's Employee ID or Name:`);
-    if (!name) return;
+  window.closeReviewModal = function() {
+    document.getElementById('review-modal').style.display = 'none';
+  };
 
-    const { data: workers } = await supabase.from('workers')
-      .select('id, name, employee_id')
-      .or(`name.ilike.%${name}%,employee_id.ilike.%${name}%`)
-      .eq('is_active', true)
-      .limit(10);
+  window.saveReview = async function() {
+    const id       = document.getElementById('rm-session-id').value;
+    const clockIn  = document.getElementById('rm-clock-in').value;
+    const clockOut = document.getElementById('rm-clock-out').value;
+    const lunchS   = document.getElementById('rm-lunch-start').value;
+    const lunchE   = document.getElementById('rm-lunch-end').value;
+    const flag     = document.getElementById('rm-flag').value || null;
+    const notes    = document.getElementById('rm-notes').value.trim() || null;
+    const reviewed = document.getElementById('rm-reviewed').checked;
+    const errEl    = document.getElementById('rm-error');
+    const btn      = document.getElementById('rm-save-btn');
 
-    if (!workers?.length) { alert('No active workers found matching that search.'); return; }
-
-    const options = workers.map((w,i) => `${i+1}. ${w.name} (${w.employee_id || 'no ID'})`).join('\n');
-    const idx = parseInt(prompt(`Found workers:\n${options}\n\nEnter number to select:`));
-    if (!idx || idx < 1 || idx > workers.length) return;
-
-    const worker = workers[idx - 1];
-    const hours  = parseFloat(prompt(`Hours assigned for ${worker.name}:`) || '0');
-
-    const { error } = await supabase.from('event_assignments').upsert({
-      event_id: eventId, worker_id: worker.id,
-      worker_name: worker.name, hours_assigned: hours || null,
-      status: 'assigned',
-    }, { onConflict: 'event_id,worker_id' });
-
-    if (error) { alert('Error: ' + error.message); return; }
-    alert(`${worker.name} assigned successfully.`);
-    loadEvents();
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const patch = {
+        check_in_time:  clockIn  || null,
+        check_out_time: clockOut || null,
+        lunch_start:    lunchS   || null,
+        lunch_end:      lunchE   || null,
+        review_flag:    flag,
+        review_notes:   notes,
+        reviewed,
+      };
+      // Recalculate hours if both times present
+      if (clockIn && clockOut) {
+        const hrs = (new Date(clockOut) - new Date(clockIn)) / 3600000;
+        const lunchMins = (lunchS && lunchE)
+          ? (new Date(lunchE) - new Date(lunchS)) / 60000
+          : 0;
+        patch.hours_worked = Math.max(0, hrs - lunchMins / 60).toFixed(2);
+      }
+      const { error } = await supabase.from('worker_sessions').update(patch).eq('id', id);
+      if (error) throw error;
+      closeReviewModal();
+      loadReview();
+    } catch (err) {
+      errEl.textContent = err.message; errEl.classList.add('show');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  };
   };
 
   // ══════════════════════════════════════════════════════════

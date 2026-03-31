@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time Tracker Settings – TalentLedger</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    .tab-bar { display:flex; gap:0; margin-bottom:22px; }
+    .tab-btn {
+      padding:9px 22px; font-size:.85rem; font-weight:600; cursor:pointer;
+      border:1.5px solid var(--border-color); background:var(--bg-default);
+      color:var(--text-secondary); font-family:var(--font); transition:all .18s;
+    }
+    .tab-btn:first-child { border-radius:6px 0 0 6px; }
+    .tab-btn:last-child  { border-radius:0 6px 6px 0; }
+    .tab-btn:not(:first-child) { border-left:none; }
+    .tab-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    .form-section { background:var(--bg-paper); border:1px solid var(--border-color); border-radius:var(--radius); padding:22px 24px; margin-bottom:20px; }
+    .form-section h3 { font-size:.95rem; font-weight:700; color:var(--text-primary); margin-bottom:18px; }
+    .form-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+    .form-field { display:flex; flex-direction:column; gap:5px; }
+    .form-field label { font-size:.75rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; }
+    .form-field input, .form-field select {
+      padding:8px 11px; border:1px solid var(--border-color); border-radius:6px;
+      font-family:var(--font); font-size:.875rem; background:var(--bg-default); color:var(--text-primary);
+    }
+    .form-field input:focus, .form-field select:focus { outline:none; border-color:var(--primary); }
+    .inline-pair { display:flex; gap:8px; }
+    .inline-pair input  { width:90px; flex-shrink:0; }
+    .inline-pair select { flex:1; }
+    .form-actions { margin-top:18px; display:flex; gap:10px; align-items:center; }
+    .error-msg   { color:#dc2626; font-size:.8rem; display:none; }
+    .error-msg.show { display:block; }
+    .success-msg { color:#16a34a; font-size:.8rem; display:none; }
+    .success-msg.show { display:block; }
+
+    .table-wrap { overflow-x:auto; border-radius:var(--radius); border:1px solid var(--border-color); }
+    .data-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    .data-table th { background:var(--primary); color:#fff; padding:10px 14px; text-align:left; font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+    .data-table td { padding:10px 14px; border-bottom:1px solid var(--border-color); color:var(--text-primary); }
+    .data-table tbody tr:last-child td { border-bottom:none; }
+    .data-table tbody tr:hover { background:var(--bg-default); }
+    .empty-state { text-align:center; padding:40px; color:var(--text-secondary); }
+
+    .toggle-row { display:flex; align-items:center; gap:10px; padding:4px 0; }
+    .toggle-label { font-size:.85rem; color:var(--text-primary); font-weight:500; }
+    input[type="checkbox"].toggle { width:40px; height:22px; appearance:none; background:#D1D5DB;
+      border-radius:999px; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; }
+    input[type="checkbox"].toggle:checked { background:var(--primary); }
+    input[type="checkbox"].toggle::after { content:''; position:absolute; width:18px; height:18px;
+      border-radius:50%; background:#fff; top:2px; left:2px; transition:left .2s; }
+    input[type="checkbox"].toggle:checked::after { left:20px; }
+
+    .badge-track-on  { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; }
+    .badge-track-off { background:#F3F4F6; color:#6B7280; padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; }
+
+    .pay-input { width:100px; padding:5px 8px; border:1px solid var(--border-color); border-radius:6px; font-size:.85rem; }
+    .pay-input:focus { outline:none; border-color:var(--primary); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div id="topbar-placeholder"></div>
+    <div id="sidebar-placeholder"></div>
+    <div class="page-content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Time Tracker Settings</h1>
+          <p class="page-subtitle">Configure per-company clock-in rules, location tracking, and worker pay rates</p>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('companies')">Company Settings</button>
+        <button class="tab-btn"        onclick="switchTab('pay')">Worker Pay Rates</button>
+      </div>
+
+      <!-- ══════════════════════════════
+           TAB 1: COMPANY SETTINGS
+      ══════════════════════════════ -->
+      <div class="tab-panel active" id="tab-companies">
+        <div class="form-section">
+          <h3 id="co-form-title">Add Company Settings</h3>
+          <input type="hidden" id="co-id">
+          <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1">
+              <label>Company Name <span style="color:#dc2626">*</span></label>
+              <input type="text" id="co-name" placeholder="Acme Corp" style="max-width:320px;">
+            </div>
+
+            <div class="form-field">
+              <label>Clock In — Early Tolerance</label>
+              <div class="inline-pair">
+                <input type="number" id="co-early-val" min="0" value="15">
+                <select id="co-early-unit">
+                  <option value="minutes">minutes</option>
+                  <option value="hours">hours</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-field">
+              <label>Clock In — Late Tolerance</label>
+              <div class="inline-pair">
+                <input type="number" id="co-late-val" min="0" value="15">
+                <select id="co-late-unit">
+                  <option value="minutes">minutes</option>
+                  <option value="hours">hours</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label>Lunch — Min Duration (min)</label>
+              <input type="number" id="co-lunch-min" min="0" value="0" placeholder="0">
+            </div>
+            <div class="form-field">
+              <label>Lunch — Max Duration (min)</label>
+              <input type="number" id="co-lunch-max" min="0" value="60" placeholder="60">
+            </div>
+
+            <div class="form-field">
+              <label>Daily Hour Limit</label>
+              <input type="number" id="co-daily-limit" min="1" max="24" step="0.5" value="12">
+            </div>
+
+            <div class="form-field">
+              <label>Late Worker Action</label>
+              <select id="co-late-action">
+                <option value="none">No action</option>
+                <option value="notify_employer">Notify Employer</option>
+                <option value="notify_internal" selected>Notify Internal Team</option>
+                <option value="both">Notify Both</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>No-Show Action</label>
+              <select id="co-noshow-action">
+                <option value="none">No action</option>
+                <option value="notify_employer">Notify Employer</option>
+                <option value="notify_internal" selected>Notify Internal Team</option>
+                <option value="both">Notify Both</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label>Notification Email</label>
+              <input type="email" id="co-notif-email" placeholder="alerts@company.com">
+            </div>
+
+            <div class="form-field" style="grid-column:1/-1">
+              <label>Location Tracking</label>
+              <div class="toggle-row">
+                <input type="checkbox" class="toggle" id="co-track-location" onchange="toggleRadiusField()">
+                <span class="toggle-label">Require workers to be within range of job site to clock in</span>
+              </div>
+            </div>
+            <div class="form-field" id="radius-field" style="display:none;">
+              <label>Allowed Radius (miles)</label>
+              <input type="number" id="co-radius" min="0.1" max="50" step="0.1" value="1.0">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveCompanySettings()" style="font-size:.85rem;padding:9px 20px;" id="co-save-btn">Save Settings</button>
+            <button class="btn btn-outlined" onclick="resetCompanyForm()" style="font-size:.85rem;padding:9px 16px;" id="co-cancel-btn" style="display:none;">Cancel</button>
+            <span class="error-msg"   id="co-error"></span>
+            <span class="success-msg" id="co-success"></span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Company</th>
+              <th>Early Tolerance</th>
+              <th>Late Tolerance</th>
+              <th>Lunch</th>
+              <th>Daily Limit</th>
+              <th>Location</th>
+              <th>Late Action</th>
+              <th>No-Show Action</th>
+              <th>Notification Email</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="settings-tbody">
+              <tr><td colspan="10" class="empty-state">No company settings yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════
+           TAB 2: WORKER PAY RATES
+      ══════════════════════════════ -->
+      <div class="tab-panel" id="tab-pay">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Worker Name</th>
+              <th>Employee ID</th>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Pay Rate ($/hr)</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="pay-tbody">
+              <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { renderNavbar }  from './src/components/navbar.js';
+  import { renderSidebar } from './src/components/sidebar.js';
+  import { checkAuth, checkPageAccess } from './src/auth.js';
+  import { supabase } from './src/supabaseClient.js';
+
+  await checkAuth();
+  await checkPageAccess('time-tracker-settings');
+  renderNavbar();
+  await renderSidebar();
+
+  // ── Helpers ──────────────────────────────────────────────
+  function msg(id, text, type = 'error') {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = (type === 'success' ? 'success-msg' : 'error-msg') + ' show';
+    setTimeout(() => el.classList.remove('show'), 4000);
+  }
+
+  function actionLabel(val) {
+    return { none:'None', notify_employer:'Notify Employer', notify_internal:'Notify Internal', both:'Notify Both' }[val] || val;
+  }
+
+  // ── Tab switching ─────────────────────────────────────────
+  window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['companies','pay'][i] === tab));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'companies') loadSettings();
+    if (tab === 'pay')       loadPayRates();
+  };
+
+  // ── Toggle radius field ───────────────────────────────────
+  window.toggleRadiusField = function() {
+    document.getElementById('radius-field').style.display =
+      document.getElementById('co-track-location').checked ? '' : 'none';
+  };
+
+  // ════════════════════════════════════════════════════════
+  // COMPANY SETTINGS TAB
+  // ════════════════════════════════════════════════════════
+  window.saveCompanySettings = async function() {
+    const id       = document.getElementById('co-id').value;
+    const name     = document.getElementById('co-name').value.trim();
+    if (!name) { msg('co-error', 'Company name is required.'); return; }
+
+    const payload = {
+      company_name:          name,
+      early_tolerance_value: parseInt(document.getElementById('co-early-val').value) || 15,
+      early_tolerance_unit:  document.getElementById('co-early-unit').value,
+      late_tolerance_value:  parseInt(document.getElementById('co-late-val').value) || 15,
+      late_tolerance_unit:   document.getElementById('co-late-unit').value,
+      lunch_min_minutes:     parseInt(document.getElementById('co-lunch-min').value) || 0,
+      lunch_max_minutes:     parseInt(document.getElementById('co-lunch-max').value) || 60,
+      daily_hour_limit:      parseFloat(document.getElementById('co-daily-limit').value) || 12,
+      late_action:           document.getElementById('co-late-action').value,
+      noshow_action:         document.getElementById('co-noshow-action').value,
+      notification_email:    document.getElementById('co-notif-email').value.trim() || null,
+      track_location:        document.getElementById('co-track-location').checked,
+      location_radius_miles: parseFloat(document.getElementById('co-radius').value) || 1.0,
+      updated_at:            new Date().toISOString(),
+    };
+
+    const btn = document.getElementById('co-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      let error;
+      if (id) {
+        ({ error } = await supabase.from('employer_settings').update(payload).eq('id', id));
+      } else {
+        ({ error } = await supabase.from('employer_settings').insert(payload));
+      }
+      if (error) throw error;
+      msg('co-success', `Settings for "${name}" saved.`, 'success');
+      resetCompanyForm();
+      loadSettings();
+    } catch (err) {
+      msg('co-error', err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Settings';
+    }
+  };
+
+  window.resetCompanyForm = function() {
+    document.getElementById('co-id').value           = '';
+    document.getElementById('co-name').value         = '';
+    document.getElementById('co-early-val').value    = '15';
+    document.getElementById('co-early-unit').value   = 'minutes';
+    document.getElementById('co-late-val').value     = '15';
+    document.getElementById('co-late-unit').value    = 'minutes';
+    document.getElementById('co-lunch-min').value    = '0';
+    document.getElementById('co-lunch-max').value    = '60';
+    document.getElementById('co-daily-limit').value  = '12';
+    document.getElementById('co-late-action').value  = 'notify_internal';
+    document.getElementById('co-noshow-action').value = 'notify_internal';
+    document.getElementById('co-notif-email').value  = '';
+    document.getElementById('co-track-location').checked = false;
+    document.getElementById('co-radius').value       = '1.0';
+    document.getElementById('radius-field').style.display = 'none';
+    document.getElementById('co-form-title').textContent  = 'Add Company Settings';
+    document.getElementById('co-cancel-btn').style.display = 'none';
+  };
+
+  window.editSettings = function(s) {
+    document.getElementById('co-id').value           = s.id;
+    document.getElementById('co-name').value         = s.company_name;
+    document.getElementById('co-early-val').value    = s.early_tolerance_value;
+    document.getElementById('co-early-unit').value   = s.early_tolerance_unit;
+    document.getElementById('co-late-val').value     = s.late_tolerance_value;
+    document.getElementById('co-late-unit').value    = s.late_tolerance_unit;
+    document.getElementById('co-lunch-min').value    = s.lunch_min_minutes;
+    document.getElementById('co-lunch-max').value    = s.lunch_max_minutes;
+    document.getElementById('co-daily-limit').value  = s.daily_hour_limit;
+    document.getElementById('co-late-action').value  = s.late_action;
+    document.getElementById('co-noshow-action').value = s.noshow_action;
+    document.getElementById('co-notif-email').value  = s.notification_email || '';
+    document.getElementById('co-track-location').checked = s.track_location;
+    document.getElementById('co-radius').value       = s.location_radius_miles;
+    document.getElementById('radius-field').style.display = s.track_location ? '' : 'none';
+    document.getElementById('co-form-title').textContent  = `Edit — ${s.company_name}`;
+    document.getElementById('co-cancel-btn').style.display = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  async function loadSettings() {
+    const tbody = document.getElementById('settings-tbody');
+    const { data, error } = await supabase
+      .from('employer_settings').select('*').order('company_name');
+    if (error || !data?.length) {
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-state">${error ? 'Error loading.' : 'No company settings yet.'}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(s => `<tr>
+      <td style="font-weight:600">${s.company_name}</td>
+      <td>${s.early_tolerance_value} ${s.early_tolerance_unit}</td>
+      <td>${s.late_tolerance_value} ${s.late_tolerance_unit}</td>
+      <td>${s.lunch_min_minutes}–${s.lunch_max_minutes} min</td>
+      <td>${s.daily_hour_limit} hrs</td>
+      <td>${s.track_location
+        ? `<span class="badge-track-on">ON — ${s.location_radius_miles} mi</span>`
+        : `<span class="badge-track-off">OFF</span>`}</td>
+      <td style="font-size:.8rem">${actionLabel(s.late_action)}</td>
+      <td style="font-size:.8rem">${actionLabel(s.noshow_action)}</td>
+      <td style="font-size:.8rem">${s.notification_email || '—'}</td>
+      <td>
+        <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
+          onclick='editSettings(${JSON.stringify(s)})'>Edit</button>
+      </td>
+    </tr>`).join('');
+  }
+
+  // ════════════════════════════════════════════════════════
+  // WORKER PAY RATES TAB
+  // ════════════════════════════════════════════════════════
+  let workers = [];
+
+  async function loadPayRates() {
+    const tbody = document.getElementById('pay-tbody');
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading…</td></tr>';
+    const { data, error } = await supabase
+      .from('workers').select('id, name, employee_id, company, role, pay_rate')
+      .order('name');
+    if (error || !data?.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${error ? 'Error.' : 'No workers found.'}</td></tr>`;
+      return;
+    }
+    workers = data;
+    tbody.innerHTML = data.map(w => `<tr id="pay-row-${w.id}">
+      <td style="font-weight:600">${w.name}</td>
+      <td style="font-family:monospace;font-size:.82rem">${w.employee_id || '—'}</td>
+      <td>${w.company || '—'}</td>
+      <td>${w.role || '—'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:var(--text-secondary)">$</span>
+          <input class="pay-input" type="number" min="0" step="0.01"
+            id="pay-${w.id}" value="${w.pay_rate ?? ''}" placeholder="0.00">
+        </div>
+      </td>
+      <td>
+        <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
+          onclick="savePayRate('${w.id}')">Save</button>
+        <span id="pay-msg-${w.id}" style="font-size:.75rem;margin-left:6px;"></span>
+      </td>
+    </tr>`).join('');
+  }
+
+  window.savePayRate = async function(workerId) {
+    const val   = parseFloat(document.getElementById('pay-' + workerId).value) || null;
+    const msgEl = document.getElementById('pay-msg-' + workerId);
+    const { error } = await supabase.from('workers').update({ pay_rate: val }).eq('id', workerId);
+    if (error) {
+      msgEl.style.color = '#dc2626'; msgEl.textContent = 'Error.';
+    } else {
+      msgEl.style.color = '#16a34a'; msgEl.textContent = 'Saved ✓';
+      setTimeout(() => { msgEl.textContent = ''; }, 3000);
+    }
+  };
+
+  // ── Initial load ──────────────────────────────────────────
+  loadSettings();
+</script>
+</body>
+</html>
