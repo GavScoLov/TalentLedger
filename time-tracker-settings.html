@@ -91,7 +91,13 @@
           <div class="form-grid">
             <div class="form-field" style="grid-column:1/-1">
               <label>Company Name <span style="color:#dc2626">*</span></label>
-              <input type="text" id="co-name" placeholder="Acme Corp" style="max-width:320px;">
+              <div style="max-width:320px;position:relative;">
+                <input type="text" id="co-name-search" placeholder="Search companies…"
+                  oninput="filterCompanyList()" onfocus="showCompanyList()" autocomplete="off"
+                  style="width:100%;padding:8px 11px;border:1px solid var(--border-color);border-radius:6px;font-family:var(--font);font-size:.875rem;background:var(--bg-default);color:var(--text-primary);">
+                <input type="hidden" id="co-name">
+                <div id="co-name-dropdown" style="display:none;position:absolute;z-index:50;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border-color);border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;margin-top:2px;"></div>
+              </div>
             </div>
 
             <div class="form-field">
@@ -242,6 +248,61 @@
     return { none:'None', notify_employer:'Notify Employer', notify_internal:'Notify Internal', both:'Notify Both' }[val] || val;
   }
 
+  // ── Company name searchable dropdown ─────────────────────
+  let allCompanies = [];
+
+  async function loadCompanyNames() {
+    const [{ data: evtData }, { data: wkData }] = await Promise.all([
+      supabase.from('events').select('company').not('company', 'is', null),
+      supabase.from('workers').select('company').not('company', 'is', null),
+    ]);
+    const names = new Set([
+      ...(evtData || []).map(r => r.company),
+      ...(wkData  || []).map(r => r.company),
+    ].filter(Boolean));
+    allCompanies = [...names].sort((a, b) => a.localeCompare(b));
+  }
+
+  window.showCompanyList = function() {
+    renderCompanyDropdown(allCompanies);
+  };
+
+  window.filterCompanyList = function() {
+    const q = document.getElementById('co-name-search').value.toLowerCase().trim();
+    // Clear hidden value — user must re-select
+    document.getElementById('co-name').value = '';
+    const filtered = q ? allCompanies.filter(c => c.toLowerCase().includes(q)) : allCompanies;
+    renderCompanyDropdown(filtered);
+  };
+
+  function renderCompanyDropdown(list) {
+    const dd = document.getElementById('co-name-dropdown');
+    if (!list.length) {
+      dd.innerHTML = '<div style="padding:10px 14px;font-size:.85rem;color:#9CA3AF;">No companies found.</div>';
+    } else {
+      dd.innerHTML = list.map(c => `
+        <div onclick="selectCompany(${JSON.stringify(c)})"
+          style="padding:9px 14px;font-size:.875rem;cursor:pointer;color:#111827;border-bottom:1px solid #F3F4F6;"
+          onmouseenter="this.style.background='#FEF3E6'" onmouseleave="this.style.background=''">
+          ${c}
+        </div>`).join('');
+    }
+    dd.style.display = '';
+  }
+
+  window.selectCompany = function(name) {
+    document.getElementById('co-name-search').value = name;
+    document.getElementById('co-name').value        = name;
+    document.getElementById('co-name-dropdown').style.display = 'none';
+  };
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#co-name-search') && !e.target.closest('#co-name-dropdown')) {
+      document.getElementById('co-name-dropdown').style.display = 'none';
+    }
+  });
+
   // ── Tab switching ─────────────────────────────────────────
   window.switchTab = function(tab) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['companies','pay'][i] === tab));
@@ -305,6 +366,7 @@
   window.resetCompanyForm = function() {
     document.getElementById('co-id').value           = '';
     document.getElementById('co-name').value         = '';
+    document.getElementById('co-name-search').value  = '';
     document.getElementById('co-early-val').value    = '15';
     document.getElementById('co-early-unit').value   = 'minutes';
     document.getElementById('co-late-val').value     = '15';
@@ -325,6 +387,7 @@
   window.editSettings = function(s) {
     document.getElementById('co-id').value           = s.id;
     document.getElementById('co-name').value         = s.company_name;
+    document.getElementById('co-name-search').value  = s.company_name;
     document.getElementById('co-early-val').value    = s.early_tolerance_value;
     document.getElementById('co-early-unit').value   = s.early_tolerance_unit;
     document.getElementById('co-late-val').value     = s.late_tolerance_value;
@@ -419,6 +482,7 @@
   };
 
   // ── Initial load ──────────────────────────────────────────
+  loadCompanyNames();
   loadSettings();
 </script>
 </body>
