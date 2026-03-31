@@ -36,11 +36,25 @@ export default defineConfig(({ mode }) => {
           workerAssignments:   resolve(__dirnameESM, 'worker-assignments.html'),
           scheduler:           resolve(__dirnameESM, 'scheduler.html'),
           timeTrackerSettings: resolve(__dirnameESM, 'time-tracker-settings.html'),
+          timesheetReview:     resolve(__dirnameESM, 'timesheet-review.html'),
         },
       },
     },
     server: {
       proxy: {
+        '/api/ts': {
+          target: 'https://api.mytimestation.com/v1.2',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/ts/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              const apiKey = env.TIMESTATION_API_KEY || '';
+              const encoded = Buffer.from(apiKey + ':').toString('base64');
+              proxyReq.setHeader('Authorization', `Basic ${encoded}`);
+              proxyReq.setHeader('Accept', 'application/json');
+            });
+          },
+        },
         '/api/psa': {
           target: 'https://api.psastaffing.com',
           changeOrigin: true,

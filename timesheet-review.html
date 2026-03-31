@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timesheet Review – TalentLedger</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 14px 0 18px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;
+    }
+    .week-nav { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+    .week-nav button { background: #fff; border: none; padding: 8px 14px; cursor: pointer; font-size: 1rem; color: #374151; transition: background .15s; }
+    .week-nav button:hover { background: #F9FAFB; }
+    .week-label { font-size: .92rem; font-weight: 700; color: #111827; min-width: 220px; text-align: center; }
+    .btn-today { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; font-size: .82rem; font-weight: 600; color: #374151; cursor: pointer; }
+    .btn-today:hover { background: #F9FAFB; }
+    .toolbar-spacer { flex: 1; }
+    .filter-select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: .85rem; background: #fff; color: #374151; }
+    .filter-select:focus { outline: none; border-color: var(--primary); }
+    .btn-refresh { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; font-size: .82rem; font-weight: 600; color: #374151; cursor: pointer; }
+    .btn-refresh:hover { background: #F9FAFB; }
+    .btn-approve-all { padding: 8px 16px; background: #16a34a; color: #fff; border: none; border-radius: 8px; font-size: .82rem; font-weight: 700; cursor: pointer; }
+    .btn-approve-all:hover { background: #15803d; }
+
+    /* ── Employee cards ── */
+    .emp-card { background: #fff; border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+    .emp-card-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 18px; background: #F9FAFB; cursor: pointer;
+      border-bottom: 1px solid var(--border-color); user-select: none;
+    }
+    .emp-card-header:hover { background: #F3F4F6; }
+    .emp-chevron { font-size: .9rem; color: #9CA3AF; transition: transform .2s; }
+    .emp-card.collapsed .emp-chevron { transform: rotate(-90deg); }
+    .emp-name { font-size: .92rem; font-weight: 700; color: #111827; flex: 1; }
+    .emp-dept { font-size: .78rem; color: #6B7280; }
+    .emp-total { font-size: .85rem; font-weight: 600; color: #374151; margin-left: auto; margin-right: 12px; }
+    .emp-approve-week { padding: 5px 12px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-size: .75rem; font-weight: 700; cursor: pointer; }
+    .emp-approve-week:hover { background: #C7712A; }
+    .emp-card-body { display: block; }
+    .emp-card.collapsed .emp-card-body { display: none; }
+
+    /* ── Shift table ── */
+    .shift-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    .shift-table th { padding: 8px 14px; text-align: left; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #6B7280; border-bottom: 1px solid #F3F4F6; }
+    .shift-table td { padding: 10px 14px; border-bottom: 1px solid #F9FAFB; color: #111827; vertical-align: middle; }
+    .shift-table tr:last-child td { border-bottom: none; }
+    .shift-table tr:hover td { background: #FFFBF5; }
+
+    /* ── Status badges ── */
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+    .badge-pending  { background: #F3F4F6; color: #6B7280; }
+    .badge-edited   { background: #FEF3E6; color: #EA8938; }
+    .badge-approved { background: #DCFCE7; color: #16a34a; }
+    .badge-absent   { background: #FEE2E2; color: #dc2626; }
+
+    /* ── Inline edit ── */
+    .time-display { cursor: default; }
+    .time-edit-row { display: none; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .time-edit-row.active { display: flex; }
+    .time-input { padding: 5px 8px; border: 1.5px solid var(--border-color); border-radius: 6px; font-size: .82rem; font-family: monospace; color: #111827; }
+    .time-input:focus { outline: none; border-color: var(--primary); }
+    .btn-save-edit { padding: 5px 12px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-size: .75rem; font-weight: 700; cursor: pointer; }
+    .btn-save-edit:hover { background: #C7712A; }
+    .btn-cancel-edit { padding: 5px 10px; background: #F3F4F6; color: #374151; border: none; border-radius: 6px; font-size: .75rem; cursor: pointer; }
+
+    .action-btns { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+    .btn-edit    { padding: 4px 10px; background: #EFF6FF; color: #2563EB; border: none; border-radius: 6px; font-size: .72rem; font-weight: 600; cursor: pointer; }
+    .btn-edit:hover { background: #DBEAFE; }
+    .btn-approve { padding: 4px 10px; background: #DCFCE7; color: #16a34a; border: none; border-radius: 6px; font-size: .72rem; font-weight: 600; cursor: pointer; }
+    .btn-approve:hover { background: #BBF7D0; }
+
+    /* ── Empty / loading states ── */
+    .state-msg { text-align: center; padding: 60px 20px; color: #9CA3AF; font-size: .92rem; }
+    .state-msg .icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .spinner-row { text-align: center; padding: 40px; }
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #E5E7EB; border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Push status ── */
+    .push-ok  { color: #16a34a; font-size: .72rem; }
+    .push-err { color: #dc2626; font-size: .72rem; }
+    .push-pending { color: #9CA3AF; font-size: .72rem; }
+
+    /* ── Stats strip ── */
+    .stats-strip { display: flex; gap: 20px; padding: 12px 0; margin-bottom: 16px; flex-wrap: wrap; }
+    .stat-item { font-size: .82rem; color: #374151; }
+    .stat-item strong { font-weight: 700; color: #111827; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div id="topbar-placeholder"></div>
+    <div id="sidebar-placeholder"></div>
+    <div class="page-content">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Timesheet Review</h1>
+          <p class="page-subtitle">Review and approve worker punch times from TimeStation</p>
+        </div>
+      </div>
+
+      <div style="background:#FEF9C3;border:1px solid #FDE047;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:.82rem;color:#854D0E;display:flex;align-items:center;gap:10px;">
+        <span>⚠️</span>
+        <span><strong>Setup mode:</strong> Edits are saved locally only. TimeStation write-back is disabled until the system goes live — no live data will be modified.</span>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="week-nav">
+          <button onclick="navigateWeek(-1)">&#8249;</button>
+          <span class="week-label" id="week-label">Loading…</span>
+          <button onclick="navigateWeek(1)">&#8250;</button>
+        </div>
+        <button class="btn-today" onclick="goToToday()">Today</button>
+        <select class="filter-select" id="dept-filter" onchange="loadTimesheets()" style="max-width:220px;">
+          <option value="">All Departments</option>
+        </select>
+        <div class="toolbar-spacer"></div>
+        <button class="btn-refresh" onclick="loadTimesheets()">↻ Refresh from TimeStation</button>
+        <button class="btn-approve-all" onclick="approveAll()">✓ Approve All Visible</button>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="stats-strip" id="stats-strip" style="display:none;">
+        <div class="stat-item">Workers: <strong id="stat-workers">—</strong></div>
+        <div class="stat-item">Total Hours: <strong id="stat-hours">—</strong></div>
+        <div class="stat-item">Approved: <strong id="stat-approved">—</strong></div>
+        <div class="stat-item">Pending: <strong id="stat-pending">—</strong></div>
+        <div class="stat-item">Edited: <strong id="stat-edited">—</strong></div>
+      </div>
+
+      <!-- Content area -->
+      <div id="content-area">
+        <div class="state-msg">
+          <div class="icon">📋</div>
+          Select a week and department to load timesheets.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { renderNavbar }  from './src/components/navbar.js';
+  import { renderSidebar } from './src/components/sidebar.js';
+  import { checkAuth, checkPageAccess } from './src/auth.js';
+  import { supabase } from './src/supabaseClient.js';
+
+  await checkAuth();
+  await checkPageAccess('timesheet-review');
+  renderNavbar();
+  await renderSidebar();
+
+  // ── Constants ─────────────────────────────────────────────
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // ── State ─────────────────────────────────────────────────
+  let weekStart  = getMondayOf(new Date());
+  let employees  = [];      // from ts_employees
+  let approvals  = {};      // ts_shift_id → approval row
+  let shiftData  = {};      // employee_id → [shifts]
+  let loading    = false;
+
+  // ── Date helpers ──────────────────────────────────────────
+  function getMondayOf(d) {
+    const dt = new Date(d);
+    const day = dt.getDay();
+    dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
+    dt.setHours(0,0,0,0);
+    return dt;
+  }
+
+  function addDays(d, n) {
+    const dt = new Date(d); dt.setDate(dt.getDate() + n); return dt;
+  }
+
+  function toDateStr(d) { return d.toISOString().slice(0,10); }
+
+  function fmtWeekLabel() {
+    const end = addDays(weekStart, 6);
+    const sm = MONTHS[weekStart.getMonth()], em = MONTHS[end.getMonth()];
+    if (sm === em) return `${sm} ${weekStart.getDate()}–${end.getDate()}, ${weekStart.getFullYear()}`;
+    return `${sm} ${weekStart.getDate()} – ${em} ${end.getDate()}, ${end.getFullYear()}`;
+  }
+
+  function fmtTime(isoStr) {
+    if (!isoStr) return '—';
+    const d = new Date(isoStr);
+    if (isNaN(d)) return isoStr;
+    let h = d.getHours(), m = d.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+
+  function fmtMins(mins) {
+    if (!mins && mins !== 0) return '—';
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  function toDatetimeLocal(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d)) return '';
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function fromDatetimeLocal(val) {
+    if (!val) return null;
+    return new Date(val).toISOString();
+  }
+
+  // ── Navigation ────────────────────────────────────────────
+  window.navigateWeek = async (dir) => {
+    weekStart = addDays(weekStart, dir * 7);
+    await loadTimesheets();
+  };
+
+  window.goToToday = async () => {
+    weekStart = getMondayOf(new Date());
+    await loadTimesheets();
+  };
+
+  function updateWeekLabel() {
+    document.getElementById('week-label').textContent = fmtWeekLabel();
+  }
+
+  // ── Load departments into filter ──────────────────────────
+  async function loadDepartments() {
+    const { data } = await supabase
+      .from('ts_employees')
+      .select('primary_department')
+      .not('primary_department', 'is', null);
+    if (!data) return;
+    const depts = [...new Set(data.map(r => r.primary_department).filter(Boolean))].sort();
+    const sel = document.getElementById('dept-filter');
+    sel.innerHTML = '<option value="">All Departments</option>'
+      + depts.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+  }
+
+  // ── Load timesheets ───────────────────────────────────────
+  window.loadTimesheets = async function() {
+    if (loading) return;
+    loading = true;
+    updateWeekLabel();
+    document.getElementById('content-area').innerHTML = '<div class="spinner-row"><div class="spinner"></div></div>';
+    document.getElementById('stats-strip').style.display = 'none';
+
+    const dept     = document.getElementById('dept-filter').value;
+    const startStr = toDateStr(weekStart);
+    const endStr   = toDateStr(addDays(weekStart, 6));
+
+    try {
+      // 1. Load employees from Supabase
+      let q = supabase.from('ts_employees')
+        .select('employee_id, first_name, last_name, primary_department')
+        .eq('status', 'Active');
+      if (dept) q = q.eq('primary_department', dept);
+      const { data: emps } = await q.order('first_name').limit(200);
+      employees = (emps || []).map(e => ({
+        id:   e.employee_id,
+        name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Employee ${e.employee_id}`,
+        dept: e.primary_department || '',
+      }));
+
+      if (!employees.length) {
+        document.getElementById('content-area').innerHTML =
+          '<div class="state-msg"><div class="icon">👥</div>No active employees found for this filter.</div>';
+        return;
+      }
+
+      // 2. Fetch shifts from TimeStation API for each employee (batched)
+      shiftData = {};
+      await Promise.all(employees.map(async emp => {
+        try {
+          const res = await fetch(
+            `/api/ts/shifts?employee_id=${encodeURIComponent(emp.id)}&start_date=${startStr}&end_date=${endStr}`
+          );
+          if (res.ok) {
+            const json = await res.json();
+            shiftData[emp.id] = json.shifts || [];
+          } else {
+            shiftData[emp.id] = [];
+          }
+        } catch { shiftData[emp.id] = []; }
+      }));
+
+      // 3. Load existing approvals from Supabase for this week
+      const allShiftIds = Object.values(shiftData).flat().map(s => String(s.shift_id));
+      approvals = {};
+      if (allShiftIds.length) {
+        const { data: appData } = await supabase
+          .from('timesheet_approvals')
+          .select('*')
+          .in('ts_shift_id', allShiftIds);
+        (appData || []).forEach(a => { approvals[a.ts_shift_id] = a; });
+      }
+
+      render();
+    } catch (err) {
+      document.getElementById('content-area').innerHTML =
+        `<div class="state-msg" style="color:#dc2626;"><div class="icon">⚠️</div>${escHtml(err.message)}</div>`;
+    } finally {
+      loading = false;
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────
+  function render() {
+    const container = document.getElementById('content-area');
+    const startStr  = toDateStr(weekStart);
+    const endStr    = toDateStr(addDays(weekStart, 6));
+    const days      = Array.from({length:7}, (_,i) => addDays(weekStart, i));
+
+    // Build day date strings for lookup
+    const dayStrs = days.map(toDateStr);
+
+    let totalMins = 0, totalWorkers = 0, nApproved = 0, nPending = 0, nEdited = 0;
+
+    const cards = employees.map(emp => {
+      const shifts = shiftData[emp.id] || [];
+      if (!shifts.length) return '';
+
+      // Map shifts by date
+      const byDate = {};
+      for (const s of shifts) {
+        const d = (s.in?.time || s.out?.time || '').slice(0,10);
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(s);
+      }
+
+      let empMins = 0;
+      const rows = dayStrs.map(dateStr => {
+        const dayShifts = byDate[dateStr] || [];
+        if (!dayShifts.length) return '';
+
+        return dayShifts.map(shift => {
+          const sid     = String(shift.shift_id);
+          const appr    = approvals[sid];
+          const timeIn  = appr?.edited_time_in  || appr?.original_time_in  || shift.in?.time  || null;
+          const timeOut = appr?.edited_time_out || appr?.original_time_out || shift.out?.time || null;
+          const mins    = appr?.total_minutes ?? shift.total_minutes ?? 0;
+          const status  = appr?.status || 'pending';
+          const edited  = !!(appr?.edited_time_in || appr?.edited_time_out);
+
+          empMins   += mins;
+          totalMins += mins;
+          if (status === 'approved')       nApproved++;
+          else if (edited || status === 'edited') nEdited++;
+          else                             nPending++;
+
+          const d = new Date(dateStr + 'T12:00:00');
+          const dayLabel = `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+
+          const pushStatus = appr?.pushed_to_ts
+            ? `<span class="push-ok" title="Pushed to TimeStation at ${appr.pushed_at}">↑ Synced</span>`
+            : edited
+              ? `<span class="push-pending">↑ Pending sync</span>`
+              : '';
+
+          const badge = status === 'approved'
+            ? '<span class="badge badge-approved">Approved</span>'
+            : edited || status === 'edited'
+              ? '<span class="badge badge-edited">Edited</span>'
+              : '<span class="badge badge-pending">Pending</span>';
+
+          const approveBtnDisabled = status === 'approved' ? 'style="opacity:.4;pointer-events:none;"' : '';
+
+          return `<tr id="row-${sid}">
+            <td>${dayLabel}</td>
+            <td>
+              <span class="time-display" id="disp-in-${sid}">${fmtTime(timeIn)}</span>
+              <div class="time-edit-row" id="edit-${sid}">
+                <input class="time-input" type="datetime-local" id="ei-in-${sid}"
+                  value="${toDatetimeLocal(timeIn)}">
+                <span style="color:#9CA3AF;">→</span>
+                <input class="time-input" type="datetime-local" id="ei-out-${sid}"
+                  value="${toDatetimeLocal(timeOut)}">
+                <button class="btn-save-edit" onclick="saveEdit('${sid}','${escHtml(emp.id)}','${escHtml(emp.name)}','${escHtml(emp.dept)}','${escHtml(String(shift.in?.time||''))}','${escHtml(String(shift.out?.time||''))}',${mins})">Save</button>
+                <button class="btn-cancel-edit" onclick="cancelEdit('${sid}')">Cancel</button>
+              </div>
+            </td>
+            <td id="disp-out-${sid}">${fmtTime(timeOut)}</td>
+            <td>${fmtMins(mins)}</td>
+            <td id="badge-${sid}">${badge} ${pushStatus}</td>
+            <td>
+              <div class="action-btns">
+                <button class="btn-edit" onclick="startEdit('${sid}')">Edit</button>
+                <button class="btn-approve" id="appbtn-${sid}" onclick="approveShift('${sid}')" ${approveBtnDisabled}>Approve</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      }).join('');
+
+      if (!rows.trim()) return '';
+      totalWorkers++;
+
+      return `<div class="emp-card" id="card-${emp.id}">
+        <div class="emp-card-header" onclick="toggleCard('${emp.id}')">
+          <span class="emp-chevron">▾</span>
+          <span class="emp-name">${escHtml(emp.name)}</span>
+          <span class="emp-dept">${escHtml(emp.dept)}</span>
+          <span class="emp-total">${fmtMins(empMins)}</span>
+          <button class="emp-approve-week" onclick="event.stopPropagation();approveWeek('${emp.id}')">✓ Approve Week</button>
+        </div>
+        <div class="emp-card-body">
+          <table class="shift-table">
+            <thead><tr>
+              <th style="width:130px">Day</th>
+              <th>Clock In → Clock Out</th>
+              <th>Time Out</th>
+              <th>Duration</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).filter(Boolean).join('');
+
+    container.innerHTML = cards || '<div class="state-msg"><div class="icon">📋</div>No shifts found for this period.</div>';
+
+    // Update stats
+    const ss = document.getElementById('stats-strip');
+    ss.style.display = '';
+    document.getElementById('stat-workers').textContent  = totalWorkers;
+    document.getElementById('stat-hours').textContent    = fmtMins(totalMins);
+    document.getElementById('stat-approved').textContent = nApproved;
+    document.getElementById('stat-pending').textContent  = nPending;
+    document.getElementById('stat-edited').textContent   = nEdited;
+  }
+
+  // ── Card toggle ───────────────────────────────────────────
+  window.toggleCard = function(empId) {
+    document.getElementById('card-' + empId)?.classList.toggle('collapsed');
+  };
+
+  // ── Inline edit ───────────────────────────────────────────
+  window.startEdit = function(sid) {
+    document.getElementById('edit-' + sid)?.classList.add('active');
+    document.getElementById('disp-in-' + sid).style.display  = 'none';
+    document.getElementById('disp-out-' + sid).style.display = 'none';
+  };
+
+  window.cancelEdit = function(sid) {
+    document.getElementById('edit-' + sid)?.classList.remove('active');
+    document.getElementById('disp-in-' + sid).style.display  = '';
+    document.getElementById('disp-out-' + sid).style.display = '';
+  };
+
+  window.saveEdit = async function(sid, empId, empName, dept, origIn, origOut, origMins) {
+    const newIn  = fromDatetimeLocal(document.getElementById('ei-in-' + sid)?.value);
+    const newOut = fromDatetimeLocal(document.getElementById('ei-out-' + sid)?.value);
+
+    if (!newIn || !newOut) { alert('Both clock-in and clock-out are required.'); return; }
+    if (new Date(newOut) <= new Date(newIn)) { alert('Clock-out must be after clock-in.'); return; }
+
+    const editedMins = Math.round((new Date(newOut) - new Date(newIn)) / 60000);
+
+    // 1. Save to Supabase timesheet_approvals
+    const payload = {
+      ts_shift_id:       sid,
+      employee_id:       empId,
+      worker_name:       empName,
+      department:        dept,
+      shift_date:        newIn.slice(0, 10),
+      original_time_in:  origIn || null,
+      original_time_out: origOut || null,
+      edited_time_in:    newIn,
+      edited_time_out:   newOut,
+      total_minutes:     editedMins,
+      status:            'edited',
+      updated_at:        new Date().toISOString(),
+    };
+
+    const { error: sbErr } = await supabase
+      .from('timesheet_approvals')
+      .upsert(payload, { onConflict: 'ts_shift_id' });
+
+    if (sbErr) { alert('Error saving: ' + sbErr.message); return; }
+
+    // NOTE: TimeStation write-back is intentionally disabled during setup.
+    // Edits are saved locally only. Push to TS will be enabled when ready.
+    const pushed = false;
+
+    // Update local state and re-render row
+    approvals[sid] = { ...approvals[sid], ...payload, pushed_to_ts: false };
+    cancelEdit(sid);
+    document.getElementById('disp-in-' + sid).textContent  = fmtTime(newIn);
+    document.getElementById('disp-out-' + sid).textContent = fmtTime(newOut);
+    document.getElementById('badge-' + sid).innerHTML =
+      `<span class="badge badge-edited">Edited</span> <span class="push-pending" title="TS write-back not yet enabled">↑ Saved locally</span>`;
+  };
+
+  // ── Approve single shift ──────────────────────────────────
+  window.approveShift = async function(sid) {
+    const appr = approvals[sid] || {};
+    const payload = {
+      ts_shift_id: sid,
+      status:      'approved',
+      approved_by: 'internal',
+      approved_at: new Date().toISOString(),
+      updated_at:  new Date().toISOString(),
+    };
+    const { error } = await supabase.from('timesheet_approvals')
+      .upsert({ ...appr, ...payload }, { onConflict: 'ts_shift_id' });
+    if (error) { alert('Error: ' + error.message); return; }
+    approvals[sid] = { ...appr, ...payload };
+    document.getElementById('badge-' + sid).innerHTML = '<span class="badge badge-approved">Approved</span>';
+    const btn = document.getElementById('appbtn-' + sid);
+    if (btn) { btn.style.opacity = '.4'; btn.style.pointerEvents = 'none'; }
+  };
+
+  // ── Approve all shifts for one employee this week ─────────
+  window.approveWeek = async function(empId) {
+    const shifts = shiftData[empId] || [];
+    if (!shifts.length) return;
+    const emp = employees.find(e => e.id === empId);
+    await Promise.all(shifts.map(s => {
+      const sid = String(s.shift_id);
+      if (approvals[sid]?.status === 'approved') return;
+      return approveShift(sid);
+    }));
+  };
+
+  // ── Approve all visible ───────────────────────────────────
+  window.approveAll = async function() {
+    if (!confirm('Approve all visible pending shifts for this week?')) return;
+    for (const emp of employees) {
+      await approveWeek(emp.id);
+    }
+  };
+
+  // ── Utility ───────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  updateWeekLabel();
+  await loadDepartments();
+</script>
+</body>
+</html>
