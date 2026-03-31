@@ -223,11 +223,9 @@
     return new Date(val).toISOString();
   }
 
-  // ── Hard refresh (re-fetch employees + shifts) ────────────
+  // ── Hard refresh ─────────────────────────────────────────
   window.refreshAll = async () => {
-    allEmployees = [];          // clear cache so employees reload fresh from TS
-    await loadEmployeesFromTS();
-    await loadDepartments();
+    allEmployees = [];
     await loadTimesheets();
   };
 
@@ -246,43 +244,19 @@
     document.getElementById('week-label').textContent = fmtWeekLabel();
   }
 
-  // ── Load all employees + departments from TimeStation API ─
-  async function loadEmployeesFromTS() {
-    try {
-      const res = await fetch('/api/ts/employees');
-      if (!res.ok) throw new Error(`TS API ${res.status}`);
-      const json = await res.json();
-      // TS returns { employees: [...] } — field names vary by account setup
-      const raw = json.employees || json.data || json || [];
-      allEmployees = raw
-        .filter(e => {
-          // Include active employees (or all if no status field)
-          const s = (e.status || e.employee_status || '').toLowerCase();
-          return !s || s === 'active' || s === '1';
-        })
-        .map(e => ({
-          id:   String(e.employee_id || e.id || ''),
-          name: `${e.first_name || e.firstName || ''} ${e.last_name || e.lastName || ''}`.trim()
-                || e.name
-                || `Employee ${e.employee_id || e.id}`,
-          dept: e.department || e.primary_department || e.company || '',
-        }))
-        .filter(e => e.id);
-    } catch (err) {
-      console.warn('Could not load employees from TimeStation:', err.message);
-      allEmployees = [];
-    }
-  }
-
-  async function loadDepartments() {
-    if (!allEmployees.length) await loadEmployeesFromTS();
+  // ── Populate department dropdown from cached employee list ─
+  function populateDeptFilter(preserveValue) {
+    const prev = preserveValue ? document.getElementById('dept-filter').value : '';
     const depts = [...new Set(allEmployees.map(e => e.dept).filter(Boolean))].sort();
     const sel = document.getElementById('dept-filter');
     sel.innerHTML = '<option value="">All Departments</option>'
-      + depts.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+      + depts.map(d => `<option value="${escHtml(d)}"${d===prev?' selected':''}>${escHtml(d)}</option>`).join('');
   }
 
   // ── Load timesheets ───────────────────────────────────────
+  // Strategy: fetch ALL shifts for the week in ONE call (no employee_id filter),
+  // then extract employees + departments from the shift records themselves.
+  // This avoids needing a separate /employees endpoint that doesn't exist.
   window.loadTimesheets = async function() {
     if (loading) return;
     loading = true;
@@ -290,43 +264,61 @@
     document.getElementById('content-area').innerHTML = '<div class="spinner-row"><div class="spinner"></div></div>';
     document.getElementById('stats-strip').style.display = 'none';
 
-    const dept     = document.getElementById('dept-filter').value;
     const startStr = toDateStr(weekStart);
     const endStr   = toDateStr(addDays(weekStart, 6));
 
     try {
-      // 1. Load employees directly from TimeStation API
-      if (!allEmployees.length) await loadEmployeesFromTS();
+      // 1. Fetch ALL shifts for the week in a single call
+      const res = await fetch(`/api/ts/shifts?start_date=${startStr}&end_date=${endStr}`);
+      if (!res.ok) throw new Error(`TimeStation API error ${res.status}: ${await res.text().catch(()=>'')}`);
+      const json = await res.json();
+      const allShifts = json.shifts || [];
+
+      // 2. Build employee list + shiftData map from the shift records
+      const empMap = {};
+      shiftData    = {};
+      for (const s of allShifts) {
+        const eid = String(s.employee_id || '');
+        if (!eid) continue;
+
+        // Build employee entry from whatever fields TS provides on the shift
+        if (!empMap[eid]) {
+          empMap[eid] = {
+            id:   eid,
+            name: s.employee_name
+                  || (`${s.first_name||''} ${s.last_name||''}`.trim())
+                  || `Employee ${eid}`,
+            dept: s.department || s.company || s.group || '',
+          };
+        }
+
+        if (!shiftData[eid]) shiftData[eid] = [];
+        shiftData[eid].push(s);
+      }
+
+      // 3. Update employee cache (only repopulate if we got fresh data)
+      if (Object.keys(empMap).length) {
+        allEmployees = Object.values(empMap).sort((a,b) => a.name.localeCompare(b.name));
+        populateDeptFilter(true);
+      }
+
+      // 4. Filter employees by selected department
+      const dept = document.getElementById('dept-filter').value;
       employees = allEmployees.filter(e => !dept || e.dept === dept);
 
+      if (!employees.length && !allShifts.length) {
+        document.getElementById('content-area').innerHTML =
+          '<div class="state-msg"><div class="icon">📋</div>No shifts found for this week in TimeStation.</div>';
+        return;
+      }
       if (!employees.length) {
         document.getElementById('content-area').innerHTML =
-          '<div class="state-msg"><div class="icon">👥</div>'
-          + (allEmployees.length
-              ? 'No employees match this department filter.'
-              : 'No employees returned from TimeStation. Check your API key and proxy configuration.')
-          + '</div>';
+          '<div class="state-msg"><div class="icon">👥</div>No employees match this department filter.</div>';
         return;
       }
 
-      // 2. Fetch shifts from TimeStation API for each employee (batched)
-      shiftData = {};
-      await Promise.all(employees.map(async emp => {
-        try {
-          const res = await fetch(
-            `/api/ts/shifts?employee_id=${encodeURIComponent(emp.id)}&start_date=${startStr}&end_date=${endStr}`
-          );
-          if (res.ok) {
-            const json = await res.json();
-            shiftData[emp.id] = json.shifts || [];
-          } else {
-            shiftData[emp.id] = [];
-          }
-        } catch { shiftData[emp.id] = []; }
-      }));
-
-      // 3. Load existing approvals from Supabase for this week
-      const allShiftIds = Object.values(shiftData).flat().map(s => String(s.shift_id));
+      // 5. Load existing approvals from Supabase for these shifts
+      const allShiftIds = allShifts.map(s => String(s.shift_id));
       approvals = {};
       if (allShiftIds.length) {
         const { data: appData } = await supabase
@@ -594,9 +586,7 @@
 
   // ── Init ─────────────────────────────────────────────────
   updateWeekLabel();
-  await loadEmployeesFromTS();   // prime the employee list first
-  await loadDepartments();       // populate dept filter from TS data
-  await loadTimesheets();        // auto-load current week
+  await loadTimesheets();   // fetches shifts + extracts employees + populates dept filter
 </script>
 </body>
 </html>
