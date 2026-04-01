@@ -135,6 +135,155 @@ a:hover { text-decoration: underline; }
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: rgba(255,255,255,0.38); padding: 14px 12px 4px; user-select: none;
 }
+
+/* ── Sidebar hover flyout groups ────────────────────────────── */
+.sidebar-section-group {
+  position: relative;
+  margin-bottom: 2px;
+}
+
+/* The row that shows the section label + icon */
+.sidebar-section-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.sidebar-section-trigger:hover,
+.sidebar-section-group:hover > .sidebar-section-trigger {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.sidebar-section-group.has-active > .sidebar-section-trigger {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.sidebar-section-trigger-icon svg {
+  width: 20px; height: 20px; flex-shrink: 0; opacity: 0.75;
+  display: block;
+}
+.sidebar-section-trigger:hover .sidebar-section-trigger-icon svg,
+.sidebar-section-group:hover .sidebar-section-trigger-icon svg,
+.sidebar-section-group.has-active .sidebar-section-trigger-icon svg { opacity: 1; }
+.sidebar-section-trigger-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-section-trigger-chevron {
+  opacity: 0.45;
+  transition: transform 0.2s, opacity 0.15s;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.sidebar-section-group:hover .sidebar-section-trigger-chevron { opacity: 0.9; }
+
+/* The flyout panel — appears to the right on hover */
+.sidebar-flyout {
+  position: absolute;
+  left: calc(var(--sidebar-width) - 8px);
+  top: 0;
+  min-width: 210px;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  z-index: 300;
+  /* Hidden by default */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+/* Show on group hover (desktop) */
+.sidebar-section-group:hover > .sidebar-flyout {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+/* Show on mobile-open class */
+.sidebar-section-group.mobile-open > .sidebar-flyout {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.sidebar-flyout-header {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  padding: 6px 10px 4px;
+}
+.sidebar-flyout-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.sidebar-flyout-item:hover {
+  background: rgba(var(--primary-rgb), 0.07);
+  color: var(--primary);
+  text-decoration: none;
+}
+.sidebar-flyout-item.active {
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary);
+  font-weight: 600;
+}
+.sidebar-flyout-item-icon svg {
+  width: 18px; height: 18px; flex-shrink: 0;
+  opacity: 0.6;
+  display: block;
+}
+.sidebar-flyout-item:hover .sidebar-flyout-item-icon svg,
+.sidebar-flyout-item.active .sidebar-flyout-item-icon svg { opacity: 1; }
+
+/* On mobile: flyout stacks inline below the trigger */
+@media (max-width: 768px) {
+  .sidebar-flyout {
+    position: static;
+    transform: none;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    background: rgba(0,0,0,0.15);
+    padding: 2px 0 2px 16px;
+    min-width: 0;
+    display: none;
+  }
+  .sidebar-section-group.mobile-open > .sidebar-flyout {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar-flyout-item { color: rgba(255,255,255,0.8); }
+  .sidebar-flyout-item:hover, .sidebar-flyout-item.active { background: rgba(255,255,255,0.1); color: #fff; }
+  .sidebar-flyout-header { color: rgba(255,255,255,0.35); }
+  .sidebar-section-trigger-chevron {
+    transition: transform 0.2s;
+  }
+  .sidebar-section-group.mobile-open > .sidebar-section-trigger .sidebar-section-trigger-chevron {
+    transform: rotate(90deg);
+  }
+}
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; }
 
 @media (max-width: 768px) {
