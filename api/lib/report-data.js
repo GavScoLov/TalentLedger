@@ -95,12 +95,35 @@ function sortedWeeksFrom(weekSet) {
   return [...weekSet].filter(w => w !== '—').sort().concat(weekSet.has('—') ? ['—'] : []);
 }
 
+// ── Week date-range label helpers ─────────────────────────────────────────────
+
+/** "2026-04-05" → "3/30-4/5"  (6 days back through the weekend-end date) */
+function weekRangeLabel(weekEndStr) {
+  if (!weekEndStr || weekEndStr === '—') return '—';
+  const end = new Date(weekEndStr + 'T00:00:00Z');
+  const s   = new Date(end);
+  s.setUTCDate(end.getUTCDate() - 6);
+  return `${s.getUTCMonth() + 1}/${s.getUTCDate()}-${end.getUTCMonth() + 1}/${end.getUTCDate()}`;
+}
+
+/** "2026-03-01" → "MARCH 2026" */
+function monthYearUpper(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).toUpperCase();
+}
+
+/** "2026-04-01" → "April 2026" */
+function monthYearTitle(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
 // ── Report CSV generators ─────────────────────────────────────────────────────
 
 export async function genDhpHoursCSV(start, end) {
-  const data      = await fetchEmployeeHours(start, end);
-  const branchData = {};
-  const weekSet    = new Set();
+  const data    = await fetchEmployeeHours(start, end);
+  const entries = {};   // company → { branch, weeks: { weekEnd: hrs } }
+  const weekSet = new Set();
 
   for (const r of data) {
     if (isCorporate(r.branchname) || !isDHP(r.customername)) continue;
@@ -109,27 +132,49 @@ export async function genDhpHoursCSV(start, end) {
     const week    = r.weekendbill  || '—';
     const hrs     = Number(r.hours) || 0;
     weekSet.add(week);
-    (branchData[branch] ??= {})[company] ??= {};
-    branchData[branch][company][week] = (branchData[branch][company][week] || 0) + hrs;
+    if (!entries[company]) entries[company] = { branch, weeks: {} };
+    entries[company].weeks[week] = (entries[company].weeks[week] || 0) + hrs;
   }
 
-  const weeks   = sortedWeeksFrom(weekSet);
-  const headers = ['Branch', 'Company', ...weeks, 'Total'];
-  const rows    = [];
-  for (const branch of Object.keys(branchData).sort()) {
-    for (const company of Object.keys(branchData[branch]).sort()) {
-      const vals  = weeks.map(w => branchData[branch][company][w] || 0);
-      const total = vals.reduce((s, v) => s + v, 0);
-      rows.push([branch, company, ...vals.map(v => v.toFixed(2)), total.toFixed(2)]);
-    }
+  const weeks      = sortedWeeksFrom(weekSet);
+  const weekLabels = weeks.map(weekRangeLabel);
+  const numCols    = 2 + weeks.length + 1;       // Company, Branch, ...weeks, Total
+  const emptyRow   = Array(numCols).fill('');
+  const titleLabel = monthYearUpper(start);
+
+  const allRows = [
+    [`${titleLabel} DHP HOURS`, ...Array(numCols - 1).fill('')],
+    ['Company', 'Branch', ...weekLabels, 'Total DHP Hours'],
+    emptyRow,
+  ];
+
+  const weekTotals = weeks.map(() => 0);
+  for (const company of Object.keys(entries).sort()) {
+    const { branch, weeks: wData } = entries[company];
+    const vals  = weeks.map(w => wData[w] || 0);
+    const total = vals.reduce((s, v) => s + v, 0);
+    vals.forEach((v, i) => { weekTotals[i] += v; });
+    allRows.push([
+      company, branch,
+      ...vals.map(v => v > 0 ? v.toFixed(2) : ''),
+      total > 0 ? total.toFixed(2) : '',
+    ]);
   }
-  return { csv: toCSV(headers, rows), filename: 'monthly-dhp-hours.csv' };
+
+  const grandTotal = weekTotals.reduce((s, v) => s + v, 0);
+  allRows.push([
+    '', 'TOTALS',
+    ...weekTotals.map(v => v > 0 ? v.toFixed(2) : '-'),
+    grandTotal > 0 ? grandTotal.toFixed(2) : '-',
+  ]);
+
+  return { csv: toCSV(allRows[0], allRows.slice(1)), filename: 'monthly-dhp-hours.csv' };
 }
 
 export async function genDhpHeadcountCSV(start, end) {
-  const data      = await fetchUniqueCountByCompany(start, end);
-  const branchData = {};
-  const weekSet    = new Set();
+  const data    = await fetchUniqueCountByCompany(start, end);
+  const entries = {};
+  const weekSet = new Set();
 
   for (const r of data) {
     if (isCorporate(r.branchname) || !isDHP(r.customername)) continue;
@@ -138,30 +183,108 @@ export async function genDhpHeadcountCSV(start, end) {
     const week    = r.weekendbill  || '—';
     const cnt     = Number(r.unique_row_count) || 0;
     weekSet.add(week);
-    (branchData[branch] ??= {})[company] ??= {};
-    branchData[branch][company][week] = (branchData[branch][company][week] || 0) + cnt;
+    if (!entries[company]) entries[company] = { branch, weeks: {} };
+    entries[company].weeks[week] = (entries[company].weeks[week] || 0) + cnt;
   }
 
-  const weeks   = sortedWeeksFrom(weekSet);
-  const headers = ['Branch', 'Company', ...weeks, 'Total'];
-  const rows    = [];
-  for (const branch of Object.keys(branchData).sort()) {
-    for (const company of Object.keys(branchData[branch]).sort()) {
-      const vals  = weeks.map(w => branchData[branch][company][w] || 0);
-      const total = vals.reduce((s, v) => s + v, 0);
-      rows.push([branch, company, ...vals, total]);
-    }
+  const weeks      = sortedWeeksFrom(weekSet);
+  const weekLabels = weeks.map(weekRangeLabel);
+  const numCols    = 2 + weeks.length + 1;
+  const emptyRow   = Array(numCols).fill('');
+  const titleLabel = monthYearUpper(start);
+
+  const allRows = [
+    [`${titleLabel} DHP HEADCOUNT`, ...Array(numCols - 1).fill('')],
+    ['Company', 'Branch', ...weekLabels, 'Total DHP Headcount'],
+    emptyRow,
+  ];
+
+  const weekTotals = weeks.map(() => 0);
+  for (const company of Object.keys(entries).sort()) {
+    const { branch, weeks: wData } = entries[company];
+    const vals  = weeks.map(w => wData[w] || 0);
+    const total = vals.reduce((s, v) => s + v, 0);
+    vals.forEach((v, i) => { weekTotals[i] += v; });
+    allRows.push([
+      company, branch,
+      ...vals.map(v => v > 0 ? v : ''),
+      total > 0 ? total : '',
+    ]);
   }
-  return { csv: toCSV(headers, rows), filename: 'monthly-dhp-headcount.csv' };
+
+  const grandTotal = weekTotals.reduce((s, v) => s + v, 0);
+  allRows.push([
+    '', 'TOTALS',
+    ...weekTotals.map(v => v > 0 ? v : 0),
+    grandTotal,
+  ]);
+
+  return { csv: toCSV(allRows[0], allRows.slice(1)), filename: 'monthly-dhp-headcount.csv' };
 }
 
 export async function genDhpBillingCSV(start, end) {
-  const data      = await fetchInvoiceRegister(start, end);
+  const data    = await fetchInvoiceRegister(start, end);
+  const entries = {};
+  const weekSet = new Set();
+
+  for (const r of data) {
+    if (isCorporate(r.branchname) || !isDHP(r.customername)) continue;
+    const branch  = r.branchname   || 'Unknown';
+    const company = r.customername || 'Unknown';
+    const week    = r.weekendbill  || '—';
+    const amt     = Number(r.invoiceamount) || 0;
+    weekSet.add(week);
+    if (!entries[company]) entries[company] = { branch, weeks: {} };
+    entries[company].weeks[week] = (entries[company].weeks[week] || 0) + amt;
+  }
+
+  const weeks      = sortedWeeksFrom(weekSet);
+  const weekLabels = weeks.map(weekRangeLabel);
+  const numCols    = 2 + weeks.length + 1;
+  const emptyRow   = Array(numCols).fill('');
+  const titleLabel = monthYearUpper(start);
+
+  const allRows = [
+    [`${titleLabel} DHP BILLING`, ...Array(numCols - 1).fill('')],
+    ['Company', 'Branch', ...weekLabels, 'Total DHP Billing'],
+    emptyRow,
+  ];
+
+  const weekTotals = weeks.map(() => 0);
+  for (const company of Object.keys(entries).sort()) {
+    const { branch, weeks: wData } = entries[company];
+    const vals  = weeks.map(w => wData[w] || 0);
+    const total = vals.reduce((s, v) => s + v, 0);
+    vals.forEach((v, i) => { weekTotals[i] += v; });
+    allRows.push([
+      company, branch,
+      ...vals.map(v => v > 0 ? `$${v.toFixed(2)}` : ''),
+      total > 0 ? `$${total.toFixed(2)}` : '',
+    ]);
+  }
+
+  const grandTotal = weekTotals.reduce((s, v) => s + v, 0);
+  allRows.push([
+    `${titleLabel} BILLING GRAND TOTAL`, 'TOTALS',
+    ...weekTotals.map(v => `$${v.toFixed(2)}`),
+    `$${grandTotal.toFixed(2)}`,
+  ]);
+
+  return { csv: toCSV(allRows[0], allRows.slice(1)), filename: 'monthly-dhp-billing.csv' };
+}
+
+export async function genPsaBillingMonthlyCSV(start, end) {
+  const data = await fetchInvoiceRegister(start, end);
+
+  // Branches in the order they should appear in the report
+  const BRANCH_ORDER  = ['NIL', 'SCF', 'BRI 1.2', 'FVH', 'AUS 1&2', 'AUS 3', 'CAR', 'KEN 1', 'ROM', 'NOTS'];
+  const branchOrderSet = new Set(BRANCH_ORDER);
+
   const branchData = {};
   const weekSet    = new Set();
 
   for (const r of data) {
-    if (isCorporate(r.branchname) || !isDHP(r.customername)) continue;
+    if (isCorporate(r.branchname)) continue;
     const branch  = r.branchname   || 'Unknown';
     const company = r.customername || 'Unknown';
     const week    = r.weekendbill  || '—';
@@ -171,63 +294,37 @@ export async function genDhpBillingCSV(start, end) {
     branchData[branch][company][week] = (branchData[branch][company][week] || 0) + amt;
   }
 
-  const weeks   = sortedWeeksFrom(weekSet);
-  const headers = ['Branch', 'Company', ...weeks, 'Total'];
+  const weeks      = sortedWeeksFrom(weekSet);
+  const weekLabels = weeks.map(weekRangeLabel);
+  const numCols    = 1 + weeks.length + 1;       // Company, ...weeks, TOTALS
+  const emptyRow   = Array(numCols).fill('');
+  const titleLabel = monthYearTitle(start);      // "April 2026"
+
+  const headers = [titleLabel, ...weekLabels, 'TOTALS'];
   const rows    = [];
-  for (const branch of Object.keys(branchData).sort()) {
-    for (const company of Object.keys(branchData[branch]).sort()) {
-      const vals  = weeks.map(w => branchData[branch][company][w] || 0);
-      const total = vals.reduce((s, v) => s + v, 0);
-      rows.push([branch, company, ...vals.map(v => v.toFixed(2)), total.toFixed(2)]);
-    }
-  }
-  return { csv: toCSV(headers, rows), filename: 'monthly-dhp-billing.csv' };
-}
 
-export async function genPsaBillingMonthlyCSV(start, end) {
-  const data = await fetchInvoiceRegister(start, end);
-
-  const PSA_GROUPS = [
-    { key: 'NIL',        label: 'NIL',        branches: ['NIL'] },
-    { key: 'SCF',        label: 'SCF',        branches: ['SCF'] },
-    { key: 'MO Offices', label: 'MO Offices', branches: ['BRI 1.2', 'FVH'] },
-    { key: 'GA Offices', label: 'GA Offices', branches: ['AUS 1&2', 'AUS 3', 'CAR', 'KEN 1', 'ROM'] },
-    { key: 'NOTS',       label: 'NOTS',       branches: ['NOTS'] },
+  // Branches in defined order, then any extras not in the list
+  const allBranches = [
+    ...BRANCH_ORDER.filter(b => branchData[b]),
+    ...Object.keys(branchData).filter(b => !branchOrderSet.has(b)).sort(),
   ];
-  const branchToGroup = {};
-  for (const g of PSA_GROUPS)
-    for (const b of g.branches)
-      branchToGroup[b.toLowerCase()] = g.key;
 
-  const hierarchy = {};
-  const weekSet   = new Set();
+  for (const branch of allBranches) {
+    const companies    = branchData[branch];
+    const branchTotals = weeks.map(() => 0);
 
-  for (const r of data) {
-    if (isCorporate(r.branchname)) continue;
-    const branch   = r.branchname   || 'Unknown';
-    const company  = r.customername || 'Unknown';
-    const week     = r.weekendbill  || '—';
-    const amt      = Number(r.invoiceamount) || 0;
-    const groupKey = branchToGroup[branch.toLowerCase()] || 'Other';
-    weekSet.add(week);
-    (hierarchy[groupKey]          ??= {})[branch]  ??= {};
-    (hierarchy[groupKey][branch]  ??= {})[company] ??= {};
-    hierarchy[groupKey][branch][company][week] = (hierarchy[groupKey][branch][company][week] || 0) + amt;
-  }
-
-  const weeks   = sortedWeeksFrom(weekSet);
-  const headers = ['Group', 'Branch', 'Company', ...weeks, 'Total'];
-  const rows    = [];
-  for (const g of PSA_GROUPS) {
-    if (!hierarchy[g.key]) continue;
-    for (const branch of Object.keys(hierarchy[g.key]).sort()) {
-      for (const company of Object.keys(hierarchy[g.key][branch]).sort()) {
-        const vals  = weeks.map(w => hierarchy[g.key][branch][company][w] || 0);
-        const total = vals.reduce((s, v) => s + v, 0);
-        rows.push([g.label, branch, company, ...vals.map(v => v.toFixed(2)), total.toFixed(2)]);
-      }
+    for (const company of Object.keys(companies).sort()) {
+      const vals  = weeks.map(w => companies[company][w] || 0);
+      const total = vals.reduce((s, v) => s + v, 0);
+      vals.forEach((v, i) => { branchTotals[i] += v; });
+      rows.push([company, ...vals.map(v => `$${v.toFixed(2)}`), `$${total.toFixed(2)}`]);
     }
+
+    const branchTotal = branchTotals.reduce((s, v) => s + v, 0);
+    rows.push([`Total ${branch}`, ...branchTotals.map(v => `$${v.toFixed(2)}`), `$${branchTotal.toFixed(2)}`]);
+    rows.push(emptyRow);
   }
+
   return { csv: toCSV(headers, rows), filename: 'psa-billing-monthly.csv' };
 }
 
