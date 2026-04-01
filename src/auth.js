@@ -215,9 +215,16 @@ export async function setUserCompanies(userId, companyIds) {
 
 // ── User creation (invite) ──
 
-// Create a new user with email + temporary password
+// Create a new user with email + temporary password.
+// Calls the /api/create-user serverless function so the admin's session
+// is never replaced (supabase.auth.signUp would log in as the new user).
 export async function createUserWithEmail(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
+  const res = await fetch('/api/create-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create user');
   return data;
 }
