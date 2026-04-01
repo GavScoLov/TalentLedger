@@ -107,6 +107,7 @@ const _PAGE_ORDER = [
   { slug: 'scheduler',             file: 'scheduler.html' },
   { slug: 'tempworks',             file: 'tempworks.html' },
   { slug: 'reports',               file: 'reports.html' },
+  { slug: 'report-emails',         file: 'report-emails.html' },
   { slug: 'roster-tracker',        file: 'roster-tracker.html' },
   { slug: 'state-tax',             file: 'state-tax.html' },
   { slug: 'settings',              file: 'settings.html' },

@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => {
           rosterTracker: resolve(__dirnameESM, 'roster-tracker.html'),
           tempworks: resolve(__dirnameESM, 'tempworks.html'),
           reports:        resolve(__dirnameESM, 'reports.html'),
+          reportEmails:   resolve(__dirnameESM, 'report-emails.html'),
           workerCheckin:       resolve(__dirnameESM, 'worker-checkin.html'),
           workerAssignments:   resolve(__dirnameESM, 'worker-assignments.html'),
           scheduler:           resolve(__dirnameESM, 'scheduler.html'),
