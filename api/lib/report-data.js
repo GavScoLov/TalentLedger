@@ -1,7 +1,10 @@
 // Server-side PSA data fetcher + report generators (CSV + inline HTML tables)
 // Used by api/cron/send-reports.js and api/send-report-now.js
 
-const PSA_BASE = 'https://api.psastaffing.com';
+import { createClient } from '@supabase/supabase-js';
+
+const PSA_BASE     = 'https://api.psastaffing.com';
+const SUPABASE_URL = 'https://txhyfogbyzwueazhrqax.supabase.co';
 
 async function psaFetch(endpoint, params = {}) {
   const url = new URL(`${PSA_BASE}${endpoint}`);
@@ -181,10 +184,17 @@ function buildDhpHtmlTable(allRows) {
 
 /**
  * Build an inline HTML table for PSA billing monthly.
- * headerRow = ["April 2026", week ranges…, "TOTALS"]
- * rows = company rows + "Total [Branch]" rows + blank separators
+ * headerRow  = ["April 2026", week ranges…, "TOTALS"]
+ * rows may contain:
+ *   - regular company rows
+ *   - "Total [Branch]" rows  (branch total, green)
+ *   - "— REGION NAME —" rows (region header, gray separator)
+ *   - "REGION NAME TOTAL" rows (region total, orange tint)
+ *   - "GRAND TOTAL" row (dark, white text)
+ *   - blank separator rows (skipped)
  */
 function buildPsaHtmlTable(headers, rows) {
+  const numCols = headers.length;
   let html = `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">`;
 
   // Dark header row
@@ -198,16 +208,48 @@ function buildPsaHtmlTable(headers, rows) {
   let dataIdx = 0;
   rows.forEach(row => {
     if (row.every(c => c === '' || c == null)) return; // skip blank separators
-    const first   = String(row[0] ?? '');
-    const isTotal = first.startsWith('Total ');
-    const bg      = isTotal ? '#E8F5E9' : (dataIdx % 2 === 0 ? '#F9F9F9' : '#FFFFFF');
-    const bold    = isTotal ? 'font-weight:700;' : '';
-    if (!isTotal) dataIdx++;
 
+    const first         = String(row[0] ?? '');
+    const isRegionHdr   = /^— .+ —$/.test(first);
+    const isGrandTotal  = first === 'GRAND TOTAL';
+    const isRegionTotal = !isGrandTotal && first === first.toUpperCase() && first.endsWith(' TOTAL');
+    const isBranchTotal = first.startsWith('Total ');
+
+    if (isRegionHdr) {
+      html += `<tr><td colspan="${numCols}" bgcolor="#E8EAF0" style="${TD_BASE}background:#E8EAF0;font-weight:700;font-size:10px;color:#444;letter-spacing:0.08em;padding:5px 9px;">${esc(first)}</td></tr>`;
+      return;
+    }
+    if (isGrandTotal) {
+      html += `<tr>`;
+      row.forEach((cell, ci) => {
+        html += `<td bgcolor="#1A1A2E" style="${TD_BASE}background:#1A1A2E;color:#fff;font-weight:700;text-align:${ci === 0 ? 'left' : 'right'};">${esc(cell)}</td>`;
+      });
+      html += `</tr>`;
+      return;
+    }
+    if (isRegionTotal) {
+      html += `<tr>`;
+      row.forEach((cell, ci) => {
+        html += `<td bgcolor="#FFF0E0" style="${TD_BASE}background:#FFF0E0;font-weight:700;color:#7A4010;text-align:${ci === 0 ? 'left' : 'right'};">${esc(cell)}</td>`;
+      });
+      html += `</tr>`;
+      return;
+    }
+    if (isBranchTotal) {
+      html += `<tr>`;
+      row.forEach((cell, ci) => {
+        html += `<td bgcolor="#E8F5E9" style="${TD_BASE}background:#E8F5E9;font-weight:700;text-align:${ci === 0 ? 'left' : 'right'};">${esc(cell)}</td>`;
+      });
+      html += `</tr>`;
+      return;
+    }
+
+    // Regular data row — alternating
+    const bg = dataIdx % 2 === 0 ? '#F9F9F9' : '#FFFFFF';
+    dataIdx++;
     html += `<tr>`;
     row.forEach((cell, ci) => {
-      const align = ci === 0 ? 'left' : 'right';
-      html += `<td bgcolor="${bg}" style="${TD_BASE}${bold}background:${bg};text-align:${align};">${esc(cell)}</td>`;
+      html += `<td bgcolor="${bg}" style="${TD_BASE}background:${bg};text-align:${ci === 0 ? 'left' : 'right'};">${esc(cell)}</td>`;
     });
     html += `</tr>`;
   });
@@ -376,6 +418,16 @@ export async function genPsaBillingMonthly(start, end) {
     branchData[branch][company][week] = (branchData[branch][company][week] || 0) + amt;
   }
 
+  // Fetch branch → region mapping from Supabase
+  const sb = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: branchSettings } = await sb.from('branch_settings').select('branch, region');
+  const branchRegionMap = {};
+  for (const row of (branchSettings || [])) {
+    if (row.branch && row.region) branchRegionMap[row.branch] = row.region;
+  }
+
   const weeks      = sortedWeeksFrom(weekSet);
   const weekLabels = weeks.map(weekRangeLabel);
   const numCols    = 1 + weeks.length + 1;
@@ -385,26 +437,62 @@ export async function genPsaBillingMonthly(start, end) {
   const headers = [titleLabel, ...weekLabels, 'TOTALS'];
   const rows    = [];
 
+  // Ordered list of branches that have data (BRANCH_ORDER first, then alphabetical extras)
   const allBranches = [
     ...BRANCH_ORDER.filter(b => branchData[b]),
     ...Object.keys(branchData).filter(b => !branchOrderSet.has(b)).sort(),
   ];
 
+  // Group branches by region, preserving BRANCH_ORDER within each region
+  const regionBranchMap = {};
   for (const branch of allBranches) {
-    const companies    = branchData[branch];
-    const branchTotals = weeks.map(() => 0);
+    const region = branchRegionMap[branch] || 'Other';
+    (regionBranchMap[region] ??= []).push(branch);
+  }
 
-    for (const company of Object.keys(companies).sort()) {
-      const vals  = weeks.map(w => companies[company][w] || 0);
-      const total = vals.reduce((s, v) => s + v, 0);
-      vals.forEach((v, i) => { branchTotals[i] += v; });
-      rows.push([company, ...vals.map(v => `$${v.toFixed(2)}`), `$${total.toFixed(2)}`]);
+  // Sort regions alphabetically; push "Other" to the end
+  const sortedRegions = Object.keys(regionBranchMap).sort((a, b) => {
+    if (a === 'Other') return 1;
+    if (b === 'Other') return -1;
+    return a.localeCompare(b);
+  });
+
+  const grandTotals = weeks.map(() => 0);
+
+  for (const region of sortedRegions) {
+    const regionBranches = regionBranchMap[region];
+    const regionTotals   = weeks.map(() => 0);
+
+    // Region header separator row
+    rows.push([`— ${region} —`, ...Array(numCols - 1).fill('')]);
+
+    for (const branch of regionBranches) {
+      const companies    = branchData[branch];
+      const branchTotals = weeks.map(() => 0);
+
+      for (const company of Object.keys(companies).sort()) {
+        const vals  = weeks.map(w => companies[company][w] || 0);
+        const total = vals.reduce((s, v) => s + v, 0);
+        vals.forEach((v, i) => { branchTotals[i] += v; });
+        rows.push([company, ...vals.map(v => v > 0 ? `$${v.toFixed(2)}` : ''), total > 0 ? `$${total.toFixed(2)}` : '']);
+      }
+
+      const branchTotal = branchTotals.reduce((s, v) => s + v, 0);
+      branchTotals.forEach((v, i) => { regionTotals[i] += v; });
+      rows.push([`Total ${branch}`, ...branchTotals.map(v => `$${v.toFixed(2)}`), `$${branchTotal.toFixed(2)}`]);
+      rows.push(emptyRow);
     }
 
-    const branchTotal = branchTotals.reduce((s, v) => s + v, 0);
-    rows.push([`Total ${branch}`, ...branchTotals.map(v => `$${v.toFixed(2)}`), `$${branchTotal.toFixed(2)}`]);
+    // Region total row
+    const regionTotal = regionTotals.reduce((s, v) => s + v, 0);
+    regionTotals.forEach((v, i) => { grandTotals[i] += v; });
+    rows.push([`${region.toUpperCase()} TOTAL`, ...regionTotals.map(v => `$${v.toFixed(2)}`), `$${regionTotal.toFixed(2)}`]);
     rows.push(emptyRow);
   }
+
+  // Grand total row
+  const grandTotal = grandTotals.reduce((s, v) => s + v, 0);
+  rows.push(['GRAND TOTAL', ...grandTotals.map(v => `$${v.toFixed(2)}`), `$${grandTotal.toFixed(2)}`]);
 
   return {
     csv:      toCSV(headers, rows),
