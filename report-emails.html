@@ -384,7 +384,9 @@ window.sendNowById = async function(id, btn) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ automationId: id }),
     });
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`Server error (${res.status})`); }
     if (!res.ok) throw new Error(data.error || 'Send failed');
     showStatus(`Sent for ${data.month} to ${data.sentTo.join(', ')}`, 'success');
     const a = automations.find(x => x.id === id);
@@ -679,8 +681,10 @@ window.handleSendNow = async function() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ automationId: id }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`Server error (${res.status})`); }
+    if (!res.ok) throw new Error(data.error || 'Send failed');
 
     renderTable();
     closeModal();

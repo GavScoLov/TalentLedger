@@ -3,10 +3,21 @@
 // Used by api/cron/send-reports.js and api/send-report-now.js
 
 import { createRequire } from 'module';
-const _require   = createRequire(import.meta.url);
-const PdfPrimer  = _require('pdfmake/build/pdfmake');
-const pdfFonts   = _require('pdfmake/build/vfs_fonts');
-PdfPrimer.vfs    = pdfFonts.pdfMake.vfs;
+// pdfmake is loaded lazily so a missing/broken bundle never crashes the whole module
+const _req = createRequire(import.meta.url);
+let _pm = null;
+function getPdfmake() {
+  if (_pm) return _pm;
+  try {
+    const maker = _req('pdfmake/build/pdfmake');
+    const fonts = _req('pdfmake/build/vfs_fonts');
+    maker.vfs   = fonts.pdfMake.vfs;
+    _pm = maker;
+  } catch (e) {
+    console.error('[report-data] pdfmake unavailable — PDFs will be skipped:', e.message);
+  }
+  return _pm;
+}
 
 const PSA_BASE = 'https://api.psastaffing.com';
 
@@ -140,11 +151,13 @@ function pdfCell(text, opts = {}) {
   return { text: String(text ?? ''), fontSize: 9, margin: [4, 3, 4, 3], ...opts };
 }
 
-/** Wrap pdfmake createPdf in a promise → resolves with a Node.js Buffer */
+/** Wrap pdfmake createPdf in a promise → resolves with a Node.js Buffer, or null if unavailable */
 function genPdfBuffer(docDef) {
+  const pm = getPdfmake();
+  if (!pm) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
     try {
-      PdfPrimer.createPdf(docDef).getBuffer(buf => resolve(Buffer.from(buf)));
+      pm.createPdf(docDef).getBuffer(buf => resolve(Buffer.from(buf)));
     } catch (e) { reject(e); }
   });
 }
@@ -312,8 +325,8 @@ export async function genDhpHours(start, end) {
   ]);
 
   const csv = toCSV(allRows[0], allRows.slice(1));
-  const pdf = await buildDhpPdf(allRows);
-  return { csv, pdf, filename: 'monthly-dhp-hours.csv', pdfFilename: 'monthly-dhp-hours.pdf' };
+  const pdf = await buildDhpPdf(allRows).catch(() => null);
+  return { csv, pdf, filename: 'monthly-dhp-hours.csv', pdfFilename: pdf ? 'monthly-dhp-hours.pdf' : null };
 }
 
 export async function genDhpHeadcount(start, end) {
@@ -365,8 +378,8 @@ export async function genDhpHeadcount(start, end) {
   ]);
 
   const csv = toCSV(allRows[0], allRows.slice(1));
-  const pdf = await buildDhpPdf(allRows);
-  return { csv, pdf, filename: 'monthly-dhp-headcount.csv', pdfFilename: 'monthly-dhp-headcount.pdf' };
+  const pdf = await buildDhpPdf(allRows).catch(() => null);
+  return { csv, pdf, filename: 'monthly-dhp-headcount.csv', pdfFilename: pdf ? 'monthly-dhp-headcount.pdf' : null };
 }
 
 export async function genDhpBilling(start, end) {
@@ -418,8 +431,8 @@ export async function genDhpBilling(start, end) {
   ]);
 
   const csv = toCSV(allRows[0], allRows.slice(1));
-  const pdf = await buildDhpPdf(allRows);
-  return { csv, pdf, filename: 'monthly-dhp-billing.csv', pdfFilename: 'monthly-dhp-billing.pdf' };
+  const pdf = await buildDhpPdf(allRows).catch(() => null);
+  return { csv, pdf, filename: 'monthly-dhp-billing.csv', pdfFilename: pdf ? 'monthly-dhp-billing.pdf' : null };
 }
 
 export async function genPsaBillingMonthly(start, end) {
@@ -473,8 +486,8 @@ export async function genPsaBillingMonthly(start, end) {
   }
 
   const csv = toCSV(headers, rows);
-  const pdf = await buildPsaPdf(headers, rows);
-  return { csv, pdf, filename: 'psa-billing-monthly.csv', pdfFilename: 'psa-billing-monthly.pdf' };
+  const pdf = await buildPsaPdf(headers, rows).catch(() => null);
+  return { csv, pdf, filename: 'psa-billing-monthly.csv', pdfFilename: pdf ? 'psa-billing-monthly.pdf' : null };
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
