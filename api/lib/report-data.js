@@ -1,6 +1,12 @@
-// Server-side PSA data fetcher + report CSV generators
+// Server-side PSA data fetcher + report CSV + PDF generators
 // Mirrors the logic in reports.html but runs in Node.js / Vercel serverless.
 // Used by api/cron/send-reports.js and api/send-report-now.js
+
+import { createRequire } from 'module';
+const _require   = createRequire(import.meta.url);
+const PdfPrimer  = _require('pdfmake/build/pdfmake');
+const pdfFonts   = _require('pdfmake/build/vfs_fonts');
+PdfPrimer.vfs    = pdfFonts.pdfMake.vfs;
 
 const PSA_BASE = 'https://api.psastaffing.com';
 
@@ -118,11 +124,148 @@ function monthYearTitle(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-// ── Report CSV generators ─────────────────────────────────────────────────────
+// ── PDF helpers ───────────────────────────────────────────────────────────────
 
-export async function genDhpHoursCSV(start, end) {
+const PDF_COLORS = {
+  brand:      '#EA8938',
+  headerBg:   '#1A1A2E',
+  totalBg:    '#FFF9C4',
+  branchBg:   '#E8F5E9',
+  altRow:     '#F9F9F9',
+  border:     '#DDDDDD',
+  white:      '#FFFFFF',
+};
+
+function pdfCell(text, opts = {}) {
+  return { text: String(text ?? ''), fontSize: 9, margin: [4, 3, 4, 3], ...opts };
+}
+
+/** Wrap pdfmake createPdf in a promise → resolves with a Node.js Buffer */
+function genPdfBuffer(docDef) {
+  return new Promise((resolve, reject) => {
+    try {
+      PdfPrimer.createPdf(docDef).getBuffer(buf => resolve(Buffer.from(buf)));
+    } catch (e) { reject(e); }
+  });
+}
+
+/**
+ * Build a PDF for DHP-style reports.
+ * allRows layout:
+ *   [0]  title row  ("MARCH 2026 DHP HOURS", "", "", ...)
+ *   [1]  header row ("Company", "Branch", "3/2-3/8", ..., "Total DHP Hours")
+ *   [2]  blank row
+ *   [3…] data rows
+ *   [-1] totals row (row[1] === "TOTALS")
+ */
+async function buildDhpPdf(allRows) {
+  const numCols   = allRows[0].length;
+  const titleText = allRows[0][0];
+  const headerRow = allRows[1];
+  // Skip title, headers, blank; detect totals row by row[1] === 'TOTALS'
+  const totalsRow = allRows.find(r => r[1] === 'TOTALS');
+  const dataRows  = allRows.slice(3).filter(r => r[1] !== 'TOTALS');
+
+  // Company col wide, Branch narrow, weeks auto, Total medium
+  const weekCount = numCols - 3;
+  const colWidths = ['*', 42, ...Array(weekCount).fill('auto'), 68];
+
+  const tableBody = [
+    // Title row – spans all columns
+    [
+      pdfCell(titleText, {
+        fontSize: 13, bold: true, color: PDF_COLORS.white,
+        fillColor: PDF_COLORS.brand, colSpan: numCols,
+        margin: [8, 8, 8, 8],
+      }),
+      ...Array(numCols - 1).fill({}),
+    ],
+    // Column headers
+    headerRow.map((h, i) => pdfCell(h, {
+      bold: true, color: PDF_COLORS.white, fillColor: PDF_COLORS.headerBg,
+      alignment: i >= 2 ? 'right' : 'left', margin: [4, 5, 4, 5],
+    })),
+    // Data rows (alternating background)
+    ...dataRows.map((row, ri) => row.map((cell, ci) => pdfCell(cell, {
+      alignment: ci >= 2 ? 'right' : 'left',
+      fillColor: ri % 2 === 1 ? PDF_COLORS.altRow : null,
+    }))),
+    // Totals row
+    ...(totalsRow ? [totalsRow.map((cell, ci) => pdfCell(cell, {
+      bold: true, fillColor: PDF_COLORS.totalBg,
+      alignment: ci >= 2 ? 'right' : 'left', margin: [4, 5, 4, 5],
+    }))] : []),
+  ];
+
+  return genPdfBuffer({
+    pageOrientation: 'landscape',
+    pageMargins: [20, 30, 20, 30],
+    content: [{
+      table: { headerRows: 2, widths: colWidths, body: tableBody },
+      layout: {
+        hLineWidth: () => 0.5, vLineWidth: () => 0.5,
+        hLineColor: () => PDF_COLORS.border, vLineColor: () => PDF_COLORS.border,
+      },
+    }],
+  });
+}
+
+/**
+ * Build a PDF for PSA-style reports.
+ * headerRow: ["April 2026", "3/30-4/5", ..., "TOTALS"]
+ * rows: company rows + "Total [Branch]" rows + blank separator rows
+ */
+async function buildPsaPdf(headerRow, rows) {
+  const numCols   = headerRow.length;
+  const weekCount = numCols - 2;   // month label + weeks + TOTALS
+  const colWidths = ['*', ...Array(weekCount).fill('auto'), 68];
+
+  const tableBody = [
+    // Header row
+    headerRow.map((h, i) => pdfCell(h, {
+      bold: true, color: PDF_COLORS.white, fillColor: PDF_COLORS.headerBg,
+      alignment: i === 0 ? 'left' : 'right', margin: [4, 5, 4, 5],
+    })),
+    // Data rows
+    ...rows.map((row, ri) => {
+      const first   = String(row[0] ?? '');
+      const isTotal = first.startsWith('Total ');
+      const isBlank = row.every(c => !c);
+
+      if (isBlank) {
+        return row.map(() => pdfCell('', { margin: [0, 2, 0, 2] }));
+      } else if (isTotal) {
+        return row.map((cell, ci) => pdfCell(cell, {
+          bold: true, fillColor: PDF_COLORS.branchBg,
+          alignment: ci === 0 ? 'left' : 'right', margin: [4, 5, 4, 5],
+        }));
+      } else {
+        return row.map((cell, ci) => pdfCell(cell, {
+          alignment: ci === 0 ? 'left' : 'right',
+          fillColor: ri % 2 === 0 ? PDF_COLORS.altRow : null,
+        }));
+      }
+    }),
+  ];
+
+  return genPdfBuffer({
+    pageOrientation: 'landscape',
+    pageMargins: [20, 30, 20, 30],
+    content: [{
+      table: { headerRows: 1, widths: colWidths, body: tableBody },
+      layout: {
+        hLineWidth: () => 0.5, vLineWidth: () => 0.5,
+        hLineColor: () => PDF_COLORS.border, vLineColor: () => PDF_COLORS.border,
+      },
+    }],
+  });
+}
+
+// ── Report generators (each returns { csv, pdf, filename, pdfFilename }) ──────
+
+export async function genDhpHours(start, end) {
   const data    = await fetchEmployeeHours(start, end);
-  const entries = {};   // company → { branch, weeks: { weekEnd: hrs } }
+  const entries = {};
   const weekSet = new Set();
 
   for (const r of data) {
@@ -138,7 +281,7 @@ export async function genDhpHoursCSV(start, end) {
 
   const weeks      = sortedWeeksFrom(weekSet);
   const weekLabels = weeks.map(weekRangeLabel);
-  const numCols    = 2 + weeks.length + 1;       // Company, Branch, ...weeks, Total
+  const numCols    = 2 + weeks.length + 1;
   const emptyRow   = Array(numCols).fill('');
   const titleLabel = monthYearUpper(start);
 
@@ -168,10 +311,12 @@ export async function genDhpHoursCSV(start, end) {
     grandTotal > 0 ? grandTotal.toFixed(2) : '-',
   ]);
 
-  return { csv: toCSV(allRows[0], allRows.slice(1)), filename: 'monthly-dhp-hours.csv' };
+  const csv = toCSV(allRows[0], allRows.slice(1));
+  const pdf = await buildDhpPdf(allRows);
+  return { csv, pdf, filename: 'monthly-dhp-hours.csv', pdfFilename: 'monthly-dhp-hours.pdf' };
 }
 
-export async function genDhpHeadcountCSV(start, end) {
+export async function genDhpHeadcount(start, end) {
   const data    = await fetchUniqueCountByCompany(start, end);
   const entries = {};
   const weekSet = new Set();
@@ -219,10 +364,12 @@ export async function genDhpHeadcountCSV(start, end) {
     grandTotal,
   ]);
 
-  return { csv: toCSV(allRows[0], allRows.slice(1)), filename: 'monthly-dhp-headcount.csv' };
+  const csv = toCSV(allRows[0], allRows.slice(1));
+  const pdf = await buildDhpPdf(allRows);
+  return { csv, pdf, filename: 'monthly-dhp-headcount.csv', pdfFilename: 'monthly-dhp-headcount.pdf' };
 }
 
-export async function genDhpBillingCSV(start, end) {
+export async function genDhpBilling(start, end) {
   const data    = await fetchInvoiceRegister(start, end);
   const entries = {};
   const weekSet = new Set();
@@ -270,14 +417,15 @@ export async function genDhpBillingCSV(start, end) {
     `$${grandTotal.toFixed(2)}`,
   ]);
 
-  return { csv: toCSV(allRows[0], allRows.slice(1)), filename: 'monthly-dhp-billing.csv' };
+  const csv = toCSV(allRows[0], allRows.slice(1));
+  const pdf = await buildDhpPdf(allRows);
+  return { csv, pdf, filename: 'monthly-dhp-billing.csv', pdfFilename: 'monthly-dhp-billing.pdf' };
 }
 
-export async function genPsaBillingMonthlyCSV(start, end) {
+export async function genPsaBillingMonthly(start, end) {
   const data = await fetchInvoiceRegister(start, end);
 
-  // Branches in the order they should appear in the report
-  const BRANCH_ORDER  = ['NIL', 'SCF', 'BRI 1.2', 'FVH', 'AUS 1&2', 'AUS 3', 'CAR', 'KEN 1', 'ROM', 'NOTS'];
+  const BRANCH_ORDER   = ['NIL', 'SCF', 'BRI 1.2', 'FVH', 'AUS 1&2', 'AUS 3', 'CAR', 'KEN 1', 'ROM', 'NOTS'];
   const branchOrderSet = new Set(BRANCH_ORDER);
 
   const branchData = {};
@@ -296,14 +444,13 @@ export async function genPsaBillingMonthlyCSV(start, end) {
 
   const weeks      = sortedWeeksFrom(weekSet);
   const weekLabels = weeks.map(weekRangeLabel);
-  const numCols    = 1 + weeks.length + 1;       // Company, ...weeks, TOTALS
+  const numCols    = 1 + weeks.length + 1;
   const emptyRow   = Array(numCols).fill('');
-  const titleLabel = monthYearTitle(start);      // "April 2026"
+  const titleLabel = monthYearTitle(start);
 
   const headers = [titleLabel, ...weekLabels, 'TOTALS'];
   const rows    = [];
 
-  // Branches in defined order, then any extras not in the list
   const allBranches = [
     ...BRANCH_ORDER.filter(b => branchData[b]),
     ...Object.keys(branchData).filter(b => !branchOrderSet.has(b)).sort(),
@@ -325,16 +472,18 @@ export async function genPsaBillingMonthlyCSV(start, end) {
     rows.push(emptyRow);
   }
 
-  return { csv: toCSV(headers, rows), filename: 'psa-billing-monthly.csv' };
+  const csv = toCSV(headers, rows);
+  const pdf = await buildPsaPdf(headers, rows);
+  return { csv, pdf, filename: 'psa-billing-monthly.csv', pdfFilename: 'psa-billing-monthly.pdf' };
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const REPORT_GENERATORS = {
-  'monthly-dhp-hours':     { title: 'Monthly DHP Hours',     gen: genDhpHoursCSV },
-  'monthly-dhp-headcount': { title: 'Monthly DHP Headcount', gen: genDhpHeadcountCSV },
-  'monthly-dhp-billing':   { title: 'Monthly DHP Billing',   gen: genDhpBillingCSV },
-  'psa-billing-monthly':   { title: 'PSA Billing Monthly',   gen: genPsaBillingMonthlyCSV },
+  'monthly-dhp-hours':     { title: 'Monthly DHP Hours',     gen: genDhpHours },
+  'monthly-dhp-headcount': { title: 'Monthly DHP Headcount', gen: genDhpHeadcount },
+  'monthly-dhp-billing':   { title: 'Monthly DHP Billing',   gen: genDhpBilling },
+  'psa-billing-monthly':   { title: 'PSA Billing Monthly',   gen: genPsaBillingMonthly },
 };
 
 // ── Email HTML builder ────────────────────────────────────────────────────────
@@ -352,7 +501,11 @@ export function buildEmailHtml(automationName, monthLabel, reportItems, appUrl) 
         <strong style="color:#1a1a2e;">${escHtml(item.title)}</strong>
         ${item.error
           ? `<span style="color:#dc2626;font-size:13px;margin-left:8px;">⚠ ${escHtml(item.error)}</span>`
-          : `<span style="color:#16a34a;font-size:13px;margin-left:8px;">✓ ${escHtml(item.filename)} attached</span>`}
+          : `<span style="color:#16a34a;font-size:13px;margin-left:8px;">
+               ✓ ${escHtml(item.filename)}
+               ${item.pdfFilename ? `&nbsp;·&nbsp;${escHtml(item.pdfFilename)}` : ''}
+               attached
+             </span>`}
       </td>
     </tr>`).join('');
 
@@ -376,7 +529,7 @@ export function buildEmailHtml(automationName, monthLabel, reportItems, appUrl) 
         <!-- Body -->
         <tr>
           <td style="padding:28px 32px;">
-            <p style="margin:0 0 16px;font-size:15px;color:#444;">Your scheduled reports are ready. CSV files are attached to this email.</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#444;">Your scheduled reports are ready. CSV and PDF files are attached to this email.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
               <tr style="background:#f8f9fa;">
                 <td style="padding:8px 16px;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Reports included</td>

@@ -46,11 +46,14 @@ export default async function handler(req, res) {
     const def = REPORT_GENERATORS[key];
     if (!def) continue;
     try {
-      const { csv, filename } = await def.gen(start, end);
+      const { csv, pdf, filename, pdfFilename } = await def.gen(start, end);
       attachments.push({ filename, content: Buffer.from(csv).toString('base64') });
-      reportItems.push({ title: def.title, filename });
+      if (pdf && pdfFilename) {
+        attachments.push({ filename: pdfFilename, content: pdf.toString('base64') });
+      }
+      reportItems.push({ title: def.title, filename, pdfFilename });
     } catch (e) {
-      reportItems.push({ title: def.title, filename: null, error: e.message });
+      reportItems.push({ title: def.title, filename: null, pdfFilename: null, error: e.message });
     }
   }
 
