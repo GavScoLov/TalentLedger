@@ -94,12 +94,39 @@ export async function getAllowedPages() {
   return profile.allowed_pages;
 }
 
+// Canonical page order — must match the slug used in each page's checkPageAccess() call
+const _PAGE_ORDER = [
+  { slug: 'dashboard',             file: 'dashboard.html' },
+  { slug: 'commission',            file: 'commission.html' },
+  { slug: 'data-visualization',    file: 'data-visualization.html' },
+  { slug: 'hours-breakdown',       file: 'hours-breakdown.html' },
+  { slug: 'profit-loss',           file: 'profit-loss.html' },
+  { slug: 'timesheet-review',      file: 'timesheet-review.html' },
+  { slug: 'time-tracker-settings', file: 'time-tracker-settings.html' },
+  { slug: 'worker-assignments',    file: 'worker-assignments.html' },
+  { slug: 'scheduler',             file: 'scheduler.html' },
+  { slug: 'tempworks',             file: 'tempworks.html' },
+  { slug: 'reports',               file: 'reports.html' },
+  { slug: 'roster-tracker',        file: 'roster-tracker.html' },
+  { slug: 'state-tax',             file: 'state-tax.html' },
+  { slug: 'settings',              file: 'settings.html' },
+];
+
+// Get the landing page for the current user (first page they have access to).
+// Super admins and unrestricted users always land on dashboard.
+export async function getHomePage() {
+  const allowed = await getAllowedPages();
+  if (allowed === null) return './dashboard.html';
+  const first = _PAGE_ORDER.find(p => allowed.includes(p.slug));
+  return first ? './' + first.file : './index.html'; // no pages granted → back to login
+}
+
 // Check if the current user can access a specific page, redirect if not
 export async function checkPageAccess(pageSlug) {
   const allowed = await getAllowedPages();
   if (allowed === null) return true; // admin has access to everything
   if (!allowed.includes(pageSlug)) {
-    window.location.href = './dashboard.html';
+    window.location.href = await getHomePage();
     return false;
   }
   return true;

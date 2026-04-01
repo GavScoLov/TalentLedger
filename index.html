@@ -42,19 +42,19 @@
     </div>
 
     <script type="module">
-        import { login, loginWithGoogle, onAuthStateChange } from './src/auth.js';
+        import { login, loginWithGoogle, onAuthStateChange, getHomePage } from './src/auth.js';
         import { supabase } from './src/supabaseClient.js';
 
         // Redirect if already logged in
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            window.location.href = './dashboard.html';
+            window.location.href = await getHomePage();
         }
 
         // Auto-redirect on auth state change (e.g. after Google OAuth callback)
-        onAuthStateChange((event, session) => {
+        onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session) {
-                window.location.href = './dashboard.html';
+                window.location.href = await getHomePage();
             }
         });
 
@@ -67,7 +67,7 @@
 
             try {
                 await login(email, password);
-                window.location.href = './dashboard.html';
+                window.location.href = await getHomePage();
             } catch (err) {
                 errorEl.textContent = err.message || 'Invalid email or password.';
                 errorEl.style.display = 'block';
