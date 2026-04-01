@@ -538,6 +538,18 @@
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
               All Reports
             </button>
+            <!-- Month navigation — shown only for autoMonth reports -->
+            <div id="month-nav" style="display:none;align-items:center;gap:4px;">
+              <button class="btn btn-outlined" id="btn-prev-month" style="font-size:.82rem;padding:7px 12px;gap:5px;display:inline-flex;align-items:center;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px;"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                Prev
+              </button>
+              <span id="month-nav-label" style="font-size:.82rem;font-weight:700;min-width:110px;text-align:center;color:var(--text-primary);white-space:nowrap;padding:0 4px;"></span>
+              <button class="btn btn-outlined" id="btn-next-month" style="font-size:.82rem;padding:7px 12px;gap:5px;display:inline-flex;align-items:center;">
+                Next
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:14px;height:14px;"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+              </button>
+            </div>
             <button class="btn btn-outlined" id="btn-export" style="font-size:.82rem;padding:7px 14px;gap:6px;display:inline-flex;align-items:center;">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
               Export CSV
@@ -2614,9 +2626,10 @@
     };
 
     /* ─── Generate handler ──────────────────────────────────── */
-    let activeReport = null;
+    let activeReport     = null;
+    let autoMonthOffset  = 0;   // 0 = current month, -1 = last month, etc.
 
-    async function runReport(reportKey) {
+    async function runReport(reportKey, navOffset = null) {
       const report = REPORTS[reportKey];
       if (!report) return;
 
@@ -2625,10 +2638,11 @@
       let dateRange;
 
       if (isAutoMonth) {
-        // Always use the current calendar month — no picker needed
+        // navOffset !== null means prev/next navigation; null means a fresh card click (reset)
+        autoMonthOffset = navOffset !== null ? navOffset : 0;
         const n = new Date();
-        const s = new Date(n.getFullYear(), n.getMonth(), 1);
-        const e = new Date(n.getFullYear(), n.getMonth() + 1, 0);
+        const s = new Date(n.getFullYear(), n.getMonth() + autoMonthOffset, 1);
+        const e = new Date(n.getFullYear(), n.getMonth() + autoMonthOffset + 1, 0);
         dateRange = { start: toDateStr(s), end: toDateStr(e) };
       } else if (isDhp) {
         dateRange = getDhpDateRange();
@@ -2640,21 +2654,28 @@
         }
       }
 
-      // Show/hide appropriate date bar
-      const globalBar = document.getElementById('global-date-bar');
-      const dhpBar    = document.getElementById('dhp-month-picker');
+      // Show/hide appropriate date bar + month nav
+      const globalBar  = document.getElementById('global-date-bar');
+      const dhpBar     = document.getElementById('dhp-month-picker');
+      const monthNav   = document.getElementById('month-nav');
+      const monthLabel = document.getElementById('month-nav-label');
       if (isDhp) {
         globalBar.style.opacity = '0.4';
         globalBar.style.pointerEvents = 'none';
         dhpBar.classList.add('visible');
+        monthNav.style.display = 'none';
       } else if (isAutoMonth) {
         globalBar.style.opacity = '0.4';
         globalBar.style.pointerEvents = 'none';
         dhpBar.classList.remove('visible');
+        monthNav.style.display = 'flex';
+        const d = new Date(dateRange.start + 'T12:00:00Z');
+        monthLabel.textContent = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
       } else {
         globalBar.style.opacity = '';
         globalBar.style.pointerEvents = '';
         dhpBar.classList.remove('visible');
+        monthNav.style.display = 'none';
       }
 
       // Mark active card
@@ -2702,6 +2723,16 @@
     });
 
     document.getElementById('btn-back').addEventListener('click', showGridView);
+
+    document.getElementById('btn-prev-month').addEventListener('click', () => {
+      if (activeReport && REPORTS[activeReport]?.autoMonth)
+        runReport(activeReport, autoMonthOffset - 1);
+    });
+
+    document.getElementById('btn-next-month').addEventListener('click', () => {
+      if (activeReport && REPORTS[activeReport]?.autoMonth)
+        runReport(activeReport, autoMonthOffset + 1);
+    });
 
     document.getElementById('btn-export').addEventListener('click', () => {
       if (!lastMeta.cols) return;
