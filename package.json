@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.1",
-    "pdfmake": "^0.3.7",
+    "pdfkit": "^0.18.0",
     "resend": "^6.10.0"
   }
 }

@@ -3,20 +3,17 @@
 // Used by api/cron/send-reports.js and api/send-report-now.js
 
 import { createRequire } from 'module';
-// pdfmake is loaded lazily so a missing/broken bundle never crashes the whole module
+// pdfkit is loaded lazily so a missing bundle never crashes the whole module
 const _req = createRequire(import.meta.url);
-let _pm = null;
-function getPdfmake() {
-  if (_pm) return _pm;
+let _PDFDocument = null;
+function getPDFDocument() {
+  if (_PDFDocument) return _PDFDocument;
   try {
-    const maker = _req('pdfmake/build/pdfmake');
-    const fonts = _req('pdfmake/build/vfs_fonts');
-    maker.vfs   = fonts.pdfMake.vfs;
-    _pm = maker;
+    _PDFDocument = _req('pdfkit');
   } catch (e) {
-    console.error('[report-data] pdfmake unavailable — PDFs will be skipped:', e.message);
+    console.error('[report-data] pdfkit unavailable — PDFs will be skipped:', e.message);
   }
-  return _pm;
+  return _PDFDocument;
 }
 
 const PSA_BASE = 'https://api.psastaffing.com';
@@ -135,142 +132,159 @@ function monthYearTitle(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-// ── PDF helpers ───────────────────────────────────────────────────────────────
+// ── PDF helpers (pdfkit) ──────────────────────────────────────────────────────
 
-const PDF_COLORS = {
-  brand:      '#EA8938',
-  headerBg:   '#1A1A2E',
-  totalBg:    '#FFF9C4',
-  branchBg:   '#E8F5E9',
-  altRow:     '#F9F9F9',
-  border:     '#DDDDDD',
-  white:      '#FFFFFF',
-};
+const C_BRAND  = '#EA8938';
+const C_DARK   = '#1A1A2E';
+const C_YELLOW = '#FFF9C4';
+const C_GREEN  = '#E8F5E9';
+const C_ALT    = '#F9F9F9';
+const C_BORDER = '#CCCCCC';
+const ROW_H    = 17;
 
-function pdfCell(text, opts = {}) {
-  return { text: String(text ?? ''), fontSize: 9, margin: [4, 3, 4, 3], ...opts };
+/** Hex colour → [r, g, b] 0-255 */
+function hexRgb(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
 }
 
-/** Wrap pdfmake createPdf in a promise → resolves with a Node.js Buffer, or null if unavailable */
-function genPdfBuffer(docDef) {
-  const pm = getPdfmake();
-  if (!pm) return Promise.resolve(null);
+/**
+ * Draw one table row onto a pdfkit doc.
+ * Returns the new y position (y + h).
+ */
+function drawRow(doc, cells, x, y, colWidths, h, bg, fg, bold) {
+  const totalW = colWidths.reduce((s, w) => s + w, 0);
+  doc.save();
+  doc.fillColor(hexRgb(bg)).rect(x, y, totalW, h).fill();
+  doc.strokeColor(hexRgb(C_BORDER)).lineWidth(0.4).rect(x, y, totalW, h).stroke();
+  let cx = x;
+  for (let i = 0; i < cells.length; i++) {
+    const w  = colWidths[i];
+    const al = i === 0 ? 'left' : 'right';
+    doc.fillColor(hexRgb(fg))
+       .font(bold ? 'Helvetica-Bold' : 'Helvetica')
+       .fontSize(8)
+       .text(String(cells[i] ?? ''), cx + 3, y + Math.round((h - 8) / 2), {
+         width: w - 6, align: al, lineBreak: false,
+       });
+    cx += w;
+  }
+  doc.restore();
+  return y + h;
+}
+
+/**
+ * Draw a full report table (title bar + header + data + optional totals row).
+ * Handles page breaks and re-draws the header row on each new page.
+ */
+function drawTable(doc, { title, headerRow, dataRows, totalsRow, colWidths }) {
+  const left  = 30;
+  let   y     = doc.y ?? 30;
+
+  const checkBreak = () => {
+    if (y + ROW_H > doc.page.height - 40) {
+      doc.addPage();
+      y = 30;
+      y = drawRow(doc, headerRow, left, y, colWidths, ROW_H, C_DARK, '#FFFFFF', true);
+    }
+  };
+
+  // Optional title bar
+  if (title) {
+    const totalW = colWidths.reduce((s, w) => s + w, 0);
+    doc.save();
+    doc.fillColor(hexRgb(C_BRAND)).rect(left, y, totalW, 24).fill();
+    doc.fillColor(hexRgb('#FFFFFF')).font('Helvetica-Bold').fontSize(12)
+       .text(title, left + 8, y + 5, { width: totalW - 16, lineBreak: false });
+    doc.restore();
+    y += 24 + 4;
+  }
+
+  // Column header row
+  y = drawRow(doc, headerRow, left, y, colWidths, ROW_H, C_DARK, '#FFFFFF', true);
+
+  // Data rows
+  dataRows.forEach((row, ri) => {
+    const isBlank      = row.every(c => c === '' || c == null);
+    const first        = String(row[0] ?? '');
+    const isBranchTot  = first.startsWith('Total ');
+
+    if (isBlank) { y += 5; return; }
+    checkBreak();
+
+    const bg   = isBranchTot ? C_GREEN : (ri % 2 === 1 ? C_ALT : '#FFFFFF');
+    y = drawRow(doc, row, left, y, colWidths, ROW_H, bg, '#000000', isBranchTot);
+  });
+
+  // Grand totals row (DHP only)
+  if (totalsRow) {
+    checkBreak();
+    y = drawRow(doc, totalsRow, left, y, colWidths, ROW_H, C_YELLOW, '#000000', true);
+  }
+
+  doc.y = y;
+}
+
+/** Calculate column widths given total usable width and column count breakdown. */
+function dhpColWidths(numCols, usableW) {
+  const weekCount = numCols - 3;           // Company, Branch, ...weeks, Total
+  const compW  = 180, branchW = 42, totW = 68;
+  const avail  = usableW - compW - branchW - totW;
+  const weekW  = Math.max(48, avail / weekCount);
+  return [compW, branchW, ...Array(weekCount).fill(weekW), totW];
+}
+
+function psaColWidths(numCols, usableW) {
+  const weekCount = numCols - 2;           // Company, ...weeks, Total
+  const compW = 200, totW = 70;
+  const weekW = Math.max(48, (usableW - compW - totW) / weekCount);
+  return [compW, ...Array(weekCount).fill(weekW), totW];
+}
+
+/** Wrap pdfkit document stream into a Buffer promise, or null if pdfkit unavailable */
+function renderPdf(builderFn) {
+  const PDFDocument = getPDFDocument();
+  if (!PDFDocument) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
     try {
-      pm.createPdf(docDef).getBuffer(buf => resolve(Buffer.from(buf)));
+      const doc    = new PDFDocument({ layout: 'landscape', size: 'LETTER', margin: 30, autoFirstPage: true });
+      const chunks = [];
+      doc.on('data',  c => chunks.push(c));
+      doc.on('end',   () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      builderFn(doc);
+      doc.end();
     } catch (e) { reject(e); }
   });
 }
 
 /**
  * Build a PDF for DHP-style reports.
- * allRows layout:
- *   [0]  title row  ("MARCH 2026 DHP HOURS", "", "", ...)
- *   [1]  header row ("Company", "Branch", "3/2-3/8", ..., "Total DHP Hours")
- *   [2]  blank row
- *   [3…] data rows
- *   [-1] totals row (row[1] === "TOTALS")
+ * allRows[0] = title row, [1] = header row, [2] = blank, [3…] = data, last = totals (row[1]==='TOTALS')
  */
-async function buildDhpPdf(allRows) {
+function buildDhpPdf(allRows) {
   const numCols   = allRows[0].length;
-  const titleText = allRows[0][0];
+  const title     = String(allRows[0][0]);
   const headerRow = allRows[1];
-  // Skip title, headers, blank; detect totals row by row[1] === 'TOTALS'
-  const totalsRow = allRows.find(r => r[1] === 'TOTALS');
-  const dataRows  = allRows.slice(3).filter(r => r[1] !== 'TOTALS');
-
-  // Company col wide, Branch narrow, weeks auto, Total medium
-  const weekCount = numCols - 3;
-  const colWidths = ['*', 42, ...Array(weekCount).fill('auto'), 68];
-
-  const tableBody = [
-    // Title row – spans all columns
-    [
-      pdfCell(titleText, {
-        fontSize: 13, bold: true, color: PDF_COLORS.white,
-        fillColor: PDF_COLORS.brand, colSpan: numCols,
-        margin: [8, 8, 8, 8],
-      }),
-      ...Array(numCols - 1).fill({}),
-    ],
-    // Column headers
-    headerRow.map((h, i) => pdfCell(h, {
-      bold: true, color: PDF_COLORS.white, fillColor: PDF_COLORS.headerBg,
-      alignment: i >= 2 ? 'right' : 'left', margin: [4, 5, 4, 5],
-    })),
-    // Data rows (alternating background)
-    ...dataRows.map((row, ri) => row.map((cell, ci) => pdfCell(cell, {
-      alignment: ci >= 2 ? 'right' : 'left',
-      fillColor: ri % 2 === 1 ? PDF_COLORS.altRow : null,
-    }))),
-    // Totals row
-    ...(totalsRow ? [totalsRow.map((cell, ci) => pdfCell(cell, {
-      bold: true, fillColor: PDF_COLORS.totalBg,
-      alignment: ci >= 2 ? 'right' : 'left', margin: [4, 5, 4, 5],
-    }))] : []),
-  ];
-
-  return genPdfBuffer({
-    pageOrientation: 'landscape',
-    pageMargins: [20, 30, 20, 30],
-    content: [{
-      table: { headerRows: 2, widths: colWidths, body: tableBody },
-      layout: {
-        hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-        hLineColor: () => PDF_COLORS.border, vLineColor: () => PDF_COLORS.border,
-      },
-    }],
+  const totalsRow = allRows.find(r => r[1] === 'TOTALS') ?? null;
+  const dataRows  = allRows.slice(2).filter(r => r[1] !== 'TOTALS');
+  return renderPdf(doc => {
+    const usableW  = doc.page.width - 60;
+    const colWidths = dhpColWidths(numCols, usableW);
+    drawTable(doc, { title, headerRow, dataRows, totalsRow, colWidths });
   });
 }
 
 /**
  * Build a PDF for PSA-style reports.
- * headerRow: ["April 2026", "3/30-4/5", ..., "TOTALS"]
- * rows: company rows + "Total [Branch]" rows + blank separator rows
+ * headerRow = ["April 2026", dates…, "TOTALS"], rows = company + Total-branch + blank rows
  */
-async function buildPsaPdf(headerRow, rows) {
-  const numCols   = headerRow.length;
-  const weekCount = numCols - 2;   // month label + weeks + TOTALS
-  const colWidths = ['*', ...Array(weekCount).fill('auto'), 68];
-
-  const tableBody = [
-    // Header row
-    headerRow.map((h, i) => pdfCell(h, {
-      bold: true, color: PDF_COLORS.white, fillColor: PDF_COLORS.headerBg,
-      alignment: i === 0 ? 'left' : 'right', margin: [4, 5, 4, 5],
-    })),
-    // Data rows
-    ...rows.map((row, ri) => {
-      const first   = String(row[0] ?? '');
-      const isTotal = first.startsWith('Total ');
-      const isBlank = row.every(c => !c);
-
-      if (isBlank) {
-        return row.map(() => pdfCell('', { margin: [0, 2, 0, 2] }));
-      } else if (isTotal) {
-        return row.map((cell, ci) => pdfCell(cell, {
-          bold: true, fillColor: PDF_COLORS.branchBg,
-          alignment: ci === 0 ? 'left' : 'right', margin: [4, 5, 4, 5],
-        }));
-      } else {
-        return row.map((cell, ci) => pdfCell(cell, {
-          alignment: ci === 0 ? 'left' : 'right',
-          fillColor: ri % 2 === 0 ? PDF_COLORS.altRow : null,
-        }));
-      }
-    }),
-  ];
-
-  return genPdfBuffer({
-    pageOrientation: 'landscape',
-    pageMargins: [20, 30, 20, 30],
-    content: [{
-      table: { headerRows: 1, widths: colWidths, body: tableBody },
-      layout: {
-        hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-        hLineColor: () => PDF_COLORS.border, vLineColor: () => PDF_COLORS.border,
-      },
-    }],
+function buildPsaPdf(headerRow, rows) {
+  const numCols = headerRow.length;
+  return renderPdf(doc => {
+    const usableW   = doc.page.width - 60;
+    const colWidths = psaColWidths(numCols, usableW);
+    drawTable(doc, { title: null, headerRow, dataRows: rows, totalsRow: null, colWidths });
   });
 }
 
