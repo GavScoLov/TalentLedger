@@ -118,7 +118,13 @@ export async function getHomePage() {
   const allowed = await getAllowedPages();
   if (allowed === null) return './dashboard.html';
   const first = _PAGE_ORDER.find(p => allowed.includes(p.slug));
-  return first ? './' + first.file : './index.html'; // no pages granted → back to login
+  if (first) return './' + first.file;
+  // No recognized page found (e.g. stale/unknown slug in allowed_pages).
+  // Sign out to avoid a redirect loop — user will see the login page cleanly.
+  _cachedUser = undefined;
+  _cachedProfile = undefined;
+  await supabase.auth.signOut();
+  return './index.html';
 }
 
 // Check if the current user can access a specific page, redirect if not
