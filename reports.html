@@ -468,70 +468,55 @@
           <button class="btn-generate" data-report="dhp-billing"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
         </div>
 
-        <!-- ── TimeStation Direct ─────────────────────────────── -->
-        <div class="reports-section-label">TimeStation Direct</div>
+        <!-- ── Monthly DHP Reports ────────────────────────────── -->
+        <div class="reports-section-label">Monthly DHP Reports</div>
 
-        <div class="report-card" data-report="employee-hours">
+        <div class="report-card" data-report="monthly-dhp-hours">
+          <div class="report-card-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+          </div>
+          <div>
+            <div class="report-card-name">Monthly DHP Hours</div>
+            <div class="report-card-source">Source: PSA API · Employee Hours</div>
+          </div>
+          <div class="report-card-desc">DHP company hours grouped by branch with per-week columns. Always loads the current calendar month.</div>
+          <button class="btn-generate" data-report="monthly-dhp-hours"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
+        </div>
+
+        <div class="report-card" data-report="monthly-dhp-headcount">
           <div class="report-card-icon">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
           </div>
           <div>
-            <div class="report-card-name">Employee Hours Summary</div>
-            <div class="report-card-source">Source: TimeStation Shifts</div>
+            <div class="report-card-name">Monthly DHP Headcount</div>
+            <div class="report-card-source">Source: PSA API · Unique Headcount</div>
           </div>
-          <div class="report-card-desc">Total hours and shift counts per employee for the selected date range. Includes department and status.</div>
-          <button class="btn-generate" data-report="employee-hours"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
+          <div class="report-card-desc">DHP company unique headcount grouped by branch with per-week columns. Always loads the current calendar month.</div>
+          <button class="btn-generate" data-report="monthly-dhp-headcount"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
         </div>
 
-        <div class="report-card" data-report="dept-hours">
+        <div class="report-card" data-report="monthly-dhp-billing">
           <div class="report-card-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
           </div>
           <div>
-            <div class="report-card-name">Department Hours Breakdown</div>
-            <div class="report-card-source">Source: TimeStation Shifts</div>
+            <div class="report-card-name">Monthly DHP Billing</div>
+            <div class="report-card-source">Source: PSA API · Invoice Register</div>
           </div>
-          <div class="report-card-desc">Hours and headcount grouped by department. Useful for identifying where time is being spent.</div>
-          <button class="btn-generate" data-report="dept-hours"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
+          <div class="report-card-desc">DHP company invoice revenue grouped by branch with per-week columns. Always loads the current calendar month.</div>
+          <button class="btn-generate" data-report="monthly-dhp-billing"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
         </div>
 
-        <div class="report-card" data-report="weekly-trend">
+        <div class="report-card" data-report="psa-billing-monthly">
           <div class="report-card-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" /></svg>
           </div>
           <div>
-            <div class="report-card-name">Weekly Hours Trend</div>
-            <div class="report-card-source">Source: TimeStation Shifts</div>
+            <div class="report-card-name">PSA Billing Monthly</div>
+            <div class="report-card-source">Source: PSA API · Invoice Register</div>
           </div>
-          <div class="report-card-desc">Hours and shift counts grouped by week. Spot attendance patterns and seasonal trends over time.</div>
-          <button class="btn-generate" data-report="weekly-trend"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
-        </div>
-
-        <div class="report-card" data-report="zero-hours">
-          <div class="report-card-icon" style="background:rgba(220,38,38,.1);color:#DC2626;">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-          </div>
-          <div>
-            <div class="report-card-name">Zero Hours Employees</div>
-            <div class="report-card-source">Source: TimeStation Employees + Shifts</div>
-          </div>
-          <div class="report-card-desc">Employees with no recorded shifts in the selected date range. Helpful for identifying inactive workers.</div>
-          <button class="btn-generate" data-report="zero-hours" style="background:#DC2626;"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
-        </div>
-
-        <!-- ── TempWorks Direct ────────────────────────────────── -->
-        <div class="reports-section-label">TempWorks Direct</div>
-
-        <div class="report-card" data-report="tw-timecards">
-          <div class="report-card-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-          </div>
-          <div>
-            <div class="report-card-name">TempWorks Timecards</div>
-            <div class="report-card-source">Source: TempWorks Timecards</div>
-          </div>
-          <div class="report-card-desc">Weekly timecard records from TempWorks filtered by weekend date. Shows regular, OT, and total hours with status.</div>
-          <button class="btn-generate" data-report="tw-timecards"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
+          <div class="report-card-desc">Monthly billing grouped by NIL, SCF, MO Offices (BRI 1.2 + FVH), GA Offices (AUS + CAR + KEN + ROM), and NOTS. Weekly columns with group and monthly totals.</div>
+          <button class="btn-generate" data-report="psa-billing-monthly"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>Generate Report</button>
         </div>
       </div><!-- /.reports-grid -->
 
@@ -800,237 +785,6 @@
     /* ─────────────────────────────────────────────────────────
        REPORT GENERATORS
     ───────────────────────────────────────────────────────── */
-
-    /* 1. Employee Hours Summary */
-    async function genEmployeeHours(start, end) {
-      const [shifts, employees] = await Promise.all([
-        fetchAll('ts_shifts', 'employee_id,total_minutes', [
-          ['gte', 'time_in', start],
-          ['lte', 'time_in', end + 'T23:59:59'],
-        ]),
-        fetchAll('ts_employees', 'employee_id,name,primary_department,status'),
-      ]);
-
-      const empMap = Object.fromEntries(employees.map(e => [e.employee_id, e]));
-
-      const agg = {};
-      for (const s of shifts) {
-        if (!agg[s.employee_id]) agg[s.employee_id] = { shifts: 0, minutes: 0 };
-        agg[s.employee_id].shifts++;
-        agg[s.employee_id].minutes += parseFloat(s.total_minutes) || 0;
-      }
-
-      const rows = Object.entries(agg).map(([empId, a]) => {
-        const emp = empMap[empId] || {};
-        return {
-          name:   emp.name || empId,
-          dept:   emp.primary_department || '—',
-          status: emp.status || '—',
-          shifts: a.shifts,
-          hours:  (a.minutes / 60).toFixed(2),
-          avg:    (a.minutes / a.shifts / 60).toFixed(2),
-        };
-      });
-
-      const cols = [
-        { key: 'name',   label: 'Employee' },
-        { key: 'dept',   label: 'Department' },
-        { key: 'status', label: 'Status', render: v => {
-          const lc = (v || '').toLowerCase();
-          if (lc === 'active')   return `<span class="badge-active">Active</span>`;
-          if (lc === 'inactive') return `<span class="badge-inactive">Inactive</span>`;
-          return v;
-        }},
-        { key: 'shifts', label: 'Shifts',      numeric: true, total: true, totalFmt: n => Math.round(n) },
-        { key: 'hours',  label: 'Total Hours', numeric: true, total: true, totalFmt: n => n.toFixed(2) },
-        { key: 'avg',    label: 'Avg Hrs/Shift', numeric: true },
-      ];
-
-      return { cols, rows, filename: 'employee-hours.csv' };
-    }
-
-    /* 2. Department Hours Breakdown */
-    async function genDeptHours(start, end) {
-      const shifts = await fetchAll('ts_shifts', 'employee_id,department_id,total_minutes', [
-        ['gte', 'time_in', start],
-        ['lte', 'time_in', end + 'T23:59:59'],
-      ]);
-
-      // Also pull employee data so we can get department names where dept_id isn't descriptive
-      const employees = await fetchAll('ts_employees', 'employee_id,current_department,current_department_id');
-      const deptNameMap = Object.fromEntries(
-        employees.filter(e => e.current_department_id && e.current_department)
-                 .map(e => [String(e.current_department_id), e.current_department])
-      );
-
-      const agg = {};
-      for (const s of shifts) {
-        const deptId  = s.department_id ? String(s.department_id) : null;
-        const deptKey = deptId || '__none__';
-        if (!agg[deptKey]) agg[deptKey] = { deptId, shifts: 0, minutes: 0, employees: new Set() };
-        agg[deptKey].shifts++;
-        agg[deptKey].minutes  += parseFloat(s.total_minutes) || 0;
-        agg[deptKey].employees.add(s.employee_id);
-      }
-
-      const rows = Object.entries(agg).map(([key, a]) => ({
-        dept:      a.deptId ? (deptNameMap[a.deptId] || `Dept ${a.deptId}`) : 'No Department',
-        dept_id:   a.deptId || '—',
-        shifts:    a.shifts,
-        hours:     (a.minutes / 60).toFixed(2),
-        employees: a.employees.size,
-      }));
-
-      const cols = [
-        { key: 'dept',      label: 'Department' },
-        { key: 'dept_id',   label: 'Dept ID' },
-        { key: 'employees', label: 'Employees',   numeric: true },
-        { key: 'shifts',    label: 'Shifts',      numeric: true, total: true, totalFmt: n => Math.round(n) },
-        { key: 'hours',     label: 'Total Hours', numeric: true, total: true, totalFmt: n => n.toFixed(2) },
-      ];
-
-      return { cols, rows, filename: 'department-hours.csv' };
-    }
-
-    /* 3. Weekly Hours Trend */
-    async function genWeeklyTrend(start, end) {
-      const shifts = await fetchAll('ts_shifts', 'employee_id,total_minutes,time_in', [
-        ['gte', 'time_in', start],
-        ['lte', 'time_in', end + 'T23:59:59'],
-      ]);
-
-      function getWeekLabel(dateStr) {
-        if (!dateStr) return 'Unknown';
-        const d = new Date(dateStr);
-        // Sunday of that week
-        const sun = new Date(d);
-        sun.setDate(d.getDate() - d.getDay());
-        return `Week of ${toDateStr(sun)}`;
-      }
-
-      const agg = {};
-      for (const s of shifts) {
-        const week = getWeekLabel(s.time_in);
-        // For sorting, store the Sunday date
-        const d    = s.time_in ? new Date(s.time_in) : new Date();
-        const sun  = new Date(d); sun.setDate(d.getDate() - d.getDay());
-        const weekSort = toDateStr(sun);
-
-        if (!agg[week]) agg[week] = { weekSort, shifts: 0, minutes: 0, employees: new Set() };
-        agg[week].shifts++;
-        agg[week].minutes  += parseFloat(s.total_minutes) || 0;
-        agg[week].employees.add(s.employee_id);
-      }
-
-      const rows = Object.entries(agg)
-        .sort((a, b) => a[1].weekSort.localeCompare(b[1].weekSort))
-        .map(([week, a]) => ({
-          week,
-          shifts:    a.shifts,
-          hours:     (a.minutes / 60).toFixed(2),
-          employees: a.employees.size,
-        }));
-
-      const cols = [
-        { key: 'week',      label: 'Week' },
-        { key: 'employees', label: 'Unique Employees', numeric: true },
-        { key: 'shifts',    label: 'Shifts',           numeric: true, total: true, totalFmt: n => Math.round(n) },
-        { key: 'hours',     label: 'Total Hours',      numeric: true, total: true, totalFmt: n => n.toFixed(2) },
-      ];
-
-      return { cols, rows, filename: 'weekly-trend.csv' };
-    }
-
-    /* 4. Zero Hours Employees */
-    async function genZeroHours(start, end) {
-      const [shifts, employees] = await Promise.all([
-        fetchAll('ts_shifts', 'employee_id', [
-          ['gte', 'time_in', start],
-          ['lte', 'time_in', end + 'T23:59:59'],
-        ]),
-        fetchAll('ts_employees', 'employee_id,name,primary_department,status,email'),
-      ]);
-
-      const active = new Set(shifts.map(s => s.employee_id));
-      const rows = employees
-        .filter(e => !active.has(e.employee_id))
-        .map(e => ({
-          name:   e.name   || e.employee_id,
-          id:     e.employee_id,
-          dept:   e.primary_department || '—',
-          status: e.status || '—',
-          email:  e.email  || '—',
-        }));
-
-      const cols = [
-        { key: 'name',   label: 'Employee' },
-        { key: 'id',     label: 'Employee ID' },
-        { key: 'dept',   label: 'Department' },
-        { key: 'status', label: 'Status', render: v => {
-          const lc = (v || '').toLowerCase();
-          if (lc === 'active')   return `<span class="badge-active">Active</span>`;
-          if (lc === 'inactive') return `<span class="badge-inactive">Inactive</span>`;
-          return v;
-        }},
-        { key: 'email',  label: 'Email' },
-      ];
-
-      return { cols, rows, filename: 'zero-hours-employees.csv' };
-    }
-
-    /* 5. TempWorks Timecards */
-    async function genTwTimecards(start, end) {
-      const timecards = await fetchAll('tw_timecards',
-        'employee_id,customer_name,weekend_date,regular_hours,overtime_hours,doubletime_hours,total_hours,pay_rate,bill_rate,status',
-        [
-          ['gte', 'weekend_date', start],
-          ['lte', 'weekend_date', end],
-          ['order', 'weekend_date', { ascending: false }],
-        ]
-      );
-
-      // Pull employee names from tw_employees
-      const employees = await fetchAll('tw_employees', 'id,first_name,last_name,branch_name');
-      const empMap = Object.fromEntries(employees.map(e => [String(e.id), e]));
-
-      const rows = timecards.map(tc => {
-        const emp = empMap[String(tc.employee_id)] || {};
-        return {
-          employee:   emp.first_name ? `${emp.first_name} ${emp.last_name}` : String(tc.employee_id),
-          branch:     emp.branch_name   || '—',
-          customer:   tc.customer_name  || '—',
-          week_end:   tc.weekend_date   || '—',
-          reg:        parseFloat(tc.regular_hours   || 0).toFixed(2),
-          ot:         parseFloat(tc.overtime_hours  || 0).toFixed(2),
-          dt:         parseFloat(tc.doubletime_hours|| 0).toFixed(2),
-          total:      parseFloat(tc.total_hours     || 0).toFixed(2),
-          pay_rate:   tc.pay_rate  != null ? `$${parseFloat(tc.pay_rate).toFixed(2)}`  : '—',
-          bill_rate:  tc.bill_rate != null ? `$${parseFloat(tc.bill_rate).toFixed(2)}` : '—',
-          status:     tc.status || '—',
-        };
-      });
-
-      const cols = [
-        { key: 'employee',  label: 'Employee' },
-        { key: 'branch',    label: 'Branch' },
-        { key: 'customer',  label: 'Customer' },
-        { key: 'week_end',  label: 'Week End' },
-        { key: 'reg',       label: 'Reg Hrs',   numeric: true, total: true },
-        { key: 'ot',        label: 'OT Hrs',    numeric: true, total: true },
-        { key: 'dt',        label: 'DT Hrs',    numeric: true, total: true },
-        { key: 'total',     label: 'Total Hrs', numeric: true, total: true },
-        { key: 'pay_rate',  label: 'Pay Rate' },
-        { key: 'bill_rate', label: 'Bill Rate' },
-        { key: 'status',    label: 'Status', render: v => {
-          const lc = (v || '').toLowerCase();
-          if (lc === 'approved' || lc === 'invoiced') return `<span class="badge-active">${v}</span>`;
-          if (lc === 'open')     return `<span class="badge-warning">${v}</span>`;
-          return v;
-        }},
-      ];
-
-      return { cols, rows, filename: 'tw-timecards.csv' };
-    }
 
     /* ─────────────────────────────────────────────────────────
        PSA SHARED HELPERS
@@ -2353,24 +2107,510 @@
       };
     }
 
+    /* ─────────────────────────────────────────────────────────
+       MONTHLY DHP + PSA BILLING MONTHLY  (autoMonth reports)
+    ───────────────────────────────────────────────────────── */
+
+    /**
+     * Shared renderer for Monthly DHP tables.
+     * branchData: branch → company → week → value
+     * mode: 'hours' | 'headcount' | 'billing'
+     */
+    function renderMonthlyDhpTable(branchData, sortedWeeks, mode) {
+      const isBilling   = mode === 'billing';
+      const isHeadcount = mode === 'headcount';
+
+      const fmtVal = v => {
+        if (v <= 0) return '<span style="color:var(--text-disabled)">—</span>';
+        if (isBilling)   return formatCurrency(v);
+        if (isHeadcount) return v;
+        return formatNumber(v, 2);
+      };
+      const fmtTot = v => {
+        if (isBilling)   return formatCurrency(v);
+        if (isHeadcount) return v;
+        return formatNumber(v, 2);
+      };
+
+      function fmtWk(w) {
+        if (w === '—') return '—';
+        const d = new Date(w + 'T12:00:00Z');
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+      }
+
+      const weekHdrs = sortedWeeks.map(w => `<th class="r">${fmtWk(w)}</th>`).join('');
+      let html = `<div style="overflow-x:auto;"><table class="billing-tbl" style="min-width:${Math.max(500, sortedWeeks.length * 110 + 320)}px;">
+        <thead><tr>
+          <th>Branch</th>
+          <th>Company</th>
+          ${weekHdrs}
+          <th class="r">Total</th>
+        </tr></thead>
+        <tbody>`;
+
+      const grandWeekTotals = new Array(sortedWeeks.length).fill(0);
+      let grandTotal = 0;
+
+      for (const branch of Object.keys(branchData).sort()) {
+        const companies = Object.keys(branchData[branch]).sort();
+        const c = regionColor(branch);
+
+        html += `<tr class="billing-branch-hdr" style="background:${c.light};color:${c.text};">
+          <td colspan="${sortedWeeks.length + 3}" style="font-weight:700;">${branch}</td>
+        </tr>`;
+
+        const branchWeekTotals = new Array(sortedWeeks.length).fill(0);
+        let branchTotal = 0;
+
+        for (const company of companies) {
+          const compData = branchData[branch][company];
+          let compTotal = 0;
+
+          const weekCells = sortedWeeks.map((w, i) => {
+            const v = compData[w] || 0;
+            branchWeekTotals[i] += v;
+            compTotal += v;
+            return `<td class="r">${fmtVal(v)}</td>`;
+          }).join('');
+
+          branchTotal += compTotal;
+
+          html += `<tr class="billing-data-row" style="border-left:3px solid ${c.bg};">
+            <td style="color:${c.bg};font-weight:500;padding-left:14px;">${branch}</td>
+            <td>${company}</td>
+            ${weekCells}
+            <td class="r" style="font-weight:600;">${fmtTot(compTotal)}</td>
+          </tr>`;
+        }
+
+        grandTotal += branchTotal;
+        branchWeekTotals.forEach((v, i) => grandWeekTotals[i] += v);
+
+        const branchWeekCells = branchWeekTotals.map(v =>
+          `<td class="r" style="font-weight:700;">${fmtTot(v)}</td>`
+        ).join('');
+        html += `<tr class="billing-branch-total" style="background:${c.light};color:${c.text};border-left:3px solid ${c.bg};">
+          <td colspan="2" style="font-weight:700;">↳ ${branch} Total</td>
+          ${branchWeekCells}
+          <td class="r" style="font-weight:700;">${fmtTot(branchTotal)}</td>
+        </tr>`;
+      }
+
+      const grandWeekCells = grandWeekTotals.map(v =>
+        `<td class="r" style="font-weight:700;">${fmtTot(v)}</td>`
+      ).join('');
+      const grandLabel = isBilling ? 'Total Monthly Billing' : isHeadcount ? 'Total Monthly HC' : 'Total Monthly Hours';
+      html += `<tr class="billing-grand-total">
+        <td colspan="2">${grandLabel}</td>
+        ${grandWeekCells}
+        <td class="r">${fmtTot(grandTotal)}</td>
+      </tr>`;
+
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    /* Monthly DHP Hours */
+    async function genMonthlyDhpHours(start, end) {
+      const hoursData = await fetchEmployeeHours(start, end);
+
+      const branchData = {};
+      const weekSet    = new Set();
+
+      for (const r of hoursData) {
+        const bn = r.branchname || 'Unknown';
+        if (isCorporateBranch(bn)) continue;
+        if (!isDHP(r.customername || r.company_name)) continue;
+        const company = r.customername || r.company_name || 'Unknown';
+        const week    = r.weekendbill || '—';
+        const hrs     = Number(r.hours) || 0;
+
+        weekSet.add(week);
+        branchData[bn]          ??= {};
+        branchData[bn][company] ??= {};
+        branchData[bn][company][week] = (branchData[bn][company][week] || 0) + hrs;
+      }
+
+      const sortedWeeks = [...weekSet].filter(w => w !== '—').sort();
+      if (weekSet.has('—')) sortedWeeks.push('—');
+
+      const flatRows = [];
+      for (const branch of Object.keys(branchData).sort()) {
+        for (const company of Object.keys(branchData[branch]).sort()) {
+          const row = { branch, company };
+          let total = 0;
+          for (const w of sortedWeeks) {
+            const v = branchData[branch][company][w] || 0;
+            row[`week_${w}`] = formatNumber(v, 2);
+            total += v;
+          }
+          row.total = formatNumber(total, 2);
+          flatRows.push(row);
+        }
+      }
+
+      const cols = [
+        { key: 'branch',  label: 'Branch' },
+        { key: 'company', label: 'Company' },
+        ...sortedWeeks.map(w => ({ key: `week_${w}`, label: w, numeric: true })),
+        { key: 'total', label: 'Total Hours', numeric: true },
+      ];
+
+      return {
+        cols, rows: flatRows, filename: 'monthly-dhp-hours.csv',
+        customRender: () => renderMonthlyDhpTable(branchData, sortedWeeks, 'hours'),
+      };
+    }
+
+    /* Monthly DHP Headcount */
+    async function genMonthlyDhpHeadcount(start, end) {
+      const headData = await fetchUniqueCountByCompany(start, end);
+
+      const branchData = {};
+      const weekSet    = new Set();
+
+      for (const r of headData) {
+        const bn = r.branchname || r.branch || 'Unknown';
+        if (isCorporateBranch(bn)) continue;
+        if (!isDHP(r.customername || r.company_name)) continue;
+        const company = r.customername || r.company_name || 'Unknown';
+        const week    = r.weekendbill || r.weekend_bill || '—';
+        const cnt     = Number(r.unique_row_count) || 0;
+
+        weekSet.add(week);
+        branchData[bn]          ??= {};
+        branchData[bn][company] ??= {};
+        branchData[bn][company][week] = (branchData[bn][company][week] || 0) + cnt;
+      }
+
+      const sortedWeeks = [...weekSet].filter(w => w !== '—').sort();
+      if (weekSet.has('—')) sortedWeeks.push('—');
+
+      const flatRows = [];
+      for (const branch of Object.keys(branchData).sort()) {
+        for (const company of Object.keys(branchData[branch]).sort()) {
+          const row = { branch, company };
+          let total = 0;
+          for (const w of sortedWeeks) {
+            const v = branchData[branch][company][w] || 0;
+            row[`week_${w}`] = v;
+            total += v;
+          }
+          row.total = total;
+          flatRows.push(row);
+        }
+      }
+
+      const cols = [
+        { key: 'branch',  label: 'Branch' },
+        { key: 'company', label: 'Company' },
+        ...sortedWeeks.map(w => ({ key: `week_${w}`, label: w, numeric: true })),
+        { key: 'total', label: 'Total HC', numeric: true },
+      ];
+
+      return {
+        cols, rows: flatRows, filename: 'monthly-dhp-headcount.csv',
+        customRender: () => renderMonthlyDhpTable(branchData, sortedWeeks, 'headcount'),
+      };
+    }
+
+    /* Monthly DHP Billing */
+    async function genMonthlyDhpBilling(start, end) {
+      const invoices = await fetchInvoiceRegister(start, end);
+
+      const branchData = {};
+      const weekSet    = new Set();
+
+      for (const r of invoices) {
+        const bn = r.branchname || 'Unknown';
+        if (isCorporateBranch(bn)) continue;
+        if (!isDHP(r.customername)) continue;
+        const company = r.customername || 'Unknown';
+        const week    = r.weekendbill  || '—';
+        const amt     = Number(r.invoiceamount) || 0;
+
+        weekSet.add(week);
+        branchData[bn]          ??= {};
+        branchData[bn][company] ??= {};
+        branchData[bn][company][week] = (branchData[bn][company][week] || 0) + amt;
+      }
+
+      const sortedWeeks = [...weekSet].filter(w => w !== '—').sort();
+      if (weekSet.has('—')) sortedWeeks.push('—');
+
+      const flatRows = [];
+      for (const branch of Object.keys(branchData).sort()) {
+        for (const company of Object.keys(branchData[branch]).sort()) {
+          const row = { branch, company };
+          let total = 0;
+          for (const w of sortedWeeks) {
+            const v = branchData[branch][company][w] || 0;
+            row[`week_${w}`] = v.toFixed(2);
+            total += v;
+          }
+          row.total = total.toFixed(2);
+          flatRows.push(row);
+        }
+      }
+
+      const cols = [
+        { key: 'branch',  label: 'Branch' },
+        { key: 'company', label: 'Company' },
+        ...sortedWeeks.map(w => ({ key: `week_${w}`, label: w, numeric: true })),
+        { key: 'total', label: 'Total Billing', numeric: true },
+      ];
+
+      return {
+        cols, rows: flatRows, filename: 'monthly-dhp-billing.csv',
+        customRender: () => renderMonthlyDhpTable(branchData, sortedWeeks, 'billing'),
+      };
+    }
+
+    /* ─── PSA Billing Monthly renderer ─────────────────────── */
+
+    const PSA_BILLING_GROUP_COLORS = {
+      'NIL':        { bg: '#3B82F6', light: '#EFF6FF', text: '#1E3A8A', white: '#fff' },
+      'SCF':        { bg: '#10B981', light: '#ECFDF5', text: '#064E3B', white: '#fff' },
+      'MO Offices': { bg: '#8B5CF6', light: '#F5F3FF', text: '#4C1D95', white: '#fff' },
+      'GA Offices': { bg: '#EA8938', light: '#FEF3E6', text: '#7C3D08', white: '#fff' },
+      'NOTS':       { bg: '#EF4444', light: '#FEF2F2', text: '#7F1D1D', white: '#fff' },
+    };
+
+    function renderPsaBillingMonthlyTable(hierarchy, sortedWeeks, groups) {
+      function fmtWk(w) {
+        if (w === '—') return '—';
+        const d = new Date(w + 'T12:00:00Z');
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+      }
+
+      const totalCols = 1 + sortedWeeks.length + 1; // company + weeks + total
+      const weekHdrs  = sortedWeeks.map(w => `<th class="r">${fmtWk(w)}</th>`).join('');
+
+      let html = `<div style="overflow-x:auto;"><table class="billing-tbl" style="min-width:${Math.max(600, sortedWeeks.length * 110 + 280)}px;">
+        <thead><tr>
+          <th>Company</th>
+          ${weekHdrs}
+          <th class="r">Total</th>
+        </tr></thead>
+        <tbody>`;
+
+      const grandWeekTotals = new Array(sortedWeeks.length).fill(0);
+      let grandTotal = 0;
+
+      for (const g of groups) {
+        const groupData = hierarchy[g.key];
+        if (!groupData || !Object.keys(groupData).length) continue;
+
+        const c  = PSA_BILLING_GROUP_COLORS[g.key] || { bg: '#6B7280', light: '#F9FAFB', text: '#374151', white: '#fff' };
+        const gk = `pbm-${g.key.replace(/\s+/g, '_')}`;
+
+        // Group header
+        html += `<tr class="billing-region-hdr" style="background:${c.bg};color:${c.white};">
+          <td colspan="${totalCols}">
+            <button class="collapse-btn" data-pbm-rbtn="${gk}" onclick="togglePsmGroup('${gk.replace(/'/g,"\\'")}')">▼</button>
+            ${g.label}
+          </td>
+        </tr>`;
+
+        const groupWeekTotals = new Array(sortedWeeks.length).fill(0);
+        let groupTotal = 0;
+        const hasManyBranches = Object.keys(groupData).length > 1;
+
+        for (const branch of Object.keys(groupData).sort()) {
+          const bk        = `${gk}|||${branch}`;
+          const branchCos = groupData[branch];
+
+          // Branch sub-header (only for multi-branch groups)
+          if (hasManyBranches) {
+            html += `<tr class="billing-branch-hdr" data-pbmgk="${gk}" style="background:${c.light};color:${c.text};">
+              <td colspan="${totalCols}">
+                <button class="collapse-btn" data-pbm-bbtn="${bk}" onclick="togglePsmBranch('${bk.replace(/'/g,"\\'")}')">▼</button>
+                ${branch}
+              </td>
+            </tr>`;
+          }
+
+          const branchWeekTotals = new Array(sortedWeeks.length).fill(0);
+          let branchTotal = 0;
+
+          for (const company of Object.keys(branchCos).sort()) {
+            const compData = branchCos[company];
+            let compTotal  = 0;
+
+            const weekCells = sortedWeeks.map((w, i) => {
+              const v = compData[w] || 0;
+              branchWeekTotals[i] += v;
+              compTotal += v;
+              return `<td class="r">${v > 0 ? formatCurrency(v) : '<span style="color:var(--text-disabled)">—</span>'}</td>`;
+            }).join('');
+
+            branchTotal += compTotal;
+
+            const rowAttrs = hasManyBranches
+              ? `data-pbmgk="${gk}" data-pbmbk="${bk}"`
+              : `data-pbmgk="${gk}"`;
+
+            html += `<tr class="billing-data-row" ${rowAttrs} style="border-left:3px solid ${c.bg};">
+              <td>${hasManyBranches
+                ? company
+                : `<span style="color:${c.bg};font-weight:500;margin-right:6px;">[${branch}]</span>${company}`
+              }</td>
+              ${weekCells}
+              <td class="r" style="font-weight:600;">${formatCurrency(compTotal)}</td>
+            </tr>`;
+          }
+
+          groupTotal += branchTotal;
+          branchWeekTotals.forEach((v, i) => groupWeekTotals[i] += v);
+
+          if (hasManyBranches) {
+            const branchWeekCells = branchWeekTotals.map(v =>
+              `<td class="r" style="font-weight:600;">${formatCurrency(v)}</td>`
+            ).join('');
+            html += `<tr class="billing-branch-total" data-pbmgk="${gk}" style="background:${c.light};color:${c.text};border-left:3px solid ${c.bg};">
+              <td>↳ ${branch} Total</td>
+              ${branchWeekCells}
+              <td class="r" style="font-weight:700;">${formatCurrency(branchTotal)}</td>
+            </tr>`;
+          }
+        }
+
+        grandTotal += groupTotal;
+        groupWeekTotals.forEach((v, i) => grandWeekTotals[i] += v);
+
+        const groupWeekCells = groupWeekTotals.map(v =>
+          `<td class="r" style="font-weight:700;">${formatCurrency(v)}</td>`
+        ).join('');
+        html += `<tr class="billing-region-total" style="background:${c.bg};color:${c.white};">
+          <td>${g.label} Total</td>
+          ${groupWeekCells}
+          <td class="r" style="font-weight:700;">${formatCurrency(groupTotal)}</td>
+        </tr>`;
+      }
+
+      const grandWeekCells = grandWeekTotals.map(v =>
+        `<td class="r">${formatCurrency(v)}</td>`
+      ).join('');
+      html += `<tr class="billing-grand-total">
+        <td>Monthly Total</td>
+        ${grandWeekCells}
+        <td class="r">${formatCurrency(grandTotal)}</td>
+      </tr>`;
+
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    window.togglePsmGroup = function(gk) {
+      const rows = document.querySelectorAll(`[data-pbmgk="${CSS.escape(gk)}"]`);
+      const btn  = document.querySelector(`[data-pbm-rbtn="${CSS.escape(gk)}"]`);
+      const collapsed = rows[0]?.style.display === 'none';
+      rows.forEach(r => r.style.display = collapsed ? '' : 'none');
+      if (btn) btn.textContent = collapsed ? '▼' : '▶';
+    };
+
+    window.togglePsmBranch = function(bk) {
+      const rows = document.querySelectorAll(`[data-pbmbk="${CSS.escape(bk)}"]`);
+      const btn  = document.querySelector(`[data-pbm-bbtn="${CSS.escape(bk)}"]`);
+      const collapsed = rows[0]?.style.display === 'none';
+      rows.forEach(r => r.style.display = collapsed ? '' : 'none');
+      if (btn) btn.textContent = collapsed ? '▼' : '▶';
+    };
+
+    /* PSA Billing Monthly — grouped by NIL / SCF / MO Offices / GA Offices / NOTS */
+    async function genPsaBillingMonthly(start, end) {
+      const invoices = await fetchInvoiceRegister(start, end);
+
+      const PSA_GROUPS = [
+        { key: 'NIL',        label: 'NIL',        branches: ['NIL']                                       },
+        { key: 'SCF',        label: 'SCF',        branches: ['SCF']                                       },
+        { key: 'MO Offices', label: 'MO Offices', branches: ['BRI 1.2', 'FVH']                           },
+        { key: 'GA Offices', label: 'GA Offices', branches: ['AUS 1&2', 'AUS 3', 'CAR', 'KEN 1', 'ROM']  },
+        { key: 'NOTS',       label: 'NOTS',       branches: ['NOTS']                                      },
+      ];
+
+      // Build branch → groupKey lookup (case-insensitive)
+      const branchToGroup = {};
+      for (const g of PSA_GROUPS)
+        for (const b of g.branches)
+          branchToGroup[b.toLowerCase()] = g.key;
+
+      // hierarchy: groupKey → branch → company → week → amount
+      const hierarchy = {};
+      const weekSet   = new Set();
+
+      for (const r of invoices) {
+        if (isCorporateBranch(r.branchname)) continue;
+        const bn       = r.branchname || 'Unknown';
+        const groupKey = branchToGroup[bn.toLowerCase()];
+        if (!groupKey) continue; // branch not in any defined group
+
+        const company = r.customername || 'Unknown';
+        const week    = r.weekendbill  || '—';
+        const amt     = Number(r.invoiceamount) || 0;
+
+        weekSet.add(week);
+        hierarchy[groupKey]              ??= {};
+        hierarchy[groupKey][bn]          ??= {};
+        hierarchy[groupKey][bn][company] ??= {};
+        hierarchy[groupKey][bn][company][week] = (hierarchy[groupKey][bn][company][week] || 0) + amt;
+      }
+
+      const sortedWeeks = [...weekSet].filter(w => w !== '—').sort();
+      if (weekSet.has('—')) sortedWeeks.push('—');
+
+      // Flat rows for CSV / Excel
+      const csvRows = [];
+      for (const g of PSA_GROUPS) {
+        if (!hierarchy[g.key]) continue;
+        for (const branch of Object.keys(hierarchy[g.key]).sort()) {
+          for (const company of Object.keys(hierarchy[g.key][branch]).sort()) {
+            const row = { group: g.label, branch, company };
+            let total = 0;
+            for (const w of sortedWeeks) {
+              const v = hierarchy[g.key][branch][company][w] || 0;
+              row[`week_${w}`] = v.toFixed(2);
+              total += v;
+            }
+            row.total = total.toFixed(2);
+            csvRows.push(row);
+          }
+        }
+      }
+
+      const cols = [
+        { key: 'group',   label: 'Group' },
+        { key: 'branch',  label: 'Branch' },
+        { key: 'company', label: 'Company' },
+        ...sortedWeeks.map(w => ({ key: `week_${w}`, label: w, numeric: true })),
+        { key: 'total', label: 'Total', numeric: true },
+      ];
+
+      return {
+        cols,
+        rows: csvRows,
+        filename: 'psa-billing-monthly.csv',
+        customRender: () => renderPsaBillingMonthlyTable(hierarchy, sortedWeeks, PSA_GROUPS),
+      };
+    }
+
     /* ─── Report registry ───────────────────────────────────── */
     const REPORTS = {
-      'employee-hours':       { title: 'Employee Hours Summary',              fn: genEmployeeHours      },
-      'dept-hours':           { title: 'Department Hours Breakdown',          fn: genDeptHours          },
-      'weekly-trend':         { title: 'Weekly Hours Trend',                  fn: genWeeklyTrend        },
-      'zero-hours':           { title: 'Zero Hours Employees',                fn: genZeroHours          },
-      'tw-timecards':         { title: 'TempWorks Timecards',                 fn: genTwTimecards        },
-      'psa-hours-headcount':  { title: 'PSA Hours & Headcount by Region',     fn: genPsaHoursHeadcount  },
-      'psa-weekly-revenue':   { title: 'PSA Weekly Revenue by Branch',        fn: genPsaWeeklyRevenue   },
-      'weekly-email-drafts':  { title: 'Weekly Revenue Email Drafts',         fn: genWeeklyEmailDrafts  },
-      'dhp-hours':            { title: 'DHP Hours by Region & Branch',        fn: genDhpHours,           dhp: true },
-      'dhp-headcount':        { title: 'DHP Headcount by Region & Branch',    fn: genDhpHeadcount,       dhp: true },
-      'dhp-billing':          { title: 'DHP Billing by Region & Branch',      fn: genDhpBilling,         dhp: true },
-      'psa-revenue-breakdown':{ title: 'PSA Billing',                          fn: genPsaRevenueBreakdown},
-      'master-headcount':     { title: 'Master Headcount — All Offices',      fn: genMasterHeadcount    },
-      'nil-hours':            { title: 'NIL Office Hours by Client',          fn: genNilHours           },
-      'mo-hours':             { title: 'MO Offices Hours by Client',          fn: genMoHours            },
-      'ga-hours':             { title: 'GA Offices Hours by Client',          fn: genGaHours            },
+      'psa-hours-headcount':   { title: 'PSA Hours & Headcount by Region',     fn: genPsaHoursHeadcount   },
+      'psa-weekly-revenue':    { title: 'PSA Weekly Revenue by Branch',        fn: genPsaWeeklyRevenue    },
+      'weekly-email-drafts':   { title: 'Weekly Revenue Email Drafts',         fn: genWeeklyEmailDrafts   },
+      'dhp-hours':             { title: 'DHP Hours by Region & Branch',        fn: genDhpHours,            dhp: true },
+      'dhp-headcount':         { title: 'DHP Headcount by Region & Branch',    fn: genDhpHeadcount,        dhp: true },
+      'dhp-billing':           { title: 'DHP Billing by Region & Branch',      fn: genDhpBilling,          dhp: true },
+      'psa-revenue-breakdown': { title: 'PSA Billing',                         fn: genPsaRevenueBreakdown },
+      'master-headcount':      { title: 'Master Headcount — All Offices',      fn: genMasterHeadcount     },
+      'nil-hours':             { title: 'NIL Office Hours by Client',          fn: genNilHours            },
+      'mo-hours':              { title: 'MO Offices Hours by Client',          fn: genMoHours             },
+      'ga-hours':              { title: 'GA Offices Hours by Client',          fn: genGaHours             },
+      'monthly-dhp-hours':     { title: 'Monthly DHP Hours',                   fn: genMonthlyDhpHours,     autoMonth: true },
+      'monthly-dhp-headcount': { title: 'Monthly DHP Headcount',               fn: genMonthlyDhpHeadcount, autoMonth: true },
+      'monthly-dhp-billing':   { title: 'Monthly DHP Billing',                 fn: genMonthlyDhpBilling,   autoMonth: true },
+      'psa-billing-monthly':   { title: 'PSA Billing Monthly',                 fn: genPsaBillingMonthly,   autoMonth: true },
     };
 
     /* ─── Generate handler ──────────────────────────────────── */
@@ -2380,10 +2620,17 @@
       const report = REPORTS[reportKey];
       if (!report) return;
 
-      const isDhp = !!report.dhp;
+      const isDhp       = !!report.dhp;
+      const isAutoMonth = !!report.autoMonth;
       let dateRange;
 
-      if (isDhp) {
+      if (isAutoMonth) {
+        // Always use the current calendar month — no picker needed
+        const n = new Date();
+        const s = new Date(n.getFullYear(), n.getMonth(), 1);
+        const e = new Date(n.getFullYear(), n.getMonth() + 1, 0);
+        dateRange = { start: toDateStr(s), end: toDateStr(e) };
+      } else if (isDhp) {
         dateRange = getDhpDateRange();
       } else {
         dateRange = { start: $start.value, end: $end.value };
@@ -2400,6 +2647,10 @@
         globalBar.style.opacity = '0.4';
         globalBar.style.pointerEvents = 'none';
         dhpBar.classList.add('visible');
+      } else if (isAutoMonth) {
+        globalBar.style.opacity = '0.4';
+        globalBar.style.pointerEvents = 'none';
+        dhpBar.classList.remove('visible');
       } else {
         globalBar.style.opacity = '';
         globalBar.style.pointerEvents = '';
