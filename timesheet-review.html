@@ -226,7 +226,7 @@
   // ── Hard refresh (clears employee cache → re-fetches from TS) ──
   window.refreshAll = async () => {
     allEmployees = [];
-    populateDeptFilter(false);
+    populateDeptFilter([], false);
     await loadTimesheets();
   };
 
@@ -246,35 +246,35 @@
   }
 
   // ── Populate department dropdown from cached employee list ─
-  function populateDeptFilter(preserveValue) {
+  // TS /employees: status is "in"|"out" (clocked in/out right now), not Active/Inactive
+  // Employees have no department field — we populate dept filter from shift data after loading
+
+  function populateDeptFilter(depts, preserveValue) {
     const prev = preserveValue ? document.getElementById('dept-filter').value : '';
-    const depts = [...new Set(allEmployees.map(e => e.dept).filter(Boolean))].sort();
-    const sel = document.getElementById('dept-filter');
+    const sel  = document.getElementById('dept-filter');
     sel.innerHTML = '<option value="">All Departments</option>'
       + depts.map(d => `<option value="${escHtml(d)}"${d===prev?' selected':''}>${escHtml(d)}</option>`).join('');
   }
 
   // ── Load employee list (TS API → Supabase fallback) ──────
   async function fetchEmployeeList() {
-    // Try TimeStation /employees first
+    // TimeStation /employees — no params required
+    // Response: { employees: [{ employee_id, name, status:"in"|"out", hourly_rate, email }] }
     try {
       const res = await fetch('/api/ts?endpoint=/employees');
       if (res.ok) {
         const json = await res.json();
-        const raw  = json.employees || json.data || (Array.isArray(json) ? json : []);
+        const raw  = json.employees || [];
         if (raw.length) {
           return raw
-            .filter(e => {
-              const s = String(e.status || e.employee_status || '').toLowerCase();
-              return !s || s === 'active' || s === '1';
-            })
             .map(e => ({
-              id:   String(e.employee_id || e.id || ''),
-              name: `${e.first_name || e.firstName || ''} ${e.last_name || e.lastName || ''}`.trim()
-                    || e.name || `Employee ${e.employee_id || e.id}`,
-              dept: e.department || e.primary_department || e.company || '',
+              id:          String(e.employee_id || ''),
+              name:        e.name || `Employee ${e.employee_id}`,
+              currentlyIn: e.status === 'in',   // live check-in status
+              dept:        '',                   // TS employees have no dept field
             }))
-            .filter(e => e.id);
+            .filter(e => e.id)
+            .sort((a, b) => a.name.localeCompare(b.name));
         }
       }
     } catch { /* fall through */ }
@@ -288,9 +288,10 @@
       .order('first_name')
       .limit(300);
     return (data || []).map(e => ({
-      id:   String(e.employee_id),
-      name: `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Employee ${e.employee_id}`,
-      dept: e.primary_department || '',
+      id:          String(e.employee_id),
+      name:        `${e.first_name || ''} ${e.last_name || ''}`.trim() || `Employee ${e.employee_id}`,
+      currentlyIn: false,
+      dept:        e.primary_department || '',
     })).filter(e => e.id);
   }
 
@@ -309,42 +310,48 @@
       // 1. Get employee list (refresh cache on explicit refresh, otherwise reuse)
       if (!allEmployees.length) {
         allEmployees = await fetchEmployeeList();
-        populateDeptFilter(true);
       }
 
       if (!allEmployees.length) {
         document.getElementById('content-area').innerHTML =
           '<div class="state-msg"><div class="icon">👥</div>'
-          + 'No employees found. Make sure the TimeStation API key is set in Vercel, '
-          + 'or run the n8n sync to populate the ts_employees table.</div>';
+          + 'No employees found. Make sure TIMESTATION_API_KEY is set in Vercel environment variables.</div>';
         return;
       }
 
-      // 2. Filter by selected department
+      // 2. Fetch shifts per employee in parallel
+      //    Note: TS employees have no dept field — we use dept from shift records instead
       const dept = document.getElementById('dept-filter').value;
-      employees = allEmployees.filter(e => !dept || e.dept === dept);
-
-      if (!employees.length) {
-        document.getElementById('content-area').innerHTML =
-          '<div class="state-msg"><div class="icon">👥</div>No employees match this department filter.</div>';
-        return;
-      }
-
-      // 3. Fetch shifts from TimeStation per employee (parallel)
-      shiftData = {};
-      await Promise.all(employees.map(async emp => {
+      shiftData  = {};
+      await Promise.all(allEmployees.map(async emp => {
         try {
           const res = await fetch(
             `/api/ts?endpoint=/shifts&employee_id=${encodeURIComponent(emp.id)}&start_date=${startStr}&end_date=${endStr}`
           );
           if (res.ok) {
             const json = await res.json();
-            shiftData[emp.id] = json.shifts || [];
+            // total_minutes comes back as a string from TS — normalise to number
+            shiftData[emp.id] = (json.shifts || []).map(s => ({
+              ...s,
+              total_minutes: s.total_minutes != null ? parseInt(s.total_minutes, 10) : null,
+            }));
           } else {
             shiftData[emp.id] = [];
           }
         } catch { shiftData[emp.id] = []; }
       }));
+
+      // 3. Build dept list from shift department_id values; filter employees by dept
+      const deptIds = [...new Set(
+        Object.values(shiftData).flat().map(s => s.department_id).filter(Boolean)
+      )].sort();
+      populateDeptFilter(deptIds, true);
+
+      employees = dept
+        ? allEmployees.filter(emp =>
+            (shiftData[emp.id] || []).some(s => s.department_id === dept)
+          )
+        : allEmployees;
 
       // 4. Load existing approvals from Supabase
       const allShiftIds = Object.values(shiftData).flat().map(s => String(s.shift_id));
@@ -401,7 +408,7 @@
           const timeIn   = appr?.edited_time_in  || appr?.original_time_in  || shift.in?.time  || null;
           const timeOut  = appr?.edited_time_out || appr?.original_time_out || shift.out?.time || null;
           const isOpen   = !timeOut;   // currently checked in, no clock-out yet
-          const mins     = appr?.total_minutes ?? shift.total_minutes ?? 0;
+          const mins     = isOpen ? 0 : (appr?.total_minutes ?? shift.total_minutes ?? 0);
           const status   = appr?.status || 'pending';
           const edited   = !!(appr?.edited_time_in || appr?.edited_time_out);
 
