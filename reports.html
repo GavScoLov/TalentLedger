@@ -2627,7 +2627,31 @@
 
     /* ─── Generate handler ──────────────────────────────────── */
     let activeReport     = null;
-    let autoMonthOffset  = 0;   // 0 = current month, -1 = last month, etc.
+    let autoMonthOffset  = 0;    // offset in months from autoMonthBase
+    let autoMonthBase    = null; // the reference date whose month is "offset 0"
+
+    /**
+     * Returns the "reference Sunday" used as the default month anchor.
+     *
+     * Data for a given week isn't finalized until Thu/Fri, so:
+     *  - Mon–Thu  → use the Sunday from 2 weeks ago
+     *  - Fri–Sun  → use last week's Sunday
+     *
+     * The month that Sunday falls in becomes the default report month.
+     */
+    function getAutoMonthBase() {
+      const today = new Date();
+      const dow   = today.getDay(); // 0=Sun 1=Mon … 6=Sat
+
+      // Step back to last Sunday (never today even if today is Sunday)
+      const lastSunday = new Date(today);
+      lastSunday.setDate(today.getDate() - (dow === 0 ? 7 : dow));
+
+      // Mon–Thu: go one more week back
+      if (dow >= 1 && dow <= 4) lastSunday.setDate(lastSunday.getDate() - 7);
+
+      return lastSunday;
+    }
 
     async function runReport(reportKey, navOffset = null) {
       const report = REPORTS[reportKey];
@@ -2638,11 +2662,16 @@
       let dateRange;
 
       if (isAutoMonth) {
-        // navOffset !== null means prev/next navigation; null means a fresh card click (reset)
-        autoMonthOffset = navOffset !== null ? navOffset : 0;
-        const n = new Date();
-        const s = new Date(n.getFullYear(), n.getMonth() + autoMonthOffset, 1);
-        const e = new Date(n.getFullYear(), n.getMonth() + autoMonthOffset + 1, 0);
+        if (navOffset !== null) {
+          // Prev/Next click — keep existing base, just shift the offset
+          autoMonthOffset = navOffset;
+        } else {
+          // Fresh card click — recompute base and reset offset
+          autoMonthBase   = getAutoMonthBase();
+          autoMonthOffset = 0;
+        }
+        const s = new Date(autoMonthBase.getFullYear(), autoMonthBase.getMonth() + autoMonthOffset, 1);
+        const e = new Date(autoMonthBase.getFullYear(), autoMonthBase.getMonth() + autoMonthOffset + 1, 0);
         dateRange = { start: toDateStr(s), end: toDateStr(e) };
       } else if (isDhp) {
         dateRange = getDhpDateRange();
