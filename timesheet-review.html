@@ -142,7 +142,7 @@
           <option value="">All Departments</option>
         </select>
         <button class="btn-live-toggle" id="btn-live-toggle" onclick="toggleLive()">
-          <span class="live-dot">●</span> Live Workers <span class="live-count" id="live-count">0</span>
+          <span class="live-dot">●</span> Clocked In <span class="live-count" id="live-count">0</span>
         </button>
         <button class="btn-today" id="btn-expand-all" onclick="expandCollapseAll()" style="min-width:110px;">⊞ Expand All</button>
         <div class="toolbar-spacer"></div>
@@ -473,7 +473,7 @@
           if (isOpen) {
             // Live / currently clocked in — calculate elapsed
             const elapsedMins = timeIn ? Math.round((Date.now() - new Date(timeIn)) / 60000) : 0;
-            badge = `<span class="badge" style="background:#DCFCE7;color:#15803d;animation:pulse 2s infinite;">● Live</span>`
+            badge = `<span class="badge" style="background:#DCFCE7;color:#15803d;animation:pulse 2s infinite;">● Clocked In</span>`
                   + (elapsedMins > 0 ? ` <span style="font-size:.72rem;color:#6B7280;">${fmtMins(elapsedMins)} so far</span>` : '');
           } else if (status === 'approved') {
             badge = '<span class="badge badge-approved">Approved</span>';
@@ -519,7 +519,7 @@
       totalWorkers++;
 
       const liveBadge = emp.currentlyIn
-        ? `<span style="background:#DCFCE7;color:#15803d;border-radius:999px;font-size:.68rem;font-weight:700;padding:2px 8px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;animation:pulse 2s infinite;">● Live</span>`
+        ? `<span style="background:#DCFCE7;color:#15803d;border-radius:999px;font-size:.68rem;font-weight:700;padding:2px 8px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;animation:pulse 2s infinite;">● Clocked In</span>`
         : '';
 
       return `<div class="emp-card collapsed" id="card-${emp.id}">
