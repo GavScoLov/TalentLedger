@@ -186,18 +186,18 @@ a:hover { text-decoration: underline; }
 }
 .sidebar-section-group:hover .sidebar-section-trigger-chevron { opacity: 0.9; }
 
-/* The flyout panel — appears to the right on hover */
+/* The flyout panel — fixed position so it escapes sidebar overflow clipping */
 .sidebar-flyout {
-  position: absolute;
-  left: calc(var(--sidebar-width) - 8px);
-  top: 0;
+  position: fixed;
+  left: var(--sidebar-width);
+  top: auto; /* set by JS */
   min-width: 210px;
   background: #fff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   padding: 6px;
-  z-index: 300;
+  z-index: 400;
   /* Hidden by default */
   opacity: 0;
   pointer-events: none;

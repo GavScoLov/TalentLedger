@@ -224,6 +224,25 @@ export async function renderSidebar() {
     document.getElementById('sidebar-overlay').classList.remove('open');
   });
 
+  // Position each flyout vertically to align with its trigger row.
+  // Uses fixed positioning (to escape sidebar overflow:auto clipping).
+  // Run once on load and recalculate on scroll/resize.
+  function positionFlyouts() {
+    document.querySelectorAll('.sidebar-section-group').forEach(group => {
+      const trigger = group.querySelector('.sidebar-section-trigger');
+      const flyout  = group.querySelector('.sidebar-flyout');
+      if (!trigger || !flyout) return;
+      const rect = trigger.getBoundingClientRect();
+      flyout.style.top = rect.top + 'px';
+    });
+  }
+
+  positionFlyouts();
+
+  // Re-position on sidebar scroll and window resize
+  document.getElementById('sidebar')?.addEventListener('scroll', positionFlyouts);
+  window.addEventListener('resize', positionFlyouts);
+
   // On mobile: tap to toggle flyout open/closed
   document.querySelectorAll('.sidebar-section-trigger').forEach(trigger => {
     trigger.addEventListener('click', () => {
