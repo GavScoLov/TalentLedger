@@ -1,20 +1,5 @@
-// Server-side PSA data fetcher + report CSV + PDF generators
-// Mirrors the logic in reports.html but runs in Node.js / Vercel serverless.
+// Server-side PSA data fetcher + report generators (CSV + inline HTML tables)
 // Used by api/cron/send-reports.js and api/send-report-now.js
-
-import { createRequire } from 'module';
-// pdfkit is loaded lazily so a missing bundle never crashes the whole module
-const _req = createRequire(import.meta.url);
-let _PDFDocument = null;
-function getPDFDocument() {
-  if (_PDFDocument) return _PDFDocument;
-  try {
-    _PDFDocument = _req('pdfkit');
-  } catch (e) {
-    console.error('[report-data] pdfkit unavailable — PDFs will be skipped:', e.message);
-  }
-  return _PDFDocument;
-}
 
 const PSA_BASE = 'https://api.psastaffing.com';
 
@@ -111,7 +96,7 @@ function sortedWeeksFrom(weekSet) {
 
 // ── Week date-range label helpers ─────────────────────────────────────────────
 
-/** "2026-04-05" → "3/30-4/5"  (6 days back through the weekend-end date) */
+/** "2026-04-05" → "3/30-4/5" */
 function weekRangeLabel(weekEndStr) {
   if (!weekEndStr || weekEndStr === '—') return '—';
   const end = new Date(weekEndStr + 'T00:00:00Z');
@@ -132,163 +117,106 @@ function monthYearTitle(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-// ── PDF helpers (pdfkit) ──────────────────────────────────────────────────────
+// ── HTML escape ───────────────────────────────────────────────────────────────
 
-const C_BRAND  = '#EA8938';
-const C_DARK   = '#1A1A2E';
-const C_YELLOW = '#FFF9C4';
-const C_GREEN  = '#E8F5E9';
-const C_ALT    = '#F9F9F9';
-const C_BORDER = '#CCCCCC';
-const ROW_H    = 17;
-
-/** Hex colour → [r, g, b] 0-255 */
-function hexRgb(hex) {
-  const h = hex.replace('#', '');
-  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ── HTML table builders ───────────────────────────────────────────────────────
+
+const TD_BASE = 'padding:5px 9px;border:1px solid #e0e0e0;font-size:11px;white-space:nowrap;font-family:Arial,sans-serif;';
 
 /**
- * Draw one table row onto a pdfkit doc.
- * Returns the new y position (y + h).
+ * Build an inline HTML table for DHP-style reports.
+ * allRows[0] = title row, [1] = column headers, [2] = blank, [3…] = data, last row[1]==='TOTALS'
  */
-function drawRow(doc, cells, x, y, colWidths, h, bg, fg, bold) {
-  const totalW = colWidths.reduce((s, w) => s + w, 0);
-  doc.save();
-  doc.fillColor(hexRgb(bg)).rect(x, y, totalW, h).fill();
-  doc.strokeColor(hexRgb(C_BORDER)).lineWidth(0.4).rect(x, y, totalW, h).stroke();
-  let cx = x;
-  for (let i = 0; i < cells.length; i++) {
-    const w  = colWidths[i];
-    const al = i === 0 ? 'left' : 'right';
-    doc.fillColor(hexRgb(fg))
-       .font(bold ? 'Helvetica-Bold' : 'Helvetica')
-       .fontSize(8)
-       .text(String(cells[i] ?? ''), cx + 3, y + Math.round((h - 8) / 2), {
-         width: w - 6, align: al, lineBreak: false,
-       });
-    cx += w;
-  }
-  doc.restore();
-  return y + h;
-}
-
-/**
- * Draw a full report table (title bar + header + data + optional totals row).
- * Handles page breaks and re-draws the header row on each new page.
- */
-function drawTable(doc, { title, headerRow, dataRows, totalsRow, colWidths }) {
-  const left  = 30;
-  let   y     = doc.y ?? 30;
-
-  const checkBreak = () => {
-    if (y + ROW_H > doc.page.height - 40) {
-      doc.addPage();
-      y = 30;
-      y = drawRow(doc, headerRow, left, y, colWidths, ROW_H, C_DARK, '#FFFFFF', true);
-    }
-  };
-
-  // Optional title bar
-  if (title) {
-    const totalW = colWidths.reduce((s, w) => s + w, 0);
-    doc.save();
-    doc.fillColor(hexRgb(C_BRAND)).rect(left, y, totalW, 24).fill();
-    doc.fillColor(hexRgb('#FFFFFF')).font('Helvetica-Bold').fontSize(12)
-       .text(title, left + 8, y + 5, { width: totalW - 16, lineBreak: false });
-    doc.restore();
-    y += 24 + 4;
-  }
-
-  // Column header row
-  y = drawRow(doc, headerRow, left, y, colWidths, ROW_H, C_DARK, '#FFFFFF', true);
-
-  // Data rows
-  dataRows.forEach((row, ri) => {
-    const isBlank      = row.every(c => c === '' || c == null);
-    const first        = String(row[0] ?? '');
-    const isBranchTot  = first.startsWith('Total ');
-
-    if (isBlank) { y += 5; return; }
-    checkBreak();
-
-    const bg   = isBranchTot ? C_GREEN : (ri % 2 === 1 ? C_ALT : '#FFFFFF');
-    y = drawRow(doc, row, left, y, colWidths, ROW_H, bg, '#000000', isBranchTot);
-  });
-
-  // Grand totals row (DHP only)
-  if (totalsRow) {
-    checkBreak();
-    y = drawRow(doc, totalsRow, left, y, colWidths, ROW_H, C_YELLOW, '#000000', true);
-  }
-
-  doc.y = y;
-}
-
-/** Calculate column widths given total usable width and column count breakdown. */
-function dhpColWidths(numCols, usableW) {
-  const weekCount = numCols - 3;           // Company, Branch, ...weeks, Total
-  const compW  = 180, branchW = 42, totW = 68;
-  const avail  = usableW - compW - branchW - totW;
-  const weekW  = Math.max(48, avail / weekCount);
-  return [compW, branchW, ...Array(weekCount).fill(weekW), totW];
-}
-
-function psaColWidths(numCols, usableW) {
-  const weekCount = numCols - 2;           // Company, ...weeks, Total
-  const compW = 200, totW = 70;
-  const weekW = Math.max(48, (usableW - compW - totW) / weekCount);
-  return [compW, ...Array(weekCount).fill(weekW), totW];
-}
-
-/** Wrap pdfkit document stream into a Buffer promise, or null if pdfkit unavailable */
-function renderPdf(builderFn) {
-  const PDFDocument = getPDFDocument();
-  if (!PDFDocument) return Promise.resolve(null);
-  return new Promise((resolve, reject) => {
-    try {
-      const doc    = new PDFDocument({ layout: 'landscape', size: 'LETTER', margin: 30, autoFirstPage: true });
-      const chunks = [];
-      doc.on('data',  c => chunks.push(c));
-      doc.on('end',   () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-      builderFn(doc);
-      doc.end();
-    } catch (e) { reject(e); }
-  });
-}
-
-/**
- * Build a PDF for DHP-style reports.
- * allRows[0] = title row, [1] = header row, [2] = blank, [3…] = data, last = totals (row[1]==='TOTALS')
- */
-function buildDhpPdf(allRows) {
+function buildDhpHtmlTable(allRows) {
   const numCols   = allRows[0].length;
-  const title     = String(allRows[0][0]);
+  const title     = esc(String(allRows[0][0]));
   const headerRow = allRows[1];
-  const totalsRow = allRows.find(r => r[1] === 'TOTALS') ?? null;
+  const totalsRow = allRows.find(r => r[1] === 'TOTALS');
   const dataRows  = allRows.slice(2).filter(r => r[1] !== 'TOTALS');
-  return renderPdf(doc => {
-    const usableW  = doc.page.width - 60;
-    const colWidths = dhpColWidths(numCols, usableW);
-    drawTable(doc, { title, headerRow, dataRows, totalsRow, colWidths });
+
+  let html = `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">`;
+
+  // Orange title bar
+  html += `<tr><td colspan="${numCols}" bgcolor="#EA8938" style="${TD_BASE}background:#EA8938;color:#fff;font-weight:700;font-size:13px;padding:8px 12px;">${title}</td></tr>`;
+
+  // Dark header row
+  html += `<tr>`;
+  headerRow.forEach((h, i) => {
+    const align = i >= 2 ? 'right' : 'left';
+    html += `<td bgcolor="#1A1A2E" style="${TD_BASE}background:#1A1A2E;color:#fff;font-weight:700;text-align:${align};">${esc(h)}</td>`;
   });
+  html += `</tr>`;
+
+  // Data rows (skip blank separator rows)
+  dataRows.forEach((row, ri) => {
+    if (row.every(c => c === '' || c == null)) return;
+    const bg = ri % 2 === 1 ? '#F9F9F9' : '#FFFFFF';
+    html += `<tr>`;
+    row.forEach((cell, ci) => {
+      const align = ci >= 2 ? 'right' : 'left';
+      html += `<td bgcolor="${bg}" style="${TD_BASE}background:${bg};text-align:${align};">${esc(cell)}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  // Yellow totals row
+  if (totalsRow) {
+    html += `<tr>`;
+    totalsRow.forEach((cell, ci) => {
+      const align = ci >= 2 ? 'right' : 'left';
+      html += `<td bgcolor="#FFF9C4" style="${TD_BASE}background:#FFF9C4;font-weight:700;text-align:${align};">${esc(cell)}</td>`;
+    });
+    html += `</tr>`;
+  }
+
+  html += `</table>`;
+  return html;
 }
 
 /**
- * Build a PDF for PSA-style reports.
- * headerRow = ["April 2026", dates…, "TOTALS"], rows = company + Total-branch + blank rows
+ * Build an inline HTML table for PSA billing monthly.
+ * headerRow = ["April 2026", week ranges…, "TOTALS"]
+ * rows = company rows + "Total [Branch]" rows + blank separators
  */
-function buildPsaPdf(headerRow, rows) {
-  const numCols = headerRow.length;
-  return renderPdf(doc => {
-    const usableW   = doc.page.width - 60;
-    const colWidths = psaColWidths(numCols, usableW);
-    drawTable(doc, { title: null, headerRow, dataRows: rows, totalsRow: null, colWidths });
+function buildPsaHtmlTable(headers, rows) {
+  let html = `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">`;
+
+  // Dark header row
+  html += `<tr>`;
+  headers.forEach((h, i) => {
+    const align = i === 0 ? 'left' : 'right';
+    html += `<td bgcolor="#1A1A2E" style="${TD_BASE}background:#1A1A2E;color:#fff;font-weight:700;text-align:${align};">${esc(h)}</td>`;
   });
+  html += `</tr>`;
+
+  let dataIdx = 0;
+  rows.forEach(row => {
+    if (row.every(c => c === '' || c == null)) return; // skip blank separators
+    const first   = String(row[0] ?? '');
+    const isTotal = first.startsWith('Total ');
+    const bg      = isTotal ? '#E8F5E9' : (dataIdx % 2 === 0 ? '#F9F9F9' : '#FFFFFF');
+    const bold    = isTotal ? 'font-weight:700;' : '';
+    if (!isTotal) dataIdx++;
+
+    html += `<tr>`;
+    row.forEach((cell, ci) => {
+      const align = ci === 0 ? 'left' : 'right';
+      html += `<td bgcolor="${bg}" style="${TD_BASE}${bold}background:${bg};text-align:${align};">${esc(cell)}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</table>`;
+  return html;
 }
 
-// ── Report generators (each returns { csv, pdf, filename, pdfFilename }) ──────
+// ── Report generators (each returns { csv, html, filename }) ─────────────────
 
 export async function genDhpHours(start, end) {
   const data    = await fetchEmployeeHours(start, end);
@@ -309,13 +237,12 @@ export async function genDhpHours(start, end) {
   const weeks      = sortedWeeksFrom(weekSet);
   const weekLabels = weeks.map(weekRangeLabel);
   const numCols    = 2 + weeks.length + 1;
-  const emptyRow   = Array(numCols).fill('');
   const titleLabel = monthYearUpper(start);
 
   const allRows = [
     [`${titleLabel} DHP HOURS`, ...Array(numCols - 1).fill('')],
     ['Company', 'Branch', ...weekLabels, 'Total DHP Hours'],
-    emptyRow,
+    Array(numCols).fill(''),
   ];
 
   const weekTotals = weeks.map(() => 0);
@@ -324,23 +251,17 @@ export async function genDhpHours(start, end) {
     const vals  = weeks.map(w => wData[w] || 0);
     const total = vals.reduce((s, v) => s + v, 0);
     vals.forEach((v, i) => { weekTotals[i] += v; });
-    allRows.push([
-      company, branch,
-      ...vals.map(v => v > 0 ? v.toFixed(2) : ''),
-      total > 0 ? total.toFixed(2) : '',
-    ]);
+    allRows.push([company, branch, ...vals.map(v => v > 0 ? v.toFixed(2) : ''), total > 0 ? total.toFixed(2) : '']);
   }
 
   const grandTotal = weekTotals.reduce((s, v) => s + v, 0);
-  allRows.push([
-    '', 'TOTALS',
-    ...weekTotals.map(v => v > 0 ? v.toFixed(2) : '-'),
-    grandTotal > 0 ? grandTotal.toFixed(2) : '-',
-  ]);
+  allRows.push(['', 'TOTALS', ...weekTotals.map(v => v > 0 ? v.toFixed(2) : '-'), grandTotal > 0 ? grandTotal.toFixed(2) : '-']);
 
-  const csv = toCSV(allRows[0], allRows.slice(1));
-  const pdf = await buildDhpPdf(allRows).catch(() => null);
-  return { csv, pdf, filename: 'monthly-dhp-hours.csv', pdfFilename: pdf ? 'monthly-dhp-hours.pdf' : null };
+  return {
+    csv:      toCSV(allRows[0], allRows.slice(1)),
+    html:     buildDhpHtmlTable(allRows),
+    filename: 'monthly-dhp-hours.csv',
+  };
 }
 
 export async function genDhpHeadcount(start, end) {
@@ -362,13 +283,12 @@ export async function genDhpHeadcount(start, end) {
   const weeks      = sortedWeeksFrom(weekSet);
   const weekLabels = weeks.map(weekRangeLabel);
   const numCols    = 2 + weeks.length + 1;
-  const emptyRow   = Array(numCols).fill('');
   const titleLabel = monthYearUpper(start);
 
   const allRows = [
     [`${titleLabel} DHP HEADCOUNT`, ...Array(numCols - 1).fill('')],
     ['Company', 'Branch', ...weekLabels, 'Total DHP Headcount'],
-    emptyRow,
+    Array(numCols).fill(''),
   ];
 
   const weekTotals = weeks.map(() => 0);
@@ -377,23 +297,17 @@ export async function genDhpHeadcount(start, end) {
     const vals  = weeks.map(w => wData[w] || 0);
     const total = vals.reduce((s, v) => s + v, 0);
     vals.forEach((v, i) => { weekTotals[i] += v; });
-    allRows.push([
-      company, branch,
-      ...vals.map(v => v > 0 ? v : ''),
-      total > 0 ? total : '',
-    ]);
+    allRows.push([company, branch, ...vals.map(v => v > 0 ? v : ''), total > 0 ? total : '']);
   }
 
   const grandTotal = weekTotals.reduce((s, v) => s + v, 0);
-  allRows.push([
-    '', 'TOTALS',
-    ...weekTotals.map(v => v > 0 ? v : 0),
-    grandTotal,
-  ]);
+  allRows.push(['', 'TOTALS', ...weekTotals.map(v => v > 0 ? v : 0), grandTotal]);
 
-  const csv = toCSV(allRows[0], allRows.slice(1));
-  const pdf = await buildDhpPdf(allRows).catch(() => null);
-  return { csv, pdf, filename: 'monthly-dhp-headcount.csv', pdfFilename: pdf ? 'monthly-dhp-headcount.pdf' : null };
+  return {
+    csv:      toCSV(allRows[0], allRows.slice(1)),
+    html:     buildDhpHtmlTable(allRows),
+    filename: 'monthly-dhp-headcount.csv',
+  };
 }
 
 export async function genDhpBilling(start, end) {
@@ -415,13 +329,12 @@ export async function genDhpBilling(start, end) {
   const weeks      = sortedWeeksFrom(weekSet);
   const weekLabels = weeks.map(weekRangeLabel);
   const numCols    = 2 + weeks.length + 1;
-  const emptyRow   = Array(numCols).fill('');
   const titleLabel = monthYearUpper(start);
 
   const allRows = [
     [`${titleLabel} DHP BILLING`, ...Array(numCols - 1).fill('')],
     ['Company', 'Branch', ...weekLabels, 'Total DHP Billing'],
-    emptyRow,
+    Array(numCols).fill(''),
   ];
 
   const weekTotals = weeks.map(() => 0);
@@ -430,23 +343,17 @@ export async function genDhpBilling(start, end) {
     const vals  = weeks.map(w => wData[w] || 0);
     const total = vals.reduce((s, v) => s + v, 0);
     vals.forEach((v, i) => { weekTotals[i] += v; });
-    allRows.push([
-      company, branch,
-      ...vals.map(v => v > 0 ? `$${v.toFixed(2)}` : ''),
-      total > 0 ? `$${total.toFixed(2)}` : '',
-    ]);
+    allRows.push([company, branch, ...vals.map(v => v > 0 ? `$${v.toFixed(2)}` : ''), total > 0 ? `$${total.toFixed(2)}` : '']);
   }
 
   const grandTotal = weekTotals.reduce((s, v) => s + v, 0);
-  allRows.push([
-    `${titleLabel} BILLING GRAND TOTAL`, 'TOTALS',
-    ...weekTotals.map(v => `$${v.toFixed(2)}`),
-    `$${grandTotal.toFixed(2)}`,
-  ]);
+  allRows.push([`${titleLabel} BILLING GRAND TOTAL`, 'TOTALS', ...weekTotals.map(v => `$${v.toFixed(2)}`), `$${grandTotal.toFixed(2)}`]);
 
-  const csv = toCSV(allRows[0], allRows.slice(1));
-  const pdf = await buildDhpPdf(allRows).catch(() => null);
-  return { csv, pdf, filename: 'monthly-dhp-billing.csv', pdfFilename: pdf ? 'monthly-dhp-billing.pdf' : null };
+  return {
+    csv:      toCSV(allRows[0], allRows.slice(1)),
+    html:     buildDhpHtmlTable(allRows),
+    filename: 'monthly-dhp-billing.csv',
+  };
 }
 
 export async function genPsaBillingMonthly(start, end) {
@@ -499,9 +406,11 @@ export async function genPsaBillingMonthly(start, end) {
     rows.push(emptyRow);
   }
 
-  const csv = toCSV(headers, rows);
-  const pdf = await buildPsaPdf(headers, rows).catch(() => null);
-  return { csv, pdf, filename: 'psa-billing-monthly.csv', pdfFilename: pdf ? 'psa-billing-monthly.pdf' : null };
+  return {
+    csv:      toCSV(headers, rows),
+    html:     buildPsaHtmlTable(headers, rows),
+    filename: 'psa-billing-monthly.csv',
+  };
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
@@ -515,26 +424,22 @@ export const REPORT_GENERATORS = {
 
 // ── Email HTML builder ────────────────────────────────────────────────────────
 
-function escHtml(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 export function buildEmailHtml(automationName, monthLabel, reportItems, appUrl) {
-  const itemsHtml = reportItems.map(item => `
-    <tr>
-      <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;">
-        <strong style="color:#1a1a2e;">${escHtml(item.title)}</strong>
-        ${item.error
-          ? `<span style="color:#dc2626;font-size:13px;margin-left:8px;">⚠ ${escHtml(item.error)}</span>`
-          : `<span style="color:#16a34a;font-size:13px;margin-left:8px;">
-               ✓ ${escHtml(item.filename)}
-               ${item.pdfFilename ? `&nbsp;·&nbsp;${escHtml(item.pdfFilename)}` : ''}
-               attached
-             </span>`}
-      </td>
-    </tr>`).join('');
+  const reportsHtml = reportItems.map(item => `
+    <div style="margin-bottom:32px;">
+      <div style="font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #EA8938;display:inline-block;">
+        ${esc(item.title)}
+      </div>
+      ${item.error
+        ? `<p style="color:#dc2626;font-size:13px;margin:0;">⚠ Failed to generate: ${esc(item.error)}</p>`
+        : `<div style="overflow-x:auto;">${item.html || ''}</div>`
+      }
+    </div>`).join('');
+
+  const csvList = reportItems
+    .filter(i => !i.error && i.filename)
+    .map(i => esc(i.filename))
+    .join(', ');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -542,28 +447,23 @@ export function buildEmailHtml(automationName, monthLabel, reportItems, appUrl) 
 <body style="margin:0;padding:0;background:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 16px;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+      <table cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);width:100%;max-width:900px;">
 
         <!-- Header -->
         <tr>
           <td style="background:#EA8938;padding:28px 32px;">
             <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;color:rgba(255,255,255,0.75);text-transform:uppercase;margin-bottom:6px;">TalentLedger Reports</div>
-            <div style="font-size:22px;font-weight:700;color:#fff;">${escHtml(automationName)}</div>
-            <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px;">${escHtml(monthLabel)}</div>
+            <div style="font-size:22px;font-weight:700;color:#fff;">${esc(automationName)}</div>
+            <div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px;">${esc(monthLabel)}</div>
           </td>
         </tr>
 
-        <!-- Body -->
+        <!-- Report tables -->
         <tr>
           <td style="padding:28px 32px;">
-            <p style="margin:0 0 16px;font-size:15px;color:#444;">Your scheduled reports are ready. CSV and PDF files are attached to this email.</p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #f0f0f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
-              <tr style="background:#f8f9fa;">
-                <td style="padding:8px 16px;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Reports included</td>
-              </tr>
-              ${itemsHtml}
-            </table>
-            <p style="margin:0 0 16px;font-size:13px;color:#666;">To view interactive reports, export PDFs, or change date ranges, open TalentLedger:</p>
+            ${reportsHtml}
+            ${csvList ? `<p style="margin:0 0 16px;font-size:12px;color:#888;">📎 CSV attachments: ${csvList}</p>` : ''}
+            <p style="margin:0 0 16px;font-size:13px;color:#666;">To view interactive reports or change date ranges, open TalentLedger:</p>
             <a href="${appUrl}/reports.html" style="display:inline-block;background:#EA8938;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">Open Reports →</a>
           </td>
         </tr>
