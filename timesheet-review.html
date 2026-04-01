@@ -144,6 +144,7 @@
         <button class="btn-live-toggle" id="btn-live-toggle" onclick="toggleLive()">
           <span class="live-dot">●</span> Live Workers <span class="live-count" id="live-count">0</span>
         </button>
+        <button class="btn-today" id="btn-expand-all" onclick="expandCollapseAll()" style="min-width:110px;">⊞ Expand All</button>
         <div class="toolbar-spacer"></div>
         <button class="btn-refresh" onclick="refreshAll()">↻ Refresh from TimeStation</button>
         <button class="btn-approve-all" onclick="approveAll()">✓ Approve All Visible</button>
@@ -517,10 +518,14 @@
       if (!rows.trim()) return '';
       totalWorkers++;
 
-      return `<div class="emp-card" id="card-${emp.id}">
+      const liveBadge = emp.currentlyIn
+        ? `<span style="background:#DCFCE7;color:#15803d;border-radius:999px;font-size:.68rem;font-weight:700;padding:2px 8px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;vertical-align:middle;animation:pulse 2s infinite;">● Live</span>`
+        : '';
+
+      return `<div class="emp-card collapsed" id="card-${emp.id}">
         <div class="emp-card-header" onclick="toggleCard('${emp.id}')">
           <span class="emp-chevron">▾</span>
-          <span class="emp-name">${escHtml(emp.name)}</span>
+          <span class="emp-name">${escHtml(emp.name)}${liveBadge}</span>
           <span class="emp-dept">${escHtml(emp.dept)}</span>
           <span class="emp-total">${fmtMins(empMins)}</span>
           <button class="emp-approve-week" onclick="event.stopPropagation();approveWeek('${emp.id}')">✓ Approve Week</button>
@@ -559,6 +564,13 @@
   // ── Card toggle ───────────────────────────────────────────
   window.toggleCard = function(empId) {
     document.getElementById('card-' + empId)?.classList.toggle('collapsed');
+  };
+
+  window.expandCollapseAll = function() {
+    const cards = document.querySelectorAll('.emp-card');
+    const anyCollapsed = [...cards].some(c => c.classList.contains('collapsed'));
+    cards.forEach(c => c.classList.toggle('collapsed', !anyCollapsed));
+    document.getElementById('btn-expand-all').textContent = anyCollapsed ? '⊟ Collapse All' : '⊞ Expand All';
   };
 
   // ── Inline edit ───────────────────────────────────────────
