@@ -113,6 +113,24 @@
 
             <div id="status-msg" class="status-msg"></div>
 
+            <!-- Add New User form -->
+            <div class="card" style="padding: 16px; margin-bottom: 16px; overflow: visible;">
+                <h3 style="font-size:0.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">Add New User</h3>
+                <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:180px;">
+                        <label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--text-secondary);">Email</label>
+                        <input type="email" id="invite-email" placeholder="user@example.com"
+                            style="width:100%;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);font-size:0.875rem;font-family:inherit;">
+                    </div>
+                    <div style="flex:1;min-width:180px;">
+                        <label style="display:block;font-size:0.8rem;font-weight:600;margin-bottom:4px;color:var(--text-secondary);">Temporary Password</label>
+                        <input type="text" id="invite-password" placeholder="min 6 characters"
+                            style="width:100%;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);font-size:0.875rem;font-family:inherit;">
+                    </div>
+                    <button class="save-btn" id="invite-user-btn" style="height:36px;">Invite User</button>
+                </div>
+            </div>
+
             <div class="card" style="padding: 0; overflow: visible;">
                 <div id="users-loading" class="loading">Loading users...</div>
                 <div id="users-empty" class="empty-state" style="display:none;">No users found.</div>
@@ -132,7 +150,7 @@
     </div>
 
     <script type="module">
-        import { checkAuth, isSuperAdmin, getAllUsers, updateUserRole, updateUserPages, deleteUserProfile } from './src/auth.js';
+        import { checkAuth, isSuperAdmin, getAllUsers, updateUserRole, updateUserPages, deleteUserProfile, createUserWithEmail } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
@@ -424,6 +442,29 @@
                 });
             });
         }
+
+        // Invite user handler
+        document.getElementById('invite-user-btn').addEventListener('click', async () => {
+            const emailInput = document.getElementById('invite-email');
+            const passInput  = document.getElementById('invite-password');
+            const email    = emailInput.value.trim();
+            const password = passInput.value.trim();
+            if (!email || !password) { showStatus('Please enter email and password.', 'error'); return; }
+            if (password.length < 6) { showStatus('Password must be at least 6 characters.', 'error'); return; }
+            const btn = document.getElementById('invite-user-btn');
+            btn.disabled = true; btn.textContent = 'Inviting…';
+            try {
+                await createUserWithEmail(email, password);
+                showStatus(`User ${email} invited successfully.`, 'success');
+                emailInput.value = ''; passInput.value = '';
+                setTimeout(async () => {
+                    try { let users = await getAllUsers(); renderUsers(users); } catch (e) {}
+                }, 2000);
+            } catch (err) {
+                showStatus('Failed: ' + err.message, 'error');
+            }
+            btn.disabled = false; btn.textContent = 'Invite User';
+        });
 
         // Load users
         try {

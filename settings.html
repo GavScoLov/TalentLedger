@@ -138,6 +138,53 @@
         }
         .mgmt-status.success { display: block; background: #DCFCE7; color: #16A34A; }
         .mgmt-status.error { display: block; background: #FEE2E2; color: #DC2626; }
+
+        /* ── Section group chip + dropdown (Users tab) ──────────────── */
+        .page-access-grid { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+        .section-group { position: relative; }
+        .section-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 11px 5px 12px; border-radius: 99px;
+            font-size: 0.8rem; font-weight: 500; cursor: pointer;
+            border: 1.5px solid var(--border-color); background: #fff;
+            color: var(--text-secondary); transition: all 0.15s;
+            white-space: nowrap; user-select: none;
+        }
+        .section-chip:hover { border-color: var(--primary); color: var(--primary); }
+        .section-chip.all-on  { background: rgba(234,137,56,0.10); border-color: var(--primary); color: var(--primary); }
+        .section-chip.some-on { background: rgba(234,137,56,0.05); border-color: var(--primary); color: var(--primary); opacity: 0.85; }
+        .section-chip .chip-label { pointer-events: none; }
+        .section-chip .chip-count {
+            font-size: 0.68rem; font-weight: 600; padding: 1px 6px;
+            border-radius: 99px; background: rgba(0,0,0,0.07); pointer-events: none;
+        }
+        .section-chip.all-on .chip-count,
+        .section-chip.some-on .chip-count { background: rgba(234,137,56,0.15); }
+        .chip-chevron { width: 12px; height: 12px; opacity: 0.5; flex-shrink: 0; pointer-events: none; transition: transform 0.15s; }
+        .section-group.open .chip-chevron { transform: rotate(180deg); }
+        .section-dropdown {
+            position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+            background: #fff; border: 1px solid var(--border-color);
+            border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+            padding: 5px; min-width: 195px;
+            opacity: 0; pointer-events: none;
+            transform: translateY(-4px); transition: opacity 0.13s, transform 0.13s;
+        }
+        .section-group.open .section-dropdown { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .dropdown-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 5px 8px 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 3px;
+        }
+        .dropdown-header-label { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .dropdown-select-all { font-size: 0.72rem; color: var(--primary); cursor: pointer; font-weight: 500; border: none; background: none; padding: 0; }
+        .dropdown-select-all:hover { text-decoration: underline; }
+        .page-option {
+            display: flex; align-items: center; gap: 8px; padding: 7px 8px;
+            border-radius: calc(var(--radius) - 2px); cursor: pointer; font-size: 0.83rem;
+            color: var(--text-primary); transition: background 0.1s; white-space: nowrap;
+        }
+        .page-option:hover { background: #F8F9FA; }
+        .page-option input[type="checkbox"] { cursor: pointer; accent-color: var(--primary); width: 14px; height: 14px; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -270,6 +317,7 @@
             <div class="tab-content" id="tab-users">
                 <div class="card" style="padding: 16px;">
                     <p class="section-desc">Invite new users and manage roles and page access for existing users.</p>
+                    <div id="users-status" class="mgmt-status"></div>
                     <div class="inline-form">
                         <div class="form-group">
                             <label class="form-label">Email</label>
@@ -928,16 +976,147 @@
         let mgmtCompanies = [];
         let mgmtUserCompanies = [];
 
-        const SITE_PAGES = [
-            { slug: 'dashboard', label: 'Dashboard' },
-            { slug: 'commission', label: 'Commission' },
-            { slug: 'data-visualization', label: 'Descending Revenue' },
-            { slug: 'hours-breakdown', label: 'Hours Breakdown' },
-            { slug: 'profit-loss', label: 'Profit & Loss' },
-            { slug: 'state-tax', label: 'State Tax' },
-            { slug: 'roster-tracker', label: 'Company Tracker' },
-            { slug: 'settings', label: 'Settings' },
+        const SITE_SECTIONS = [
+            {
+                label: 'Analytics',
+                pages: [
+                    { slug: 'dashboard',         label: 'Dashboard' },
+                    { slug: 'commission',         label: 'Commission' },
+                    { slug: 'data-visualization', label: 'Descending Revenue' },
+                    { slug: 'hours-breakdown',    label: 'Hours Breakdown' },
+                    { slug: 'profit-loss',        label: 'Profit & Loss' },
+                ],
+            },
+            {
+                label: 'Time & Staffing',
+                pages: [
+                    { slug: 'time-tracker', label: 'Time Tracker' },
+                    { slug: 'timecards',    label: 'Timecards' },
+                    { slug: 'tempworks',    label: 'TempWorks' },
+                ],
+            },
+            {
+                label: 'Reports',
+                pages: [
+                    { slug: 'reports', label: 'Reports' },
+                ],
+            },
+            {
+                label: 'Company Tracker',
+                pages: [
+                    { slug: 'roster-tracker', label: 'Company Tracker' },
+                ],
+            },
+            {
+                label: 'State Tax',
+                pages: [
+                    { slug: 'state-tax', label: 'State Tax' },
+                ],
+            },
+            {
+                label: 'Settings & Admin',
+                pages: [
+                    { slug: 'settings', label: 'Settings' },
+                ],
+            },
         ];
+
+        /* ── Status for Users tab ──────────────────────────── */
+        function showUsersStatus(msg, type) {
+            const el = document.getElementById('users-status');
+            el.textContent = msg;
+            el.className = 'mgmt-status ' + type;
+            setTimeout(() => { el.className = 'mgmt-status'; }, 4000);
+        }
+
+        /* ── Build section chip HTML ───────────────────────── */
+        function buildPageAccessHTML(allowedPages) {
+            return SITE_SECTIONS.map((sec, si) => {
+                const slugs   = sec.pages.map(p => p.slug);
+                const onCount = slugs.filter(s => allowedPages.includes(s)).length;
+                const total   = slugs.length;
+                const chipCls = onCount === total ? 'all-on' : onCount > 0 ? 'some-on' : '';
+
+                const pagesHTML = sec.pages.map(p => `
+                    <label class="page-option">
+                        <input type="checkbox" value="${p.slug}" ${allowedPages.includes(p.slug) ? 'checked' : ''}>
+                        <span>${p.label}</span>
+                    </label>`).join('');
+
+                return `
+                <div class="section-group" data-si="${si}">
+                    <button type="button" class="section-chip ${chipCls}" data-si="${si}">
+                        <span class="chip-label">${sec.label}</span>
+                        <span class="chip-count">${onCount}/${total}</span>
+                        <svg class="chip-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+                    </button>
+                    <div class="section-dropdown">
+                        <div class="dropdown-header">
+                            <span class="dropdown-header-label">${sec.label}</span>
+                            <button type="button" class="dropdown-select-all" data-si="${si}">
+                                ${onCount === total ? 'Deselect all' : 'Select all'}
+                            </button>
+                        </div>
+                        ${pagesHTML}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        /* ── Refresh chip state after checkbox changes ─────── */
+        function refreshChip(group) {
+            const inputs  = group.querySelectorAll('.page-option input');
+            const onCount = [...inputs].filter(i => i.checked).length;
+            const total   = inputs.length;
+            const chip    = group.querySelector('.section-chip');
+            const count   = group.querySelector('.chip-count');
+            const selAll  = group.querySelector('.dropdown-select-all');
+            chip.classList.toggle('all-on',  onCount === total);
+            chip.classList.toggle('some-on', onCount > 0 && onCount < total);
+            count.textContent = `${onCount}/${total}`;
+            if (selAll) selAll.textContent = onCount === total ? 'Deselect all' : 'Select all';
+        }
+
+        /* ── Attach dropdown / toggle listeners ────────────── */
+        function attachPageAccessListeners(container) {
+            container.querySelectorAll('.section-group').forEach(group => {
+                let closeTimer = null;
+                function openDropdown()  { clearTimeout(closeTimer); group.classList.add('open'); }
+                function scheduleClose() { closeTimer = setTimeout(() => group.classList.remove('open'), 120); }
+                group.addEventListener('mouseenter', openDropdown);
+                group.addEventListener('mouseleave', scheduleClose);
+
+                group.querySelector('.section-chip').addEventListener('click', () => {
+                    const inputs = group.querySelectorAll('.page-option input');
+                    const allOn  = [...inputs].every(i => i.checked);
+                    inputs.forEach(i => i.checked = !allOn);
+                    refreshChip(group);
+                });
+
+                group.querySelector('.dropdown-select-all')?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const inputs = group.querySelectorAll('.page-option input');
+                    const allOn  = [...inputs].every(i => i.checked);
+                    inputs.forEach(i => i.checked = !allOn);
+                    refreshChip(group);
+                });
+
+                group.querySelectorAll('.page-option input').forEach(input => {
+                    input.addEventListener('change', () => refreshChip(group));
+                });
+            });
+
+            document.addEventListener('click', e => {
+                if (!e.target.closest('.section-group')) {
+                    container.querySelectorAll('.section-group.open').forEach(g => g.classList.remove('open'));
+                }
+            }, { capture: true });
+        }
+
+        /* ── Collect all checked slugs from a row ──────────── */
+        function getCheckedPages(row) {
+            return [...row.querySelectorAll('.page-option input:checked')].map(i => i.value);
+        }
 
         function showMgmtStatus(msg, type) {
             const el = document.getElementById('mgmt-status');
@@ -1010,23 +1189,26 @@
         // ── USERS ────────────────────────────────
         function renderUsers() {
             const loading = document.getElementById('users-loading');
-            const empty = document.getElementById('users-empty');
-            const table = document.getElementById('users-table');
-            const tbody = document.getElementById('users-tbody');
+            const empty   = document.getElementById('users-empty');
+            const table   = document.getElementById('users-table');
+            const tbody   = document.getElementById('users-tbody');
             loading.style.display = 'none';
 
-            if (!mgmtUsers.length) {
-                empty.style.display = 'block'; table.style.display = 'none'; return;
-            }
+            if (!mgmtUsers.length) { empty.style.display = 'block'; table.style.display = 'none'; return; }
             empty.style.display = 'none'; table.style.display = 'table';
 
             const currentUserId = currentUser?.user?.id || currentUser?.id;
 
             tbody.innerHTML = mgmtUsers.map(user => {
-                const name = user.username || user.email || 'Unknown';
-                const initial = name.charAt(0).toUpperCase();
-                const allowedPages = user.allowed_pages || [];
+                const name          = user.username || user.email || 'Unknown';
+                const initial       = name.charAt(0).toUpperCase();
+                const allowedPages  = user.allowed_pages || [];
                 const isCurrentUser = user.id === currentUserId;
+                const isSA          = user.role === 'super_admin';
+
+                const pageAccessHTML = isSA
+                    ? '<span style="color:var(--text-secondary);font-size:0.82rem;font-style:italic;">All pages — super admin</span>'
+                    : `<div class="page-access-grid" data-user-id="${user.id}">${buildPageAccessHTML(allowedPages)}</div>`;
 
                 return `
                 <tr data-user-id="${user.id}">
@@ -1042,22 +1224,11 @@
                     <td>
                         <select class="role-select" data-user-id="${user.id}" ${isCurrentUser ? 'disabled title="Cannot change your own role"' : ''}>
                             <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
-                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                            <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
+                            <option value="admin"       ${user.role === 'admin'       ? 'selected' : ''}>Admin</option>
+                            <option value="user"        ${user.role === 'user'        ? 'selected' : ''}>User</option>
                         </select>
                     </td>
-                    <td>
-                        <div class="page-toggles" data-user-id="${user.id}">
-                            ${user.role === 'super_admin'
-                                ? '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (super admin)</span>'
-                                : SITE_PAGES.map(p => `
-                                    <label class="page-toggle ${allowedPages.includes(p.slug) ? 'active' : ''}">
-                                        <input type="checkbox" value="${p.slug}" ${allowedPages.includes(p.slug) ? 'checked' : ''}>
-                                        ${p.label}
-                                    </label>
-                                `).join('')}
-                        </div>
-                    </td>
+                    <td>${pageAccessHTML}</td>
                     <td>
                         <div class="row-actions">
                             <button class="mgmt-save-btn" data-user-id="${user.id}" ${isCurrentUser ? 'disabled' : ''}>Save</button>
@@ -1067,30 +1238,24 @@
                 </tr>`;
             }).join('');
 
-            // Toggle page chips
-            tbody.querySelectorAll('.page-toggle input').forEach(input => {
-                input.addEventListener('change', () => input.parentElement.classList.toggle('active', input.checked));
+            // Attach dropdown listeners for each user row
+            tbody.querySelectorAll('.page-access-grid').forEach(grid => {
+                attachPageAccessListeners(grid);
             });
 
-            // Role change → update page toggles
+            // Role change → rebuild page access section
             tbody.querySelectorAll('.role-select').forEach(select => {
                 select.addEventListener('change', () => {
                     const userId = select.dataset.userId;
-                    const tc = tbody.querySelector(`.page-toggles[data-user-id="${userId}"]`);
+                    const row    = tbody.querySelector(`tr[data-user-id="${userId}"]`);
+                    const cell   = row.querySelector('td:nth-child(3)');
+                    const user   = mgmtUsers.find(u => u.id === userId);
+                    const allowed = user?.allowed_pages || [];
                     if (select.value === 'super_admin') {
-                        tc.innerHTML = '<span style="color:var(--text-secondary);font-size:0.8rem;">All pages (super admin)</span>';
+                        cell.innerHTML = '<span style="color:var(--text-secondary);font-size:0.82rem;font-style:italic;">All pages — super admin</span>';
                     } else {
-                        const user = mgmtUsers.find(u => u.id === userId);
-                        const ap = user?.allowed_pages || [];
-                        tc.innerHTML = SITE_PAGES.map(p => `
-                            <label class="page-toggle ${ap.includes(p.slug) ? 'active' : ''}">
-                                <input type="checkbox" value="${p.slug}" ${ap.includes(p.slug) ? 'checked' : ''}>
-                                ${p.label}
-                            </label>
-                        `).join('');
-                        tc.querySelectorAll('.page-toggle input').forEach(i => {
-                            i.addEventListener('change', () => i.parentElement.classList.toggle('active', i.checked));
-                        });
+                        cell.innerHTML = `<div class="page-access-grid" data-user-id="${userId}">${buildPageAccessHTML(allowed)}</div>`;
+                        attachPageAccessListeners(cell.querySelector('.page-access-grid'));
                     }
                 });
             });
@@ -1099,63 +1264,60 @@
             tbody.querySelectorAll('.mgmt-save-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const userId = btn.dataset.userId;
-                    btn.disabled = true; btn.textContent = 'Saving...';
+                    btn.disabled = true; btn.textContent = 'Saving…';
                     try {
-                        const row = btn.closest('tr');
+                        const row  = btn.closest('tr');
                         const role = row.querySelector('.role-select').value;
                         await updateUserRole(userId, role);
                         if (role !== 'super_admin') {
-                            const cbs = row.querySelectorAll('.page-toggle input');
-                            const pages = Array.from(cbs).filter(cb => cb.checked).map(cb => cb.value);
+                            const pages = getCheckedPages(row);
                             await updateUserPages(userId, pages);
                         }
-                        showMgmtStatus('User updated.', 'success');
+                        showUsersStatus('User updated successfully.', 'success');
                         const user = mgmtUsers.find(u => u.id === userId);
                         if (user) {
                             user.role = role;
-                            if (role !== 'super_admin') {
-                                user.allowed_pages = Array.from(row.querySelectorAll('.page-toggle input')).filter(cb => cb.checked).map(cb => cb.value);
-                            }
+                            if (role !== 'super_admin') user.allowed_pages = getCheckedPages(row);
                         }
-                    } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+                    } catch (err) { showUsersStatus('Failed to update user: ' + err.message, 'error'); }
                     btn.disabled = false; btn.textContent = 'Save';
                 });
             });
 
             // Delete button
             tbody.querySelectorAll('.mgmt-delete-btn').forEach(btn => {
-                if (!btn.dataset.userId) return; // skip company delete btns
+                if (!btn.dataset.userId) return;
                 btn.addEventListener('click', async () => {
                     const userId = btn.dataset.userId;
-                    const user = mgmtUsers.find(u => u.id === userId);
+                    const user   = mgmtUsers.find(u => u.id === userId);
                     if (!confirm(`Remove ${user?.username || user?.email || 'this user'}?`)) return;
                     try {
                         await deleteUserProfile(userId);
                         mgmtUsers = mgmtUsers.filter(u => u.id !== userId);
                         renderUsers(); renderAssignments();
-                        showMgmtStatus('User removed.', 'success');
-                    } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+                        showUsersStatus('User removed.', 'success');
+                    } catch (err) { showUsersStatus('Failed: ' + err.message, 'error'); }
                 });
             });
         }
 
         document.getElementById('invite-user-btn').addEventListener('click', async () => {
             const emailInput = document.getElementById('invite-email');
-            const passInput = document.getElementById('invite-password');
-            const email = emailInput.value.trim();
+            const passInput  = document.getElementById('invite-password');
+            const email    = emailInput.value.trim();
             const password = passInput.value.trim();
-            if (!email || !password) { showMgmtStatus('Please enter email and password.', 'error'); return; }
-            if (password.length < 6) { showMgmtStatus('Password must be at least 6 characters.', 'error'); return; }
+            if (!email || !password) { showUsersStatus('Please enter email and password.', 'error'); return; }
+            if (password.length < 6) { showUsersStatus('Password must be at least 6 characters.', 'error'); return; }
             const btn = document.getElementById('invite-user-btn');
-            btn.disabled = true; btn.textContent = 'Inviting...';
+            btn.disabled = true; btn.textContent = 'Inviting…';
             try {
                 await createUserWithEmail(email, password);
-                showMgmtStatus(`Invitation sent to ${email}.`, 'success');
+                showUsersStatus(`Invitation sent to ${email}.`, 'success');
                 emailInput.value = ''; passInput.value = '';
                 setTimeout(async () => {
                     try { mgmtUsers = await getAllUsers(); renderUsers(); renderAssignments(); } catch (e) {}
                 }, 2000);
-            } catch (err) { showMgmtStatus('Failed: ' + err.message, 'error'); }
+            } catch (err) { showUsersStatus('Failed: ' + err.message, 'error'); }
             btn.disabled = false; btn.textContent = 'Invite User';
         });
 
