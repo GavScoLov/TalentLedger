@@ -315,7 +315,7 @@
 
             <!-- Users Tab -->
             <div class="tab-content" id="tab-users">
-                <div class="card" style="padding: 16px;">
+                <div class="card" style="padding: 16px; overflow: visible;">
                     <p class="section-desc">Invite new users and manage roles and page access for existing users.</p>
                     <div id="users-status" class="mgmt-status"></div>
                     <div class="inline-form">
@@ -331,12 +331,10 @@
                     </div>
                     <div id="users-loading" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading users...</div>
                     <div id="users-empty" class="mgmt-empty" style="display:none;">No users found.</div>
-                    <div style="overflow-x:auto;">
-                        <table class="mgmt-table" id="users-table" style="display:none;">
-                            <thead><tr><th>User</th><th>Role</th><th>Page Access</th><th>Actions</th></tr></thead>
-                            <tbody id="users-tbody"></tbody>
-                        </table>
-                    </div>
+                    <table class="mgmt-table" id="users-table" style="display:none;">
+                        <thead><tr><th>User</th><th>Role</th><th>Page Access</th><th>Actions</th></tr></thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
                 </div>
             </div>
 
