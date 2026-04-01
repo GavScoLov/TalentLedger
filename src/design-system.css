@@ -202,13 +202,28 @@ a:hover { text-decoration: underline; }
   opacity: 0;
   pointer-events: none;
   transform: translateX(-6px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  /* Instant show, delayed hide — gives time to move mouse across the gap */
+  transition: opacity 0.15s ease 0s, transform 0.15s ease 0s;
+}
+/* Invisible bridge fills the gap between sidebar edge and flyout */
+.sidebar-flyout::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 0;
+  width: 16px;
+  height: 100%;
 }
 /* Show on group hover (desktop) */
 .sidebar-section-group:hover > .sidebar-flyout {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
+  transition: opacity 0.1s ease 0s, transform 0.1s ease 0s;
+}
+/* Delay hiding when mouse leaves — 300ms grace period */
+.sidebar-section-group:not(:hover) > .sidebar-flyout {
+  transition: opacity 0.15s ease 0.3s, transform 0.15s ease 0.3s;
 }
 /* Show on mobile-open class */
 .sidebar-section-group.mobile-open > .sidebar-flyout {
