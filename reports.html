@@ -549,6 +549,10 @@
             <div class="results-meta" id="results-meta"></div>
           </div>
           <div class="results-actions">
+            <button class="btn btn-outlined" id="btn-back" style="font-size:.82rem;padding:7px 14px;gap:6px;display:inline-flex;align-items:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+              All Reports
+            </button>
             <button class="btn btn-outlined" id="btn-export" style="font-size:.82rem;padding:7px 14px;gap:6px;display:inline-flex;align-items:center;">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
               Export CSV
@@ -762,8 +766,27 @@
       XLSX.writeFile(wb, filename);
     }
 
+    /* ─── Show/hide grid ────────────────────────────────────── */
+    function showReportView() {
+      document.getElementById('reports-grid').style.display = 'none';
+      document.getElementById('date-filter-bar').style.display = 'none';
+      document.getElementById('dhp-month-picker').classList.remove('visible');
+    }
+
+    function showGridView() {
+      document.getElementById('reports-grid').style.display = '';
+      document.getElementById('date-filter-bar').style.display = '';
+      document.getElementById('results-section').style.display = 'none';
+      // Clear active card highlight
+      document.querySelectorAll('.report-card').forEach(c => c.classList.remove('active'));
+      activeReport = null;
+      // Scroll back to top
+      document.querySelector('.main-content')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
     /* ─── Show results section ──────────────────────────────── */
     function showResults(title, dateRange) {
+      showReportView();
       const sec = document.getElementById('results-section');
       sec.style.display = 'block';
       document.getElementById('results-title').textContent = title;
@@ -2426,6 +2449,8 @@
     document.querySelectorAll('.btn-generate').forEach(btn => {
       btn.addEventListener('click', () => runReport(btn.dataset.report));
     });
+
+    document.getElementById('btn-back').addEventListener('click', showGridView);
 
     document.getElementById('btn-export').addEventListener('click', () => {
       if (!lastMeta.cols) return;
