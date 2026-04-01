@@ -769,13 +769,13 @@
     /* ─── Show/hide grid ────────────────────────────────────── */
     function showReportView() {
       document.getElementById('reports-grid').style.display = 'none';
-      document.getElementById('date-filter-bar').style.display = 'none';
+      document.getElementById('global-date-bar').style.display = 'none';
       document.getElementById('dhp-month-picker').classList.remove('visible');
     }
 
     function showGridView() {
       document.getElementById('reports-grid').style.display = '';
-      document.getElementById('date-filter-bar').style.display = '';
+      document.getElementById('global-date-bar').style.display = '';
       document.getElementById('results-section').style.display = 'none';
       // Clear active card highlight
       document.querySelectorAll('.report-card').forEach(c => c.classList.remove('active'));
