@@ -48,7 +48,6 @@
     }
     .tbl-input:focus { outline:none; border-color:var(--primary); }
     .tbl-num  { width:56px; }
-    .tbl-email { width:150px; }
     .tbl-select {
       padding:5px 5px; border:1px solid var(--border-color); border-radius:5px;
       font-family:var(--font); font-size:.78rem; background:var(--bg-default); color:var(--text-primary);
@@ -149,14 +148,11 @@
               <th>Lunch (min–max)</th>
               <th>Daily Limit</th>
               <th>Location</th>
-              <th>Late Action</th>
-              <th>No-Show Action</th>
-              <th>Notification Email</th>
               <th>Shifts</th>
               <th>Actions</th>
             </tr></thead>
             <tbody id="settings-tbody">
-              <tr><td colspan="12" class="empty-state">Loading…</td></tr>
+              <tr><td colspan="9" class="empty-state">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -225,17 +221,6 @@
   renderNavbar();
   await renderSidebar();
 
-  // ── Helpers ──────────────────────────────────────────────
-  function actionLabel(val) {
-    return { none:'None', notify_employer:'Notify Employer', notify_internal:'Notify Internal', both:'Notify Both' }[val] || val;
-  }
-
-  function actionOptions(selected) {
-    return ['none','notify_employer','notify_internal','both'].map(v =>
-      `<option value="${v}" ${(selected ?? 'notify_internal') === v ? 'selected' : ''}>${actionLabel(v)}</option>`
-    ).join('');
-  }
-
   // ── Tab switching ─────────────────────────────────────────
   window.switchTab = function(tab) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['companies','pay'][i] === tab));
@@ -293,7 +278,7 @@
     const count = document.getElementById('co-count');
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No companies found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No companies found.</td></tr>';
       count.textContent = '';
       return;
     }
@@ -353,16 +338,6 @@
         </div>
       </td>
       <td>
-        <select class="tbl-select" id="t-${idx}-laction">${actionOptions(s?.late_action)}</select>
-      </td>
-      <td>
-        <select class="tbl-select" id="t-${idx}-nsaction">${actionOptions(s?.noshow_action)}</select>
-      </td>
-      <td>
-        <input class="tbl-input tbl-email" type="email" id="t-${idx}-email"
-          value="${s?.notification_email || ''}" placeholder="alerts@co.com">
-      </td>
-      <td>
         <button class="btn btn-outlined" style="font-size:.72rem;padding:4px 10px;"
           onclick='openShiftsModal(${JSON.stringify(name)})'>
           ${shiftCount > 0
@@ -405,9 +380,6 @@
       lunch_min_minutes:     parseInt(document.getElementById(`t-${idx}-lmin`).value)      || 0,
       lunch_max_minutes:     parseInt(document.getElementById(`t-${idx}-lmax`).value)      || 60,
       daily_hour_limit:      parseFloat(document.getElementById(`t-${idx}-dlimit`).value)  || 12,
-      late_action:           document.getElementById(`t-${idx}-laction`).value,
-      noshow_action:         document.getElementById(`t-${idx}-nsaction`).value,
-      notification_email:    document.getElementById(`t-${idx}-email`).value.trim() || null,
       track_location:        document.getElementById(`t-${idx}-track`).checked,
       location_radius_miles: parseFloat(document.getElementById(`t-${idx}-radius`).value)  || 1.0,
       updated_at:            new Date().toISOString(),
