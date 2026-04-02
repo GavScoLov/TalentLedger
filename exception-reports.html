@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exception Reports – TalentLedger</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    /* ── Filter bar ── */
+    .filter-bar {
+      display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
+      background:var(--bg-paper); border:1px solid var(--border-color);
+      border-radius:var(--radius); padding:16px 20px; margin-bottom:20px;
+    }
+    .filter-field { display:flex; flex-direction:column; gap:4px; }
+    .filter-field label { font-size:.72rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; }
+    .filter-field input, .filter-field select {
+      padding:7px 11px; border:1px solid var(--border-color); border-radius:6px;
+      font-family:var(--font); font-size:.875rem; background:var(--bg-default); color:var(--text-primary);
+    }
+    .filter-field input:focus, .filter-field select:focus { outline:none; border-color:var(--primary); }
+
+    /* ── Summary stats ── */
+    .stats-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+    .stat-card {
+      background:var(--bg-paper); border:1px solid var(--border-color); border-radius:var(--radius);
+      padding:14px 20px; flex:1; min-width:130px;
+    }
+    .stat-card .stat-val { font-size:1.6rem; font-weight:700; color:var(--text-primary); line-height:1; }
+    .stat-card .stat-lbl { font-size:.75rem; color:var(--text-secondary); margin-top:4px; }
+    .stat-card.warn  { border-left:3px solid #F59E0B; }
+    .stat-card.error { border-left:3px solid #EF4444; }
+    .stat-card.total { border-left:3px solid var(--primary); }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x:auto; border-radius:var(--radius); border:1px solid var(--border-color); }
+    .data-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    .data-table th {
+      background:var(--primary); color:#fff; padding:10px 14px; text-align:left;
+      font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap;
+    }
+    .data-table td { padding:10px 14px; border-bottom:1px solid var(--border-color); color:var(--text-primary); }
+    .data-table tbody tr:last-child td { border-bottom:none; }
+    .data-table tbody tr:hover { background:var(--bg-default); }
+    .empty-state { text-align:center; padding:48px; color:var(--text-secondary); }
+    .empty-state .icon { font-size:2rem; margin-bottom:8px; }
+
+    /* ── Badges ── */
+    .badge-warning { background:#FEF3C7; color:#92400E; padding:3px 9px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+    .badge-error   { background:#FEE2E2; color:#991B1B; padding:3px 9px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+
+    /* ── Result count ── */
+    .result-count { font-size:.82rem; color:var(--text-secondary); margin-bottom:10px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div id="topbar-placeholder"></div>
+    <div id="sidebar-placeholder"></div>
+    <div class="page-content">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Exception Reports</h1>
+          <p class="page-subtitle">Workers and companies that have triggered configured exception rules</p>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <div class="filter-field">
+          <label>Start Date</label>
+          <input type="date" id="f-start">
+        </div>
+        <div class="filter-field">
+          <label>End Date</label>
+          <input type="date" id="f-end">
+        </div>
+        <div class="filter-field">
+          <label>Company</label>
+          <select id="f-company" style="min-width:180px;">
+            <option value="">All Companies</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Severity</label>
+          <select id="f-severity">
+            <option value="">All</option>
+            <option value="error">Error only</option>
+            <option value="warning">Warning only</option>
+          </select>
+        </div>
+        <div class="filter-field" style="justify-content:flex-end;">
+          <label style="visibility:hidden">Run</label>
+          <button class="btn btn-primary" onclick="runReport()" id="run-btn" style="padding:8px 20px;font-size:.875rem;">Run Report</button>
+        </div>
+      </div>
+
+      <!-- Summary stats -->
+      <div class="stats-row" id="stats-row" style="display:none;">
+        <div class="stat-card total">
+          <div class="stat-val" id="stat-total">0</div>
+          <div class="stat-lbl">Total Exceptions</div>
+        </div>
+        <div class="stat-card error">
+          <div class="stat-val" id="stat-errors">0</div>
+          <div class="stat-lbl">Errors</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="stat-val" id="stat-warnings">0</div>
+          <div class="stat-lbl">Warnings</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="stat-workers">0</div>
+          <div class="stat-lbl">Workers Affected</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="stat-companies">0</div>
+          <div class="stat-lbl">Companies Affected</div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="result-count" class="result-count" style="display:none;"></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Company</th>
+              <th>Worker</th>
+              <th>Date</th>
+              <th>Exception Rule</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody">
+            <tr>
+              <td colspan="6" class="empty-state">
+                <div class="icon">⚠️</div>
+                Select a date range and click <strong>Run Report</strong> to see exceptions.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { renderNavbar }  from './src/components/navbar.js';
+  import { renderSidebar } from './src/components/sidebar.js';
+  import { checkAuth, checkPageAccess } from './src/auth.js';
+  import { supabase } from './src/supabaseClient.js';
+
+  await checkAuth();
+  await checkPageAccess('exception-reports');
+  renderNavbar();
+  await renderSidebar();
+
+  // ── Default date range: last 7 days ──────────────────────
+  const today = new Date();
+  const prior = new Date(today);
+  prior.setDate(today.getDate() - 7);
+  const toISO = d => d.toISOString().split('T')[0];
+  document.getElementById('f-start').value = toISO(prior);
+  document.getElementById('f-end').value   = toISO(today);
+
+  // ── Populate company filter from employer_flags ───────────
+  async function loadCompanyFilter() {
+    const { data } = await supabase.from('employer_flags').select('company_name');
+    if (!data?.length) return;
+    const companies = [...new Set(data.map(r => r.company_name))].sort();
+    const sel = document.getElementById('f-company');
+    companies.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── Evaluation helpers ────────────────────────────────────
+  function timeToMins(str) {
+    const [h, m] = String(str).split(':').map(Number);
+    return h * 60 + (m || 0);
+  }
+
+  function timestampToMins(ts) {
+    const d = new Date(ts);
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  function compare(a, op, b) {
+    if (op === 'gt')  return a > b;
+    if (op === 'gte') return a >= b;
+    if (op === 'lt')  return a < b;
+    if (op === 'lte') return a <= b;
+    return false;
+  }
+
+  function fmtTime12(ts) {
+    const d = new Date(ts);
+    const h = d.getHours(), m = d.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+
+  function fmtThreshold(flag) {
+    if (flag.field === 'shift_duration') return `${flag.value} hr${Number(flag.value) === 1 ? '' : 's'}`;
+    const [h, m] = flag.value.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+
+  const OP_LABEL = { gt:'>', gte:'≥', lt:'<', lte:'≤' };
+  const FIELD_LABEL = {
+    shift_duration:   'Shift Duration',
+    shift_start_time: 'Start Time',
+    shift_end_time:   'End Time',
+  };
+
+  function buildDetail(session, flag) {
+    if (flag.field === 'shift_duration') {
+      const hrs = parseFloat(session.hours_worked).toFixed(2);
+      return `Duration was ${hrs} hrs (rule: ${OP_LABEL[flag.operator]} ${fmtThreshold(flag)})`;
+    }
+    if (flag.field === 'shift_end_time') {
+      return `Clocked out at ${fmtTime12(session.check_out_time)} (rule: ${OP_LABEL[flag.operator]} ${fmtThreshold(flag)})`;
+    }
+    if (flag.field === 'shift_start_time') {
+      return `Clocked in at ${fmtTime12(session.check_in_time)} (rule: ${OP_LABEL[flag.operator]} ${fmtThreshold(flag)})`;
+    }
+    return '';
+  }
+
+  function evaluateSession(session, flags) {
+    const company = session.workers?.company;
+    if (!company) return [];
+    const hits = [];
+    for (const flag of flags) {
+      if (flag.company_name !== company) continue;
+      let fieldVal, threshold;
+      if (flag.field === 'shift_duration') {
+        if (session.hours_worked == null) continue;
+        fieldVal  = parseFloat(session.hours_worked);
+        threshold = parseFloat(flag.value);
+      } else if (flag.field === 'shift_end_time') {
+        if (!session.check_out_time) continue;
+        fieldVal  = timestampToMins(session.check_out_time);
+        threshold = timeToMins(flag.value);
+      } else if (flag.field === 'shift_start_time') {
+        if (!session.check_in_time) continue;
+        fieldVal  = timestampToMins(session.check_in_time);
+        threshold = timeToMins(flag.value);
+      } else continue;
+
+      if (compare(fieldVal, flag.operator, threshold)) {
+        hits.push({ flag, session, company, detail: buildDetail(session, flag) });
+      }
+    }
+    return hits;
+  }
+
+  // ── Run Report ────────────────────────────────────────────
+  window.runReport = async function() {
+    const start     = document.getElementById('f-start').value;
+    const end       = document.getElementById('f-end').value;
+    const company   = document.getElementById('f-company').value;
+    const severity  = document.getElementById('f-severity').value;
+    const tbody     = document.getElementById('results-tbody');
+    const btn       = document.getElementById('run-btn');
+
+    if (!start || !end) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Please select a date range.</td></tr>';
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Running…';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading…</td></tr>';
+    document.getElementById('stats-row').style.display = 'none';
+    document.getElementById('result-count').style.display = 'none';
+
+    try {
+      // Fetch flags and sessions in parallel
+      let flagsQuery = supabase.from('employer_flags').select('*');
+      if (company) flagsQuery = flagsQuery.eq('company_name', company);
+      if (severity) flagsQuery = flagsQuery.eq('severity', severity);
+
+      const [{ data: flags }, { data: sessions }] = await Promise.all([
+        flagsQuery,
+        supabase
+          .from('worker_sessions')
+          .select('id, worker_name, worker_id, date, check_in_time, check_out_time, hours_worked, workers(company, employee_id)')
+          .gte('date', start)
+          .lte('date', end)
+          .order('date', { ascending: false })
+          .order('check_in_time', { ascending: false }),
+      ]);
+
+      if (!flags?.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">✅</div>No exception rules configured. Set them up in <a href="./time-tracker-settings.html" style="color:var(--primary)">Company Settings</a>.</td></tr>';
+        return;
+      }
+
+      // Evaluate all sessions against all flags
+      const violations = [];
+      for (const session of (sessions || [])) {
+        violations.push(...evaluateSession(session, flags));
+      }
+
+      // Apply severity filter (already applied to flags query, but double-check)
+      const filtered = severity ? violations.filter(v => v.flag.severity === severity) : violations;
+
+      // Sort: errors first, then by date desc
+      filtered.sort((a, b) => {
+        if (a.flag.severity !== b.flag.severity) return a.flag.severity === 'error' ? -1 : 1;
+        return new Date(b.session.date) - new Date(a.session.date);
+      });
+
+      // Stats
+      const errCount  = filtered.filter(v => v.flag.severity === 'error').length;
+      const warnCount = filtered.filter(v => v.flag.severity === 'warning').length;
+      const workers   = new Set(filtered.map(v => v.session.worker_id)).size;
+      const companies = new Set(filtered.map(v => v.company)).size;
+
+      document.getElementById('stat-total').textContent     = filtered.length;
+      document.getElementById('stat-errors').textContent    = errCount;
+      document.getElementById('stat-warnings').textContent  = warnCount;
+      document.getElementById('stat-workers').textContent   = workers;
+      document.getElementById('stat-companies').textContent = companies;
+      document.getElementById('stats-row').style.display    = '';
+
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">✅</div>No exceptions found for the selected period.</td></tr>';
+        document.getElementById('result-count').style.display = 'none';
+        return;
+      }
+
+      const rc = document.getElementById('result-count');
+      rc.textContent = `${filtered.length} exception${filtered.length === 1 ? '' : 's'} found`;
+      rc.style.display = '';
+
+      tbody.innerHTML = filtered.map(({ flag, session, company, detail }) => {
+        const dateStr = new Date(session.date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        const badgeClass = flag.severity === 'error' ? 'badge-error' : 'badge-warning';
+        const badgeLabel = flag.severity === 'error' ? '⛔ Error' : '⚠️ Warning';
+        return `<tr>
+          <td><span class="${badgeClass}">${badgeLabel}</span></td>
+          <td style="font-weight:600">${company}</td>
+          <td>${session.worker_name || '—'}</td>
+          <td style="white-space:nowrap">${dateStr}</td>
+          <td>${flag.flag_name}</td>
+          <td style="font-size:.82rem;color:var(--text-secondary)">${detail}</td>
+        </tr>`;
+      }).join('');
+
+    } finally {
+      btn.disabled = false; btn.textContent = 'Run Report';
+    }
+  };
+
+  // ── Init ──────────────────────────────────────────────────
+  loadCompanyFilter();
+</script>
+</body>
+</html>

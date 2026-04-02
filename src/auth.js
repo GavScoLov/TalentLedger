@@ -103,6 +103,7 @@ const _PAGE_ORDER = [
   { slug: 'profit-loss',           file: 'profit-loss.html' },
   { slug: 'timesheet-review',      file: 'timesheet-review.html' },
   { slug: 'time-tracker-settings', file: 'time-tracker-settings.html' },
+  { slug: 'exception-reports',     file: 'exception-reports.html' },
   { slug: 'worker-assignments',    file: 'worker-assignments.html' },
   { slug: 'scheduler',             file: 'scheduler.html' },
   { slug: 'tempworks',             file: 'tempworks.html' },
