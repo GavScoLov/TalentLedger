@@ -88,6 +88,10 @@
           <h1 class="page-title">Exception Reports</h1>
           <p class="page-subtitle">Track workers who fall outside configured tolerances, limits, and shift windows</p>
         </div>
+        <button class="btn btn-outlined" id="btn-refresh" onclick="runReport()" style="font-size:.82rem;padding:8px 16px;display:flex;align-items:center;gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>
+          Refresh
+        </button>
       </div>
 
       <!-- Rules configuration -->
@@ -211,12 +215,10 @@
   // rule_type → { enabled, severity }
   let ruleConfig = {};
 
-  // ── Default dates: last 7 days ────────────────────────────
+  // ── Default dates: today ──────────────────────────────────
   const today = new Date();
-  const prior = new Date(today);
-  prior.setDate(today.getDate() - 7);
   const toISO = d => d.toISOString().split('T')[0];
-  document.getElementById('f-start').value = toISO(prior);
+  document.getElementById('f-start').value = toISO(today);
   document.getElementById('f-end').value   = toISO(today);
 
   // ── Load / init exception rules from Supabase ─────────────
@@ -330,8 +332,7 @@
     }, null);
   }
 
-  function evaluateSession(session, settings, shifts) {
-    const company   = session.workers?.company;
+  function evaluateSession(session, company, settings, shifts) {
     const violations = [];
     const ciMins    = session.check_in_time  ? tsMins(session.check_in_time)  : null;
     const coMins    = session.check_out_time ? tsMins(session.check_out_time) : null;
@@ -442,15 +443,17 @@
       { data: sessions },
       { data: allSettings },
       { data: allShifts },
+      { data: allWorkers },
     ] = await Promise.all([
       supabase
         .from('worker_sessions')
-        .select('id, worker_name, worker_id, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end, workers(company, employee_id)')
+        .select('id, worker_name, worker_id, company, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end')
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false }),
       supabase.from('employer_settings').select('*'),
       supabase.from('employer_shifts').select('*'),
+      supabase.from('workers').select('employee_id, company'),
     ]);
 
     // Build lookups
@@ -462,15 +465,22 @@
       (shiftsMap[s.company_name] ??= []).push(s);
     }
 
+    // Build worker → company map as fallback
+    const workerCompanyMap = {};
+    for (const w of (allWorkers || [])) {
+      if (w.employee_id) workerCompanyMap[String(w.employee_id)] = w.company;
+    }
+
     // Evaluate
     let violations = [];
     for (const session of (sessions || [])) {
-      const co       = session.workers?.company;
+      // Company: prefer direct field, fall back to workers table lookup
+      const co = session.company || workerCompanyMap[String(session.worker_id)] || null;
       if (!co) continue;
       if (company && co !== company) continue;
       const settings = settingsMap[co] || null;
       const shifts   = shiftsMap[co]   || [];
-      violations.push(...evaluateSession(session, settings, shifts));
+      violations.push(...evaluateSession(session, co, settings, shifts));
     }
 
     // Filter by severity
