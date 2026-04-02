@@ -93,8 +93,8 @@
           </select>
         </div>
         <div class="filter-field" style="justify-content:flex-end;">
-          <label style="visibility:hidden">Run</label>
-          <button class="btn btn-primary" onclick="runReport()" id="run-btn" style="padding:8px 20px;font-size:.875rem;">Run Report</button>
+          <label style="visibility:hidden">Refresh</label>
+          <button class="btn btn-outlined" onclick="runReport()" id="run-btn" style="padding:8px 20px;font-size:.875rem;">Refresh</button>
         </div>
       </div>
 
@@ -363,8 +363,14 @@
     }
   };
 
-  // ── Init ──────────────────────────────────────────────────
-  loadCompanyFilter();
+  // ── Re-run automatically when filters change ─────────────
+  ['f-start', 'f-end', 'f-company', 'f-severity'].forEach(id =>
+    document.getElementById(id).addEventListener('change', runReport)
+  );
+
+  // ── Init: load filter options then auto-run ───────────────
+  await loadCompanyFilter();
+  runReport();
 </script>
 </body>
 </html>
