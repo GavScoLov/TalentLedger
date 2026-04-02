@@ -36,17 +36,41 @@
     .table-wrap { overflow-x:auto; border-radius:var(--radius); border:1px solid var(--border-color); }
     .data-table { width:100%; border-collapse:collapse; font-size:.85rem; }
     .data-table th { background:var(--primary); color:#fff; padding:10px 14px; text-align:left; font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
-    .data-table td { padding:10px 14px; border-bottom:1px solid var(--border-color); color:var(--text-primary); }
+    .data-table td { padding:8px 10px; border-bottom:1px solid var(--border-color); color:var(--text-primary); vertical-align:middle; }
     .data-table tbody tr:last-child td { border-bottom:none; }
-    .data-table tbody tr:hover { background:var(--bg-default); }
+    .data-table tbody tr:hover { background:var(--bg-hover, rgba(0,0,0,.02)); }
     .empty-state { text-align:center; padding:40px; color:var(--text-secondary); }
+
+    /* ── Inline table inputs ── */
+    .tbl-input {
+      padding:5px 7px; border:1px solid var(--border-color); border-radius:5px;
+      font-family:var(--font); font-size:.8rem; background:var(--bg-default); color:var(--text-primary);
+    }
+    .tbl-input:focus { outline:none; border-color:var(--primary); }
+    .tbl-num  { width:56px; }
+    .tbl-email { width:150px; }
+    .tbl-select {
+      padding:5px 5px; border:1px solid var(--border-color); border-radius:5px;
+      font-family:var(--font); font-size:.78rem; background:var(--bg-default); color:var(--text-primary);
+    }
+    .tbl-select:focus { outline:none; border-color:var(--primary); }
+    .tbl-pair { display:flex; align-items:center; gap:4px; }
 
     .badge-configured   { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:999px; font-size:.7rem; font-weight:700; }
     .badge-unconfigured { background:#F3F4F6; color:#9CA3AF; padding:2px 8px; border-radius:999px; font-size:.7rem; font-weight:600; }
-    .badge-track-on  { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; }
-    .badge-track-off { background:#F3F4F6; color:#6B7280; padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:700; }
 
-    /* ── Modal ── */
+    .toggle-sm { width:34px; height:19px; appearance:none; background:#D1D5DB;
+      border-radius:999px; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; }
+    .toggle-sm:checked { background:var(--primary); }
+    .toggle-sm::after { content:''; position:absolute; width:15px; height:15px;
+      border-radius:50%; background:#fff; top:2px; left:2px; transition:left .2s; }
+    .toggle-sm:checked::after { left:17px; }
+
+    /* ── Pay rates tab ── */
+    .pay-input { width:100px; padding:5px 8px; border:1px solid var(--border-color); border-radius:6px; font-size:.85rem; }
+    .pay-input:focus { outline:none; border-color:var(--primary); }
+
+    /* ── Shifts modal ── */
     .modal-overlay {
       display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
       z-index:200; align-items:center; justify-content:center; padding:16px;
@@ -54,7 +78,7 @@
     .modal-overlay.open { display:flex; }
     .modal-box {
       background:var(--bg-paper); border-radius:var(--radius);
-      padding:26px 28px 22px; width:100%; max-width:580px;
+      padding:26px 28px 22px; width:100%; max-width:520px;
       max-height:90vh; overflow-y:auto;
       box-shadow:0 8px 40px rgba(0,0,0,0.18);
     }
@@ -63,38 +87,6 @@
     .modal-close { background:none; border:none; font-size:1.4rem; line-height:1; cursor:pointer; color:var(--text-secondary); padding:0; margin:-2px -2px 0 8px; }
     .modal-close:hover { color:var(--text-primary); }
 
-    .form-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
-    .form-field { display:flex; flex-direction:column; gap:5px; }
-    .form-field label { font-size:.75rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.4px; }
-    .form-field input, .form-field select {
-      padding:8px 11px; border:1px solid var(--border-color); border-radius:6px;
-      font-family:var(--font); font-size:.875rem; background:var(--bg-default); color:var(--text-primary);
-    }
-    .form-field input:focus, .form-field select:focus { outline:none; border-color:var(--primary); }
-    .inline-pair { display:flex; gap:8px; }
-    .inline-pair input  { width:90px; flex-shrink:0; }
-    .inline-pair select { flex:1; }
-    .form-actions { margin-top:20px; display:flex; gap:10px; align-items:center; }
-    .error-msg   { color:#dc2626; font-size:.8rem; display:none; }
-    .error-msg.show { display:block; }
-    .success-msg { color:#16a34a; font-size:.8rem; display:none; }
-    .success-msg.show { display:block; }
-
-    .toggle-row { display:flex; align-items:center; gap:10px; padding:4px 0; }
-    .toggle-label { font-size:.85rem; color:var(--text-primary); font-weight:500; }
-    input[type="checkbox"].toggle { width:40px; height:22px; appearance:none; background:#D1D5DB;
-      border-radius:999px; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; }
-    input[type="checkbox"].toggle:checked { background:var(--primary); }
-    input[type="checkbox"].toggle::after { content:''; position:absolute; width:18px; height:18px;
-      border-radius:50%; background:#fff; top:2px; left:2px; transition:left .2s; }
-    input[type="checkbox"].toggle:checked::after { left:20px; }
-
-    /* ── Pay rates tab ── */
-    .pay-input { width:100px; padding:5px 8px; border:1px solid var(--border-color); border-radius:6px; font-size:.85rem; }
-    .pay-input:focus { outline:none; border-color:var(--primary); }
-
-    /* ── Shifts section inside modal ── */
-    .modal-divider { border:none; border-top:1px solid var(--border-color); margin:22px 0 18px; }
     .shifts-section h4 { font-size:.78rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; margin:0 0 12px; }
     .shift-add-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
     .shift-add-row input[type="text"] { flex:1; min-width:110px; padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-size:.85rem; font-family:var(--font); background:var(--bg-default); color:var(--text-primary); }
@@ -154,7 +146,7 @@
               <th>Status</th>
               <th>Early Tolerance</th>
               <th>Late Tolerance</th>
-              <th>Lunch</th>
+              <th>Lunch (min–max)</th>
               <th>Daily Limit</th>
               <th>Location</th>
               <th>Late Action</th>
@@ -196,98 +188,14 @@
 </div>
 
 <!-- ══════════════════════════════
-     EDIT COMPANY SETTINGS MODAL
+     SHIFTS MODAL
 ══════════════════════════════ -->
-<div class="modal-overlay" id="edit-modal" onclick="handleModalOverlayClick(event)">
+<div class="modal-overlay" id="shifts-modal" onclick="handleModalOverlayClick(event)">
   <div class="modal-box">
     <div class="modal-header">
-      <h3 id="modal-title">Edit Company Settings</h3>
-      <button class="modal-close" onclick="closeEditModal()">×</button>
+      <h3 id="modal-title">Shifts</h3>
+      <button class="modal-close" onclick="closeShiftsModal()">×</button>
     </div>
-
-    <input type="hidden" id="co-id">
-
-    <div class="form-grid">
-      <div class="form-field">
-        <label>Clock In — Early Tolerance</label>
-        <div class="inline-pair">
-          <input type="number" id="co-early-val" min="0" value="15">
-          <select id="co-early-unit">
-            <option value="minutes">minutes</option>
-            <option value="hours">hours</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-field">
-        <label>Clock In — Late Tolerance</label>
-        <div class="inline-pair">
-          <input type="number" id="co-late-val" min="0" value="15">
-          <select id="co-late-unit">
-            <option value="minutes">minutes</option>
-            <option value="hours">hours</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-field">
-        <label>Lunch — Min Duration (min)</label>
-        <input type="number" id="co-lunch-min" min="0" value="0" placeholder="0">
-      </div>
-      <div class="form-field">
-        <label>Lunch — Max Duration (min)</label>
-        <input type="number" id="co-lunch-max" min="0" value="60" placeholder="60">
-      </div>
-
-      <div class="form-field">
-        <label>Daily Hour Limit</label>
-        <input type="number" id="co-daily-limit" min="1" max="24" step="0.5" value="12">
-      </div>
-
-      <div class="form-field">
-        <label>Late Worker Action</label>
-        <select id="co-late-action">
-          <option value="none">No action</option>
-          <option value="notify_employer">Notify Employer</option>
-          <option value="notify_internal" selected>Notify Internal Team</option>
-          <option value="both">Notify Both</option>
-        </select>
-      </div>
-      <div class="form-field">
-        <label>No-Show Action</label>
-        <select id="co-noshow-action">
-          <option value="none">No action</option>
-          <option value="notify_employer">Notify Employer</option>
-          <option value="notify_internal" selected>Notify Internal Team</option>
-          <option value="both">Notify Both</option>
-        </select>
-      </div>
-
-      <div class="form-field">
-        <label>Notification Email</label>
-        <input type="email" id="co-notif-email" placeholder="alerts@company.com">
-      </div>
-
-      <div class="form-field" style="grid-column:1/-1">
-        <label>Location Tracking</label>
-        <div class="toggle-row">
-          <input type="checkbox" class="toggle" id="co-track-location" onchange="toggleRadiusField()">
-          <span class="toggle-label">Require workers to be within range of job site to clock in</span>
-        </div>
-      </div>
-      <div class="form-field" id="radius-field" style="display:none;">
-        <label>Allowed Radius (miles)</label>
-        <input type="number" id="co-radius" min="0.1" max="50" step="0.1" value="1.0">
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-primary" onclick="saveCompanySettings()" style="font-size:.85rem;padding:9px 20px;" id="co-save-btn">Save Settings</button>
-      <button class="btn btn-outlined" onclick="closeEditModal()" style="font-size:.85rem;padding:9px 16px;">Cancel</button>
-      <span class="error-msg"   id="co-error"></span>
-      <span class="success-msg" id="co-success"></span>
-    </div>
-
-    <hr class="modal-divider">
 
     <div class="shifts-section">
       <h4>Shifts</h4>
@@ -318,15 +226,14 @@
   await renderSidebar();
 
   // ── Helpers ──────────────────────────────────────────────
-  function msg(id, text, type = 'error') {
-    const el = document.getElementById(id);
-    el.textContent = text;
-    el.className = (type === 'success' ? 'success-msg' : 'error-msg') + ' show';
-    setTimeout(() => el.classList.remove('show'), 4000);
-  }
-
   function actionLabel(val) {
     return { none:'None', notify_employer:'Notify Employer', notify_internal:'Notify Internal', both:'Notify Both' }[val] || val;
+  }
+
+  function actionOptions(selected) {
+    return ['none','notify_employer','notify_internal','both'].map(v =>
+      `<option value="${v}" ${(selected ?? 'notify_internal') === v ? 'selected' : ''}>${actionLabel(v)}</option>`
+    ).join('');
   }
 
   // ── Tab switching ─────────────────────────────────────────
@@ -337,24 +244,16 @@
     if (tab === 'pay') loadPayRates();
   };
 
-  // ── Toggle radius field ───────────────────────────────────
-  window.toggleRadiusField = function() {
-    document.getElementById('radius-field').style.display =
-      document.getElementById('co-track-location').checked ? '' : 'none';
-  };
-
   // ════════════════════════════════════════════════════════
   // COMPANY SETTINGS TAB
   // ════════════════════════════════════════════════════════
 
-  // All company rows rendered (for client-side search filtering)
   let allRows = [];
 
   async function loadSettings() {
     const tbody = document.getElementById('settings-tbody');
-    tbody.innerHTML = '<tr><td colspan="11" class="empty-state">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state">Loading…</td></tr>';
 
-    // Fetch company names, settings, shift counts, and flag counts in parallel
     const [
       { data: twData },
       { data: settingsData },
@@ -365,29 +264,25 @@
       supabase.from('employer_shifts').select('company_name'),
     ]);
 
-    // Build full company list (deduplicated, sorted)
     const nameSet = new Set(
       (twData || []).map(r => r.customer_name).filter(Boolean)
     );
-
-    // Also include companies that have settings/shifts even if not in TempWorks
     for (const s of (settingsData || [])) { if (s.company_name) nameSet.add(s.company_name); }
     for (const s of (shiftsData  || [])) { if (s.company_name) nameSet.add(s.company_name); }
 
     const companies = [...nameSet].sort((a, b) => a.localeCompare(b));
 
-    // Build lookup maps
     const settingsMap = {};
     for (const s of (settingsData || [])) settingsMap[s.company_name] = s;
 
     const shiftCountMap = {};
     for (const s of (shiftsData || [])) shiftCountMap[s.company_name] = (shiftCountMap[s.company_name] || 0) + 1;
 
-    // Build row data
-    allRows = companies.map(name => ({
+    allRows = companies.map((name, i) => ({
       name,
       settings:   settingsMap[name]   || null,
       shiftCount: shiftCountMap[name] || 0,
+      idx: i,
     }));
 
     renderTable(allRows);
@@ -398,41 +293,89 @@
     const count = document.getElementById('co-count');
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No companies found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="empty-state">No companies found.</td></tr>';
       count.textContent = '';
       return;
     }
 
     count.textContent = `${rows.length} compan${rows.length === 1 ? 'y' : 'ies'}`;
 
-    tbody.innerHTML = rows.map(({ name, settings: s, shiftCount }) => {
-      const configured = !!s;
-      return `<tr>
-        <td style="font-weight:600">${name}</td>
-        <td>${configured
-          ? '<span class="badge-configured">Configured</span>'
-          : '<span class="badge-unconfigured">Not set</span>'}</td>
-        <td>${s ? `${s.early_tolerance_value} ${s.early_tolerance_unit}` : '—'}</td>
-        <td>${s ? `${s.late_tolerance_value} ${s.late_tolerance_unit}` : '—'}</td>
-        <td>${s ? `${s.lunch_min_minutes}–${s.lunch_max_minutes} min` : '—'}</td>
-        <td>${s ? `${s.daily_hour_limit} hrs` : '—'}</td>
-        <td>${s
-          ? (s.track_location
-              ? `<span class="badge-track-on">ON — ${s.location_radius_miles} mi</span>`
-              : `<span class="badge-track-off">OFF</span>`)
-          : '—'}</td>
-        <td style="font-size:.8rem">${s ? actionLabel(s.late_action)   : '—'}</td>
-        <td style="font-size:.8rem">${s ? actionLabel(s.noshow_action) : '—'}</td>
-        <td style="font-size:.8rem">${s?.notification_email || '—'}</td>
-        <td>${shiftCount > 0
-          ? `<span class="badge-shifts">${shiftCount} shift${shiftCount === 1 ? '' : 's'}</span>`
-          : '<span style="color:var(--text-secondary);font-size:.8rem">—</span>'}</td>
-        <td>
-          <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
-            onclick='openEditModal(${JSON.stringify(name)}, ${JSON.stringify(s)})'>Edit</button>
-        </td>
-      </tr>`;
-    }).join('');
+    tbody.innerHTML = rows.map(({ name, settings: s, shiftCount, idx }) => `<tr>
+      <td style="font-weight:600;white-space:nowrap">${name}</td>
+      <td id="t-${idx}-status">${s
+        ? '<span class="badge-configured">Configured</span>'
+        : '<span class="badge-unconfigured">Not set</span>'}</td>
+      <td>
+        <div class="tbl-pair">
+          <input class="tbl-input tbl-num" type="number" min="0" id="t-${idx}-earlyv" value="${s?.early_tolerance_value ?? 15}">
+          <select class="tbl-select" id="t-${idx}-earlyu">
+            <option value="minutes" ${(s?.early_tolerance_unit ?? 'minutes') === 'minutes' ? 'selected' : ''}>min</option>
+            <option value="hours"   ${s?.early_tolerance_unit === 'hours' ? 'selected' : ''}>hr</option>
+          </select>
+        </div>
+      </td>
+      <td>
+        <div class="tbl-pair">
+          <input class="tbl-input tbl-num" type="number" min="0" id="t-${idx}-latev" value="${s?.late_tolerance_value ?? 15}">
+          <select class="tbl-select" id="t-${idx}-lateu">
+            <option value="minutes" ${(s?.late_tolerance_unit ?? 'minutes') === 'minutes' ? 'selected' : ''}>min</option>
+            <option value="hours"   ${s?.late_tolerance_unit === 'hours' ? 'selected' : ''}>hr</option>
+          </select>
+        </div>
+      </td>
+      <td>
+        <div class="tbl-pair">
+          <input class="tbl-input tbl-num" type="number" min="0" id="t-${idx}-lmin" value="${s?.lunch_min_minutes ?? 0}" placeholder="min">
+          <span style="color:var(--text-secondary);font-size:.8rem">–</span>
+          <input class="tbl-input tbl-num" type="number" min="0" id="t-${idx}-lmax" value="${s?.lunch_max_minutes ?? 60}" placeholder="max">
+        </div>
+      </td>
+      <td>
+        <div class="tbl-pair">
+          <input class="tbl-input tbl-num" type="number" min="1" max="24" step="0.5" id="t-${idx}-dlimit" value="${s?.daily_hour_limit ?? 12}">
+          <span style="font-size:.75rem;color:var(--text-secondary)">hrs</span>
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" class="toggle-sm" id="t-${idx}-track" ${s?.track_location ? 'checked' : ''}
+              onchange="toggleInlineRadius(${idx})">
+            <span style="font-size:.78rem;color:var(--text-secondary)">Track</span>
+          </label>
+          <div id="t-${idx}-rw" style="${s?.track_location ? '' : 'display:none;'}">
+            <div class="tbl-pair">
+              <input class="tbl-input tbl-num" type="number" min="0.1" max="50" step="0.1"
+                id="t-${idx}-radius" value="${s?.location_radius_miles ?? 1.0}">
+              <span style="font-size:.72rem;color:var(--text-secondary)">mi</span>
+            </div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <select class="tbl-select" id="t-${idx}-laction">${actionOptions(s?.late_action)}</select>
+      </td>
+      <td>
+        <select class="tbl-select" id="t-${idx}-nsaction">${actionOptions(s?.noshow_action)}</select>
+      </td>
+      <td>
+        <input class="tbl-input tbl-email" type="email" id="t-${idx}-email"
+          value="${s?.notification_email || ''}" placeholder="alerts@co.com">
+      </td>
+      <td>
+        <button class="btn btn-outlined" style="font-size:.72rem;padding:4px 10px;"
+          onclick='openShiftsModal(${JSON.stringify(name)})'>
+          ${shiftCount > 0
+            ? `<span class="badge-shifts">${shiftCount} shift${shiftCount === 1 ? '' : 's'}</span>`
+            : 'Shifts'}
+        </button>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-primary" style="font-size:.72rem;padding:5px 12px;"
+          id="t-${idx}-savebtn" onclick="saveRowSettings(${idx})">Save</button>
+        <div id="t-${idx}-msg" style="font-size:.72rem;margin-top:3px;min-height:1em;"></div>
+      </td>
+    </tr>`).join('');
   }
 
   window.filterTable = function() {
@@ -441,93 +384,85 @@
     renderTable(filtered);
   };
 
-  // ── Edit Modal ────────────────────────────────────────────
-
-  let currentEditName = null;
-
-  window.openEditModal = function(companyName, s) {
-    currentEditName = companyName;
-    document.getElementById('modal-title').textContent = `Edit — ${companyName}`;
-    document.getElementById('co-id').value = s?.id || '';
-
-    // Populate fields with saved settings or defaults
-    document.getElementById('co-early-val').value    = s?.early_tolerance_value  ?? 15;
-    document.getElementById('co-early-unit').value   = s?.early_tolerance_unit   ?? 'minutes';
-    document.getElementById('co-late-val').value     = s?.late_tolerance_value   ?? 15;
-    document.getElementById('co-late-unit').value    = s?.late_tolerance_unit    ?? 'minutes';
-    document.getElementById('co-lunch-min').value    = s?.lunch_min_minutes      ?? 0;
-    document.getElementById('co-lunch-max').value    = s?.lunch_max_minutes      ?? 60;
-    document.getElementById('co-daily-limit').value  = s?.daily_hour_limit       ?? 12;
-    document.getElementById('co-late-action').value  = s?.late_action            ?? 'notify_internal';
-    document.getElementById('co-noshow-action').value= s?.noshow_action          ?? 'notify_internal';
-    document.getElementById('co-notif-email').value  = s?.notification_email     || '';
-    document.getElementById('co-track-location').checked = s?.track_location     ?? false;
-    document.getElementById('co-radius').value       = s?.location_radius_miles  ?? 1.0;
-    document.getElementById('radius-field').style.display = (s?.track_location) ? '' : 'none';
-
-    // Clear any leftover messages
-    ['co-error','co-success'].forEach(id => document.getElementById(id).classList.remove('show'));
-
-    document.getElementById('edit-modal').classList.add('open');
-    loadCompanyShifts(companyName);
+  window.toggleInlineRadius = function(idx) {
+    const wrap = document.getElementById(`t-${idx}-rw`);
+    if (wrap) wrap.style.display = document.getElementById(`t-${idx}-track`).checked ? '' : 'none';
   };
 
-  window.closeEditModal = function() {
-    document.getElementById('edit-modal').classList.remove('open');
-    currentEditName = null;
-  };
-
-  window.handleModalOverlayClick = function(e) {
-    if (e.target === document.getElementById('edit-modal')) closeEditModal();
-  };
-
-  window.saveCompanySettings = async function() {
-    const id   = document.getElementById('co-id').value;
-    const name = currentEditName;
-    if (!name) return;
+  window.saveRowSettings = async function(idx) {
+    const row = allRows.find(r => r.idx === idx);
+    if (!row) return;
+    const { name, settings: s } = row;
+    const btn   = document.getElementById(`t-${idx}-savebtn`);
+    const msgEl = document.getElementById(`t-${idx}-msg`);
 
     const payload = {
       company_name:          name,
-      early_tolerance_value: parseInt(document.getElementById('co-early-val').value)   || 15,
-      early_tolerance_unit:  document.getElementById('co-early-unit').value,
-      late_tolerance_value:  parseInt(document.getElementById('co-late-val').value)    || 15,
-      late_tolerance_unit:   document.getElementById('co-late-unit').value,
-      lunch_min_minutes:     parseInt(document.getElementById('co-lunch-min').value)   || 0,
-      lunch_max_minutes:     parseInt(document.getElementById('co-lunch-max').value)   || 60,
-      daily_hour_limit:      parseFloat(document.getElementById('co-daily-limit').value) || 12,
-      late_action:           document.getElementById('co-late-action').value,
-      noshow_action:         document.getElementById('co-noshow-action').value,
-      notification_email:    document.getElementById('co-notif-email').value.trim() || null,
-      track_location:        document.getElementById('co-track-location').checked,
-      location_radius_miles: parseFloat(document.getElementById('co-radius').value) || 1.0,
+      early_tolerance_value: parseInt(document.getElementById(`t-${idx}-earlyv`).value)    || 15,
+      early_tolerance_unit:  document.getElementById(`t-${idx}-earlyu`).value,
+      late_tolerance_value:  parseInt(document.getElementById(`t-${idx}-latev`).value)     || 15,
+      late_tolerance_unit:   document.getElementById(`t-${idx}-lateu`).value,
+      lunch_min_minutes:     parseInt(document.getElementById(`t-${idx}-lmin`).value)      || 0,
+      lunch_max_minutes:     parseInt(document.getElementById(`t-${idx}-lmax`).value)      || 60,
+      daily_hour_limit:      parseFloat(document.getElementById(`t-${idx}-dlimit`).value)  || 12,
+      late_action:           document.getElementById(`t-${idx}-laction`).value,
+      noshow_action:         document.getElementById(`t-${idx}-nsaction`).value,
+      notification_email:    document.getElementById(`t-${idx}-email`).value.trim() || null,
+      track_location:        document.getElementById(`t-${idx}-track`).checked,
+      location_radius_miles: parseFloat(document.getElementById(`t-${idx}-radius`).value)  || 1.0,
       updated_at:            new Date().toISOString(),
     };
 
-    const btn = document.getElementById('co-save-btn');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
       let error;
-      if (id) {
-        ({ error } = await supabase.from('employer_settings').update(payload).eq('id', id));
+      if (s?.id) {
+        ({ error } = await supabase.from('employer_settings').update(payload).eq('id', s.id));
       } else {
         ({ error } = await supabase.from('employer_settings').insert(payload));
       }
       if (error) throw error;
-      msg('co-success', `Settings for "${name}" saved.`, 'success');
-      setTimeout(() => {
-        closeEditModal();
-        loadSettings();
-      }, 1200);
+
+      // Update in-memory settings so subsequent saves use the right id
+      row.settings = { ...payload, id: s?.id };
+
+      msgEl.style.color = '#16a34a';
+      msgEl.textContent = 'Saved ✓';
+      setTimeout(() => { msgEl.textContent = ''; }, 3000);
+
+      // Update status badge without full reload
+      const statusEl = document.getElementById(`t-${idx}-status`);
+      if (statusEl) statusEl.innerHTML = '<span class="badge-configured">Configured</span>';
     } catch (err) {
-      msg('co-error', err.message);
+      msgEl.style.color = '#dc2626';
+      msgEl.textContent = err.message;
     } finally {
-      btn.disabled = false; btn.textContent = 'Save Settings';
+      btn.disabled = false; btn.textContent = 'Save';
     }
   };
 
   // ════════════════════════════════════════════════════════
-  // COMPANY SHIFTS
+  // SHIFTS MODAL
   // ════════════════════════════════════════════════════════
+
+  let currentShiftsCompany = null;
+
+  window.openShiftsModal = function(companyName) {
+    currentShiftsCompany = companyName;
+    document.getElementById('modal-title').textContent = `Shifts — ${companyName}`;
+    document.getElementById('sh-name').value = '';
+    document.getElementById('shifts-modal').classList.add('open');
+    loadCompanyShifts(companyName);
+  };
+
+  window.closeShiftsModal = function() {
+    document.getElementById('shifts-modal').classList.remove('open');
+    currentShiftsCompany = null;
+  };
+
+  window.handleModalOverlayClick = function(e) {
+    if (e.target === document.getElementById('shifts-modal')) closeShiftsModal();
+  };
 
   function fmtTime(t) {
     if (!t) return '—';
@@ -565,7 +500,7 @@
     const color = document.getElementById('sh-color').value;
     if (!name || !start || !end) return;
     const { error } = await supabase.from('employer_shifts').insert({
-      company_name: currentEditName,
+      company_name: currentShiftsCompany,
       shift_name:   name,
       start_time:   start,
       end_time:     end,
@@ -573,18 +508,17 @@
     });
     if (error) { alert(error.message); return; }
     document.getElementById('sh-name').value = '';
-    await loadCompanyShifts(currentEditName);
-    loadSettings(); // refresh shift count badge in table
+    await loadCompanyShifts(currentShiftsCompany);
+    loadSettings();
   };
 
   window.deleteShift = async function(id) {
     const { error } = await supabase.from('employer_shifts').delete().eq('id', id);
     if (!error) {
-      await loadCompanyShifts(currentEditName);
-      loadSettings(); // refresh shift count badge in table
+      await loadCompanyShifts(currentShiftsCompany);
+      loadSettings();
     }
   };
-
 
   // ════════════════════════════════════════════════════════
   // WORKER PAY RATES TAB
