@@ -288,7 +288,7 @@
       { data: settingsData },
       { data: shiftsData },
     ] = await Promise.all([
-      supabase.from('tw_customer_weekly_summary').select('customer_name').not('customer_name', 'is', null),
+      supabase.from('tw_timecards').select('customer_name').not('customer_name', 'is', null),
       supabase.from('employer_settings').select('*'),
       supabase.from('employer_shifts').select('company_name'),
     ]);
@@ -596,15 +596,23 @@
       { data: twData },
       { data: mapData },
     ] = await Promise.all([
-      supabase.from('tw_customer_weekly_summary').select('customer_name').not('customer_name','is',null),
+      supabase.from('tw_timecards').select('customer_id,customer_name').not('customer_name','is',null).not('customer_id','is',null),
       supabase.from('company_ts_department_map').select('*').order('ts_department_id'),
     ]);
 
-    // Populate TW company dropdown
-    twCompanyList = [...new Set((twData || []).map(r => r.customer_name).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+    // Populate TW company dropdown — deduplicate by customer_id, sort by name
+    const seen = new Map();
+    for (const r of (twData || [])) {
+      if (r.customer_id && r.customer_name && !seen.has(r.customer_id)) {
+        seen.set(r.customer_id, r.customer_name);
+      }
+    }
+    twCompanyList = [...seen.entries()]
+      .sort(([,a],[,b]) => a.localeCompare(b))
+      .map(([id, name]) => ({ id, name }));
     const sel = document.getElementById('new-map-company');
     sel.innerHTML = '<option value="">— Select company —</option>'
-      + twCompanyList.map(n => `<option value="${n}">${n}</option>`).join('');
+      + twCompanyList.map(c => `<option value="${c.name}">${c.name} (${c.id})</option>`).join('');
 
     renderMappingTable(mapData || []);
   }
