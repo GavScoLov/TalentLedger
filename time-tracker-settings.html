@@ -110,6 +110,30 @@
     .shift-del:hover { color:#dc2626; }
     .shift-empty { font-size:.82rem; color:var(--text-secondary); font-style:italic; padding:4px 0; }
     .badge-shifts { background:#EDE9FE; color:#5B21B6; padding:2px 8px; border-radius:999px; font-size:.7rem; font-weight:700; }
+
+    /* ── Flags section inside modal ── */
+    .flags-section h4 { font-size:.78rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; margin:0 0 12px; }
+    .flag-add-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+    .flag-add-grid input, .flag-add-grid select {
+      padding:7px 10px; border:1px solid var(--border-color); border-radius:6px;
+      font-size:.85rem; font-family:var(--font); background:var(--bg-default); color:var(--text-primary);
+    }
+    .flag-add-grid input:focus, .flag-add-grid select:focus { outline:none; border-color:var(--primary); }
+    .flag-add-row2 { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    .flag-add-row2 select, .flag-add-row2 input { padding:7px 10px; border:1px solid var(--border-color); border-radius:6px; font-size:.85rem; font-family:var(--font); background:var(--bg-default); color:var(--text-primary); }
+    .flag-add-row2 select { flex:1; }
+    .flag-add-row2 input  { width:110px; flex-shrink:0; }
+    .flag-add-row2 input:focus, .flag-add-row2 select:focus { outline:none; border-color:var(--primary); }
+    .flag-list { display:flex; flex-direction:column; gap:6px; }
+    .flag-item { display:flex; align-items:center; gap:10px; padding:8px 12px; background:var(--bg-default); border:1px solid var(--border-color); border-radius:6px; }
+    .flag-name { font-weight:600; font-size:.85rem; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .flag-desc { font-size:.78rem; color:var(--text-secondary); white-space:nowrap; }
+    .flag-del  { background:none; border:none; color:#9CA3AF; cursor:pointer; font-size:1.1rem; line-height:1; padding:2px 4px; margin-left:4px; flex-shrink:0; }
+    .flag-del:hover { color:#dc2626; }
+    .flag-empty { font-size:.82rem; color:var(--text-secondary); font-style:italic; padding:4px 0; }
+    .badge-sev-warning { background:#FEF3C7; color:#92400E; padding:2px 7px; border-radius:999px; font-size:.68rem; font-weight:700; white-space:nowrap; }
+    .badge-sev-error   { background:#FEE2E2; color:#991B1B; padding:2px 7px; border-radius:999px; font-size:.68rem; font-weight:700; white-space:nowrap; }
+    .badge-flags { background:#FEF3C7; color:#92400E; padding:2px 8px; border-radius:999px; font-size:.7rem; font-weight:700; }
   </style>
 </head>
 <body>
@@ -160,10 +184,11 @@
               <th>No-Show Action</th>
               <th>Notification Email</th>
               <th>Shifts</th>
+              <th>Exceptions</th>
               <th>Actions</th>
             </tr></thead>
             <tbody id="settings-tbody">
-              <tr><td colspan="12" class="empty-state">Loading…</td></tr>
+              <tr><td colspan="13" class="empty-state">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -301,6 +326,38 @@
         <div class="shift-empty">No shifts defined yet.</div>
       </div>
     </div>
+
+    <hr class="modal-divider">
+
+    <div class="flags-section">
+      <h4>Exception Reports</h4>
+      <div class="flag-add-grid">
+        <input type="text" id="fl-name" placeholder="Exception name (e.g. Long Shift)" style="grid-column:1/-1">
+        <select id="fl-field" onchange="updateFlagValueInput()">
+          <option value="shift_duration">Shift Duration</option>
+          <option value="shift_start_time">Shift Start Time</option>
+          <option value="shift_end_time">Shift End Time</option>
+        </select>
+        <select id="fl-operator">
+          <option value="gt">is greater than</option>
+          <option value="gte">is greater than or equal to</option>
+          <option value="lt">is less than</option>
+          <option value="lte">is less than or equal to</option>
+        </select>
+      </div>
+      <div class="flag-add-row2">
+        <input type="number" id="fl-value-num" min="0" step="0.5" placeholder="Hours" style="width:110px;">
+        <input type="time"   id="fl-value-time" value="15:30" style="display:none;width:130px;">
+        <select id="fl-severity">
+          <option value="warning">Warning</option>
+          <option value="error">Error</option>
+        </select>
+        <button class="btn btn-primary" onclick="addFlag()" style="font-size:.8rem;padding:7px 14px;white-space:nowrap;">+ Add</button>
+      </div>
+      <div id="flag-list" class="flag-list">
+        <div class="flag-empty">No exception reports defined yet.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -352,15 +409,17 @@
     const tbody = document.getElementById('settings-tbody');
     tbody.innerHTML = '<tr><td colspan="11" class="empty-state">Loading…</td></tr>';
 
-    // Fetch company names, settings, and shift counts in parallel
+    // Fetch company names, settings, shift counts, and flag counts in parallel
     const [
       { data: twData },
       { data: settingsData },
       { data: shiftsData },
+      { data: flagsData },
     ] = await Promise.all([
       supabase.from('tw_customer_weekly_summary').select('customer_name').not('customer_name', 'is', null),
       supabase.from('employer_settings').select('*'),
       supabase.from('employer_shifts').select('company_name'),
+      supabase.from('employer_flags').select('company_name'),
     ]);
 
     // Build full company list (deduplicated, sorted)
@@ -368,9 +427,10 @@
       (twData || []).map(r => r.customer_name).filter(Boolean)
     );
 
-    // Also include any saved settings/shifts companies in case they aren't in TempWorks
+    // Also include companies that have settings/shifts/flags even if not in TempWorks
     for (const s of (settingsData || [])) { if (s.company_name) nameSet.add(s.company_name); }
     for (const s of (shiftsData  || [])) { if (s.company_name) nameSet.add(s.company_name); }
+    for (const s of (flagsData   || [])) { if (s.company_name) nameSet.add(s.company_name); }
 
     const companies = [...nameSet].sort((a, b) => a.localeCompare(b));
 
@@ -381,8 +441,16 @@
     const shiftCountMap = {};
     for (const s of (shiftsData || [])) shiftCountMap[s.company_name] = (shiftCountMap[s.company_name] || 0) + 1;
 
+    const flagCountMap = {};
+    for (const s of (flagsData || [])) flagCountMap[s.company_name] = (flagCountMap[s.company_name] || 0) + 1;
+
     // Build row data
-    allRows = companies.map(name => ({ name, settings: settingsMap[name] || null, shiftCount: shiftCountMap[name] || 0 }));
+    allRows = companies.map(name => ({
+      name,
+      settings:   settingsMap[name]   || null,
+      shiftCount: shiftCountMap[name] || 0,
+      flagCount:  flagCountMap[name]  || 0,
+    }));
 
     renderTable(allRows);
   }
@@ -399,7 +467,7 @@
 
     count.textContent = `${rows.length} compan${rows.length === 1 ? 'y' : 'ies'}`;
 
-    tbody.innerHTML = rows.map(({ name, settings: s, shiftCount }) => {
+    tbody.innerHTML = rows.map(({ name, settings: s, shiftCount, flagCount }) => {
       const configured = !!s;
       return `<tr>
         <td style="font-weight:600">${name}</td>
@@ -420,6 +488,9 @@
         <td style="font-size:.8rem">${s?.notification_email || '—'}</td>
         <td>${shiftCount > 0
           ? `<span class="badge-shifts">${shiftCount} shift${shiftCount === 1 ? '' : 's'}</span>`
+          : '<span style="color:var(--text-secondary);font-size:.8rem">—</span>'}</td>
+        <td>${flagCount > 0
+          ? `<span class="badge-flags">${flagCount} exception${flagCount === 1 ? '' : 's'}</span>`
           : '<span style="color:var(--text-secondary);font-size:.8rem">—</span>'}</td>
         <td>
           <button class="btn btn-outlined" style="font-size:.75rem;padding:4px 10px;"
@@ -464,6 +535,7 @@
 
     document.getElementById('edit-modal').classList.add('open');
     loadCompanyShifts(companyName);
+    loadCompanyFlags(companyName);
   };
 
   window.closeEditModal = function() {
@@ -576,6 +648,84 @@
     if (!error) {
       await loadCompanyShifts(currentEditName);
       loadSettings(); // refresh shift count badge in table
+    }
+  };
+
+  // ════════════════════════════════════════════════════════
+  // EXCEPTION REPORTS
+  // ════════════════════════════════════════════════════════
+
+  const FLAG_FIELDS = {
+    shift_duration:  'Shift Duration',
+    shift_start_time:'Shift Start Time',
+    shift_end_time:  'Shift End Time',
+  };
+  const FLAG_OPS = { gt:'>', gte:'≥', lt:'<', lte:'≤' };
+
+  function fmtFlagValue(field, value) {
+    if (field === 'shift_duration') return `${value} hr${Number(value) === 1 ? '' : 's'}`;
+    return fmtTime(value);
+  }
+
+  window.updateFlagValueInput = function() {
+    const field = document.getElementById('fl-field').value;
+    const isTime = field === 'shift_start_time' || field === 'shift_end_time';
+    document.getElementById('fl-value-num').style.display  = isTime ? 'none' : '';
+    document.getElementById('fl-value-time').style.display = isTime ? '' : 'none';
+  };
+
+  async function loadCompanyFlags(companyName) {
+    const container = document.getElementById('flag-list');
+    container.innerHTML = '<div class="flag-empty">Loading…</div>';
+    const { data, error } = await supabase
+      .from('employer_flags')
+      .select('*')
+      .eq('company_name', companyName)
+      .order('created_at');
+    if (error || !data?.length) {
+      container.innerHTML = '<div class="flag-empty">No exception reports defined yet.</div>';
+      return;
+    }
+    container.innerHTML = data.map(f => {
+      const sevClass = f.severity === 'error' ? 'badge-sev-error' : 'badge-sev-warning';
+      const sevLabel = f.severity === 'error' ? 'Error' : 'Warning';
+      const desc = `${FLAG_FIELDS[f.field] || f.field} ${FLAG_OPS[f.operator] || f.operator} ${fmtFlagValue(f.field, f.value)}`;
+      return `
+        <div class="flag-item">
+          <span class="flag-name">${f.flag_name}</span>
+          <span class="flag-desc">${desc}</span>
+          <span class="badge-sev-${f.severity}">${sevLabel}</span>
+          <button class="flag-del" onclick="deleteFlag('${f.id}')" title="Remove">×</button>
+        </div>`;
+    }).join('');
+  }
+
+  window.addFlag = async function() {
+    const name     = document.getElementById('fl-name').value.trim();
+    const field    = document.getElementById('fl-field').value;
+    const operator = document.getElementById('fl-operator').value;
+    const severity = document.getElementById('fl-severity').value;
+    const isTime   = field === 'shift_start_time' || field === 'shift_end_time';
+    const value    = isTime
+      ? document.getElementById('fl-value-time').value
+      : document.getElementById('fl-value-num').value;
+    if (!name || !value) return;
+    const { error } = await supabase.from('employer_flags').insert({
+      company_name: currentEditName,
+      flag_name:    name,
+      field, operator, value, severity,
+    });
+    if (error) { alert(error.message); return; }
+    document.getElementById('fl-name').value = '';
+    await loadCompanyFlags(currentEditName);
+    loadSettings();
+  };
+
+  window.deleteFlag = async function(id) {
+    const { error } = await supabase.from('employer_flags').delete().eq('id', id);
+    if (!error) {
+      await loadCompanyFlags(currentEditName);
+      loadSettings();
     }
   };
 
