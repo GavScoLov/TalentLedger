@@ -7,6 +7,37 @@
   <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
   <link rel="stylesheet" href="./src/design-system.css">
   <style>
+    /* ── Rule cards ── */
+    .rules-section { background:var(--bg-paper); border:1px solid var(--border-color); border-radius:var(--radius); padding:20px 24px; margin-bottom:20px; }
+    .rules-section h2 { font-size:.9rem; font-weight:700; color:var(--text-primary); margin:0 0 4px; }
+    .rules-section p  { font-size:.8rem; color:var(--text-secondary); margin:0 0 18px; }
+    .rules-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+    .rule-card {
+      border:1.5px solid var(--border-color); border-radius:8px; padding:14px 16px;
+      display:flex; flex-direction:column; gap:10px; background:var(--bg-default);
+      transition:border-color .15s;
+    }
+    .rule-card.enabled { border-color:var(--primary); background:var(--bg-paper); }
+    .rule-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+    .rule-card-info { flex:1; }
+    .rule-card-name { font-size:.875rem; font-weight:700; color:var(--text-primary); margin-bottom:3px; }
+    .rule-card-desc { font-size:.75rem; color:var(--text-secondary); line-height:1.4; }
+    .rule-card-bottom { display:flex; align-items:center; gap:8px; }
+    .rule-card-bottom label { font-size:.72rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.3px; }
+    .rule-card-bottom select {
+      padding:4px 8px; border:1px solid var(--border-color); border-radius:6px;
+      font-size:.8rem; font-family:var(--font); background:var(--bg-default); color:var(--text-primary);
+    }
+    .rule-card-bottom select:focus { outline:none; border-color:var(--primary); }
+
+    /* Toggle */
+    input[type="checkbox"].toggle { width:38px; height:20px; appearance:none; background:#D1D5DB;
+      border-radius:999px; cursor:pointer; position:relative; transition:background .2s; flex-shrink:0; margin-top:2px; }
+    input[type="checkbox"].toggle:checked { background:var(--primary); }
+    input[type="checkbox"].toggle::after { content:''; position:absolute; width:16px; height:16px;
+      border-radius:50%; background:#fff; top:2px; left:2px; transition:left .2s; }
+    input[type="checkbox"].toggle:checked::after { left:20px; }
+
     /* ── Filter bar ── */
     .filter-bar {
       display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
@@ -21,37 +52,28 @@
     }
     .filter-field input:focus, .filter-field select:focus { outline:none; border-color:var(--primary); }
 
-    /* ── Summary stats ── */
+    /* ── Stats ── */
     .stats-row { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-    .stat-card {
-      background:var(--bg-paper); border:1px solid var(--border-color); border-radius:var(--radius);
-      padding:14px 20px; flex:1; min-width:130px;
-    }
+    .stat-card { background:var(--bg-paper); border:1px solid var(--border-color); border-radius:var(--radius); padding:14px 20px; flex:1; min-width:120px; }
     .stat-card .stat-val { font-size:1.6rem; font-weight:700; color:var(--text-primary); line-height:1; }
     .stat-card .stat-lbl { font-size:.75rem; color:var(--text-secondary); margin-top:4px; }
-    .stat-card.warn  { border-left:3px solid #F59E0B; }
-    .stat-card.error { border-left:3px solid #EF4444; }
-    .stat-card.total { border-left:3px solid var(--primary); }
+    .stat-card.s-total { border-left:3px solid var(--primary); }
+    .stat-card.s-error { border-left:3px solid #EF4444; }
+    .stat-card.s-warn  { border-left:3px solid #F59E0B; }
 
     /* ── Table ── */
     .table-wrap { overflow-x:auto; border-radius:var(--radius); border:1px solid var(--border-color); }
     .data-table { width:100%; border-collapse:collapse; font-size:.85rem; }
-    .data-table th {
-      background:var(--primary); color:#fff; padding:10px 14px; text-align:left;
-      font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap;
-    }
-    .data-table td { padding:10px 14px; border-bottom:1px solid var(--border-color); color:var(--text-primary); }
+    .data-table th { background:var(--primary); color:#fff; padding:10px 14px; text-align:left; font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+    .data-table td { padding:10px 14px; border-bottom:1px solid var(--border-color); color:var(--text-primary); vertical-align:middle; }
     .data-table tbody tr:last-child td { border-bottom:none; }
     .data-table tbody tr:hover { background:var(--bg-default); }
     .empty-state { text-align:center; padding:48px; color:var(--text-secondary); }
     .empty-state .icon { font-size:2rem; margin-bottom:8px; }
 
-    /* ── Badges ── */
     .badge-warning { background:#FEF3C7; color:#92400E; padding:3px 9px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
     .badge-error   { background:#FEE2E2; color:#991B1B; padding:3px 9px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap; }
-
-    /* ── Result count ── */
-    .result-count { font-size:.82rem; color:var(--text-secondary); margin-bottom:10px; }
+    .result-count  { font-size:.82rem; color:var(--text-secondary); margin-bottom:10px; }
   </style>
 </head>
 <body>
@@ -64,11 +86,20 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Exception Reports</h1>
-          <p class="page-subtitle">Workers and companies that have triggered configured exception rules</p>
+          <p class="page-subtitle">Track workers who fall outside configured tolerances, limits, and shift windows</p>
         </div>
       </div>
 
-      <!-- Filter bar -->
+      <!-- Rules configuration -->
+      <div class="rules-section">
+        <h2>Exception Rules</h2>
+        <p>Enable the rules you want to monitor. Each rule is evaluated against the individual company's configured settings and shifts.</p>
+        <div class="rules-grid" id="rules-grid">
+          <!-- rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Filters -->
       <div class="filter-bar">
         <div class="filter-field">
           <label>Start Date</label>
@@ -92,57 +123,32 @@
             <option value="warning">Warning only</option>
           </select>
         </div>
-        <div class="filter-field" style="justify-content:flex-end;">
-          <label style="visibility:hidden">Refresh</label>
-          <button class="btn btn-outlined" onclick="runReport()" id="run-btn" style="padding:8px 20px;font-size:.875rem;">Refresh</button>
-        </div>
       </div>
 
-      <!-- Summary stats -->
+      <!-- Stats (hidden until results load) -->
       <div class="stats-row" id="stats-row" style="display:none;">
-        <div class="stat-card total">
-          <div class="stat-val" id="stat-total">0</div>
-          <div class="stat-lbl">Total Exceptions</div>
-        </div>
-        <div class="stat-card error">
-          <div class="stat-val" id="stat-errors">0</div>
-          <div class="stat-lbl">Errors</div>
-        </div>
-        <div class="stat-card warn">
-          <div class="stat-val" id="stat-warnings">0</div>
-          <div class="stat-lbl">Warnings</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="stat-workers">0</div>
-          <div class="stat-lbl">Workers Affected</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="stat-companies">0</div>
-          <div class="stat-lbl">Companies Affected</div>
-        </div>
+        <div class="stat-card s-total"><div class="stat-val" id="st-total">0</div><div class="stat-lbl">Total Exceptions</div></div>
+        <div class="stat-card s-error"><div class="stat-val" id="st-errors">0</div><div class="stat-lbl">Errors</div></div>
+        <div class="stat-card s-warn" ><div class="stat-val" id="st-warns">0</div><div class="stat-lbl">Warnings</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-workers">0</div><div class="stat-lbl">Workers Affected</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-companies">0</div><div class="stat-lbl">Companies Affected</div></div>
       </div>
 
-      <!-- Results -->
       <div id="result-count" class="result-count" style="display:none;"></div>
+
+      <!-- Results table -->
       <div class="table-wrap">
         <table class="data-table">
-          <thead>
-            <tr>
-              <th>Severity</th>
-              <th>Company</th>
-              <th>Worker</th>
-              <th>Date</th>
-              <th>Exception Rule</th>
-              <th>Details</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Severity</th>
+            <th>Company</th>
+            <th>Worker</th>
+            <th>Date</th>
+            <th>Rule</th>
+            <th>Details</th>
+          </tr></thead>
           <tbody id="results-tbody">
-            <tr>
-              <td colspan="6" class="empty-state">
-                <div class="icon">⚠️</div>
-                Select a date range and click <strong>Run Report</strong> to see exceptions.
-              </td>
-            </tr>
+            <tr><td colspan="6" class="empty-state"><div class="icon">⏳</div>Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -162,7 +168,50 @@
   renderNavbar();
   await renderSidebar();
 
-  // ── Default date range: last 7 days ──────────────────────
+  // ── Predefined rule definitions ───────────────────────────
+  const RULE_DEFS = [
+    {
+      type: 'early_clockin',
+      name: 'Early Clock-In',
+      desc: 'Worker clocked in earlier than the shift start minus the early tolerance.',
+      requiresShifts: true,
+    },
+    {
+      type: 'late_clockin',
+      name: 'Late Clock-In',
+      desc: 'Worker clocked in later than the shift start plus the late tolerance.',
+      requiresShifts: true,
+    },
+    {
+      type: 'short_lunch',
+      name: 'Short Lunch',
+      desc: 'Worker's lunch break was shorter than the company minimum.',
+      requiresLunch: true,
+    },
+    {
+      type: 'long_lunch',
+      name: 'Long Lunch',
+      desc: 'Worker's lunch break exceeded the company maximum.',
+      requiresLunch: true,
+    },
+    {
+      type: 'over_daily_limit',
+      name: 'Over Daily Hour Limit',
+      desc: 'Worker's total hours exceeded the company daily hour limit.',
+    },
+    {
+      type: 'outside_shift',
+      name: 'Outside Shift Window',
+      desc: 'Worker clocked in outside all defined shift windows for that company.',
+      requiresShifts: true,
+    },
+  ];
+
+  // ── Rule config state ─────────────────────────────────────
+  // rule_type → { enabled, severity }
+  let ruleConfig = {};
+
+  // ── Default dates: last 7 days ────────────────────────────
   const today = new Date();
   const prior = new Date(today);
   prior.setDate(today.getDate() - 7);
@@ -170,205 +219,311 @@
   document.getElementById('f-start').value = toISO(prior);
   document.getElementById('f-end').value   = toISO(today);
 
-  // ── Populate company filter from employer_flags ───────────
+  // ── Load / init exception rules from Supabase ─────────────
+  async function loadRules() {
+    const { data } = await supabase.from('exception_rules').select('*');
+    const saved = {};
+    for (const r of (data || [])) saved[r.rule_type] = r;
+
+    // Upsert any missing defaults
+    const missing = RULE_DEFS.filter(d => !saved[d.type]);
+    if (missing.length) {
+      await supabase.from('exception_rules').upsert(
+        missing.map(d => ({ rule_type: d.type, enabled: true, severity: 'warning' })),
+        { onConflict: 'rule_type' }
+      );
+    }
+
+    for (const d of RULE_DEFS) {
+      ruleConfig[d.type] = saved[d.type]
+        ? { enabled: saved[d.type].enabled, severity: saved[d.type].severity }
+        : { enabled: true, severity: 'warning' };
+    }
+
+    renderRuleCards();
+  }
+
+  function renderRuleCards() {
+    const grid = document.getElementById('rules-grid');
+    grid.innerHTML = RULE_DEFS.map(def => {
+      const cfg = ruleConfig[def.type];
+      return `
+        <div class="rule-card ${cfg.enabled ? 'enabled' : ''}" id="card-${def.type}">
+          <div class="rule-card-top">
+            <div class="rule-card-info">
+              <div class="rule-card-name">${def.name}</div>
+              <div class="rule-card-desc">${def.desc}</div>
+            </div>
+            <input type="checkbox" class="toggle" id="tog-${def.type}"
+              ${cfg.enabled ? 'checked' : ''}
+              onchange="toggleRule('${def.type}')">
+          </div>
+          <div class="rule-card-bottom">
+            <label>Severity</label>
+            <select id="sev-${def.type}" onchange="changeSeverity('${def.type}')"
+              ${!cfg.enabled ? 'disabled' : ''}>
+              <option value="warning" ${cfg.severity === 'warning' ? 'selected' : ''}>Warning</option>
+              <option value="error"   ${cfg.severity === 'error'   ? 'selected' : ''}>Error</option>
+            </select>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  window.toggleRule = async function(type) {
+    const enabled = document.getElementById('tog-' + type).checked;
+    ruleConfig[type].enabled = enabled;
+    document.getElementById('card-' + type).classList.toggle('enabled', enabled);
+    document.getElementById('sev-' + type).disabled = !enabled;
+    await supabase.from('exception_rules')
+      .upsert({ rule_type: type, enabled, severity: ruleConfig[type].severity }, { onConflict: 'rule_type' });
+    runReport();
+  };
+
+  window.changeSeverity = async function(type) {
+    const severity = document.getElementById('sev-' + type).value;
+    ruleConfig[type].severity = severity;
+    await supabase.from('exception_rules')
+      .upsert({ rule_type: type, enabled: ruleConfig[type].enabled, severity }, { onConflict: 'rule_type' });
+    runReport();
+  };
+
+  // ── Populate company filter ───────────────────────────────
   async function loadCompanyFilter() {
-    const { data } = await supabase.from('employer_flags').select('company_name');
+    const { data } = await supabase.from('employer_settings').select('company_name').order('company_name');
     if (!data?.length) return;
-    const companies = [...new Set(data.map(r => r.company_name))].sort();
     const sel = document.getElementById('f-company');
-    companies.forEach(c => {
+    data.forEach(r => {
       const opt = document.createElement('option');
-      opt.value = c; opt.textContent = c;
+      opt.value = r.company_name; opt.textContent = r.company_name;
       sel.appendChild(opt);
     });
   }
 
   // ── Evaluation helpers ────────────────────────────────────
-  function timeToMins(str) {
-    const [h, m] = String(str).split(':').map(Number);
+  function toMins(hhmm) {
+    const [h, m] = String(hhmm).split(':').map(Number);
     return h * 60 + (m || 0);
   }
-
-  function timestampToMins(ts) {
+  function tsMins(ts) {
     const d = new Date(ts);
     return d.getHours() * 60 + d.getMinutes();
   }
-
-  function compare(a, op, b) {
-    if (op === 'gt')  return a > b;
-    if (op === 'gte') return a >= b;
-    if (op === 'lt')  return a < b;
-    if (op === 'lte') return a <= b;
-    return false;
-  }
-
   function fmtTime12(ts) {
     const d = new Date(ts);
     const h = d.getHours(), m = d.getMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  }
+  function fmtHHMM(hhmm) {
+    const [h, m] = hhmm.split(':').map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  }
+  function fmtMins(mins) {
+    if (mins < 60) return `${mins} min`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  }
+  function closestShift(shifts, checkInMins) {
+    return shifts.reduce((best, sh) => {
+      const diff     = Math.abs(checkInMins - toMins(sh.start_time));
+      const bestDiff = best ? Math.abs(checkInMins - toMins(best.start_time)) : Infinity;
+      return diff < bestDiff ? sh : best;
+    }, null);
   }
 
-  function fmtThreshold(flag) {
-    if (flag.field === 'shift_duration') return `${flag.value} hr${Number(flag.value) === 1 ? '' : 's'}`;
-    const [h, m] = flag.value.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${ampm}`;
-  }
+  function evaluateSession(session, settings, shifts) {
+    const company   = session.workers?.company;
+    const violations = [];
+    const ciMins    = session.check_in_time  ? tsMins(session.check_in_time)  : null;
+    const coMins    = session.check_out_time ? tsMins(session.check_out_time) : null;
 
-  const OP_LABEL = { gt:'>', gte:'≥', lt:'<', lte:'≤' };
-  const FIELD_LABEL = {
-    shift_duration:   'Shift Duration',
-    shift_start_time: 'Start Time',
-    shift_end_time:   'End Time',
-  };
+    const nearest = (shifts.length && ciMins !== null) ? closestShift(shifts, ciMins) : null;
 
-  function buildDetail(session, flag) {
-    if (flag.field === 'shift_duration') {
-      const hrs = parseFloat(session.hours_worked).toFixed(2);
-      return `Duration was ${hrs} hrs (rule: ${OP_LABEL[flag.operator]} ${fmtThreshold(flag)})`;
-    }
-    if (flag.field === 'shift_end_time') {
-      return `Clocked out at ${fmtTime12(session.check_out_time)} (rule: ${OP_LABEL[flag.operator]} ${fmtThreshold(flag)})`;
-    }
-    if (flag.field === 'shift_start_time') {
-      return `Clocked in at ${fmtTime12(session.check_in_time)} (rule: ${OP_LABEL[flag.operator]} ${fmtThreshold(flag)})`;
-    }
-    return '';
-  }
-
-  function evaluateSession(session, flags) {
-    const company = session.workers?.company;
-    if (!company) return [];
-    const hits = [];
-    for (const flag of flags) {
-      if (flag.company_name !== company) continue;
-      let fieldVal, threshold;
-      if (flag.field === 'shift_duration') {
-        if (session.hours_worked == null) continue;
-        fieldVal  = parseFloat(session.hours_worked);
-        threshold = parseFloat(flag.value);
-      } else if (flag.field === 'shift_end_time') {
-        if (!session.check_out_time) continue;
-        fieldVal  = timestampToMins(session.check_out_time);
-        threshold = timeToMins(flag.value);
-      } else if (flag.field === 'shift_start_time') {
-        if (!session.check_in_time) continue;
-        fieldVal  = timestampToMins(session.check_in_time);
-        threshold = timeToMins(flag.value);
-      } else continue;
-
-      if (compare(fieldVal, flag.operator, threshold)) {
-        hits.push({ flag, session, company, detail: buildDetail(session, flag) });
+    // 1. Early Clock-In
+    if (ruleConfig.early_clockin?.enabled && settings && nearest && ciMins !== null) {
+      const tolMins = settings.early_tolerance_unit === 'hours'
+        ? settings.early_tolerance_value * 60
+        : settings.early_tolerance_value;
+      const shStart = toMins(nearest.start_time);
+      if (ciMins < shStart - tolMins) {
+        violations.push({
+          type: 'early_clockin', name: 'Early Clock-In',
+          severity: ruleConfig.early_clockin.severity,
+          detail: `Clocked in at ${fmtTime12(session.check_in_time)} — ${fmtMins(shStart - ciMins)} before "${nearest.shift_name}" start (${fmtHHMM(nearest.start_time)}), tolerance ${tolMins} min`,
+        });
       }
     }
-    return hits;
+
+    // 2. Late Clock-In
+    if (ruleConfig.late_clockin?.enabled && settings && nearest && ciMins !== null) {
+      const tolMins = settings.late_tolerance_unit === 'hours'
+        ? settings.late_tolerance_value * 60
+        : settings.late_tolerance_value;
+      const shStart = toMins(nearest.start_time);
+      if (ciMins > shStart + tolMins) {
+        violations.push({
+          type: 'late_clockin', name: 'Late Clock-In',
+          severity: ruleConfig.late_clockin.severity,
+          detail: `Clocked in at ${fmtTime12(session.check_in_time)} — ${fmtMins(ciMins - shStart)} after "${nearest.shift_name}" start (${fmtHHMM(nearest.start_time)}), tolerance ${tolMins} min`,
+        });
+      }
+    }
+
+    // 3. Short Lunch
+    if (ruleConfig.short_lunch?.enabled && settings && session.lunch_start && session.lunch_end) {
+      const mins = Math.round((new Date(session.lunch_end) - new Date(session.lunch_start)) / 60000);
+      if (mins < settings.lunch_min_minutes) {
+        violations.push({
+          type: 'short_lunch', name: 'Short Lunch',
+          severity: ruleConfig.short_lunch.severity,
+          detail: `Lunch was ${mins} min — below the ${settings.lunch_min_minutes} min minimum`,
+        });
+      }
+    }
+
+    // 4. Long Lunch
+    if (ruleConfig.long_lunch?.enabled && settings && session.lunch_start && session.lunch_end) {
+      const mins = Math.round((new Date(session.lunch_end) - new Date(session.lunch_start)) / 60000);
+      if (mins > settings.lunch_max_minutes) {
+        violations.push({
+          type: 'long_lunch', name: 'Long Lunch',
+          severity: ruleConfig.long_lunch.severity,
+          detail: `Lunch was ${mins} min — above the ${settings.lunch_max_minutes} min maximum`,
+        });
+      }
+    }
+
+    // 5. Over Daily Limit
+    if (ruleConfig.over_daily_limit?.enabled && settings && session.hours_worked != null) {
+      const hrs   = parseFloat(session.hours_worked);
+      const limit = parseFloat(settings.daily_hour_limit);
+      if (hrs > limit) {
+        violations.push({
+          type: 'over_daily_limit', name: 'Over Daily Limit',
+          severity: ruleConfig.over_daily_limit.severity,
+          detail: `Worked ${hrs.toFixed(2)} hrs — exceeds the ${limit} hr daily limit`,
+        });
+      }
+    }
+
+    // 6. Outside Shift Window
+    if (ruleConfig.outside_shift?.enabled && shifts.length > 0 && ciMins !== null) {
+      const inWindow = shifts.some(sh => {
+        const s = toMins(sh.start_time), e = toMins(sh.end_time);
+        return ciMins >= s && ciMins <= e;
+      });
+      if (!inWindow) {
+        violations.push({
+          type: 'outside_shift', name: 'Outside Shift Window',
+          severity: ruleConfig.outside_shift.severity,
+          detail: `Clocked in at ${fmtTime12(session.check_in_time)} — outside all defined shift windows`,
+        });
+      }
+    }
+
+    return violations.map(v => ({ ...v, session, company }));
   }
 
   // ── Run Report ────────────────────────────────────────────
-  window.runReport = async function() {
-    const start     = document.getElementById('f-start').value;
-    const end       = document.getElementById('f-end').value;
-    const company   = document.getElementById('f-company').value;
-    const severity  = document.getElementById('f-severity').value;
-    const tbody     = document.getElementById('results-tbody');
-    const btn       = document.getElementById('run-btn');
+  async function runReport() {
+    const start    = document.getElementById('f-start').value;
+    const end      = document.getElementById('f-end').value;
+    const company  = document.getElementById('f-company').value;
+    const severity = document.getElementById('f-severity').value;
+    const tbody    = document.getElementById('results-tbody');
 
-    if (!start || !end) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Please select a date range.</td></tr>';
+    if (!start || !end) return;
+
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading…</td></tr>';
+    document.getElementById('stats-row').style.display    = 'none';
+    document.getElementById('result-count').style.display = 'none';
+
+    // Fetch everything needed in parallel
+    const [
+      { data: sessions },
+      { data: allSettings },
+      { data: allShifts },
+    ] = await Promise.all([
+      supabase
+        .from('worker_sessions')
+        .select('id, worker_name, worker_id, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end, workers(company, employee_id)')
+        .gte('date', start)
+        .lte('date', end)
+        .order('date', { ascending: false }),
+      supabase.from('employer_settings').select('*'),
+      supabase.from('employer_shifts').select('*'),
+    ]);
+
+    // Build lookups
+    const settingsMap = {};
+    for (const s of (allSettings || [])) settingsMap[s.company_name] = s;
+
+    const shiftsMap = {};
+    for (const s of (allShifts || [])) {
+      (shiftsMap[s.company_name] ??= []).push(s);
+    }
+
+    // Evaluate
+    let violations = [];
+    for (const session of (sessions || [])) {
+      const co       = session.workers?.company;
+      if (!co) continue;
+      if (company && co !== company) continue;
+      const settings = settingsMap[co] || null;
+      const shifts   = shiftsMap[co]   || [];
+      violations.push(...evaluateSession(session, settings, shifts));
+    }
+
+    // Filter by severity
+    if (severity) violations = violations.filter(v => v.severity === severity);
+
+    // Sort: errors first, then date desc
+    violations.sort((a, b) => {
+      if (a.severity !== b.severity) return a.severity === 'error' ? -1 : 1;
+      return new Date(b.session.date) - new Date(a.session.date);
+    });
+
+    // Stats
+    const errCnt  = violations.filter(v => v.severity === 'error').length;
+    const warnCnt = violations.filter(v => v.severity === 'warning').length;
+    const wkrCnt  = new Set(violations.map(v => v.session.worker_id)).size;
+    const coCnt   = new Set(violations.map(v => v.company)).size;
+
+    document.getElementById('st-total').textContent    = violations.length;
+    document.getElementById('st-errors').textContent   = errCnt;
+    document.getElementById('st-warns').textContent    = warnCnt;
+    document.getElementById('st-workers').textContent  = wkrCnt;
+    document.getElementById('st-companies').textContent= coCnt;
+    document.getElementById('stats-row').style.display = '';
+
+    if (!violations.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">✅</div>No exceptions found for the selected period.</td></tr>';
       return;
     }
 
-    btn.disabled = true; btn.textContent = 'Running…';
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Loading…</td></tr>';
-    document.getElementById('stats-row').style.display = 'none';
-    document.getElementById('result-count').style.display = 'none';
+    const rc = document.getElementById('result-count');
+    rc.textContent  = `${violations.length} exception${violations.length === 1 ? '' : 's'} found`;
+    rc.style.display = '';
 
-    try {
-      // Fetch flags and sessions in parallel
-      let flagsQuery = supabase.from('employer_flags').select('*');
-      if (company) flagsQuery = flagsQuery.eq('company_name', company);
-      if (severity) flagsQuery = flagsQuery.eq('severity', severity);
+    tbody.innerHTML = violations.map(v => {
+      const dateStr = new Date(v.session.date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      return `<tr>
+        <td><span class="badge-${v.severity}">${v.severity === 'error' ? '⛔ Error' : '⚠️ Warning'}</span></td>
+        <td style="font-weight:600">${v.company}</td>
+        <td>${v.session.worker_name || '—'}</td>
+        <td style="white-space:nowrap">${dateStr}</td>
+        <td style="font-weight:500">${v.name}</td>
+        <td style="font-size:.82rem;color:var(--text-secondary)">${v.detail}</td>
+      </tr>`;
+    }).join('');
+  }
 
-      const [{ data: flags }, { data: sessions }] = await Promise.all([
-        flagsQuery,
-        supabase
-          .from('worker_sessions')
-          .select('id, worker_name, worker_id, date, check_in_time, check_out_time, hours_worked, workers(company, employee_id)')
-          .gte('date', start)
-          .lte('date', end)
-          .order('date', { ascending: false })
-          .order('check_in_time', { ascending: false }),
-      ]);
-
-      if (!flags?.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">✅</div>No exception rules configured. Set them up in <a href="./time-tracker-settings.html" style="color:var(--primary)">Company Settings</a>.</td></tr>';
-        return;
-      }
-
-      // Evaluate all sessions against all flags
-      const violations = [];
-      for (const session of (sessions || [])) {
-        violations.push(...evaluateSession(session, flags));
-      }
-
-      // Apply severity filter (already applied to flags query, but double-check)
-      const filtered = severity ? violations.filter(v => v.flag.severity === severity) : violations;
-
-      // Sort: errors first, then by date desc
-      filtered.sort((a, b) => {
-        if (a.flag.severity !== b.flag.severity) return a.flag.severity === 'error' ? -1 : 1;
-        return new Date(b.session.date) - new Date(a.session.date);
-      });
-
-      // Stats
-      const errCount  = filtered.filter(v => v.flag.severity === 'error').length;
-      const warnCount = filtered.filter(v => v.flag.severity === 'warning').length;
-      const workers   = new Set(filtered.map(v => v.session.worker_id)).size;
-      const companies = new Set(filtered.map(v => v.company)).size;
-
-      document.getElementById('stat-total').textContent     = filtered.length;
-      document.getElementById('stat-errors').textContent    = errCount;
-      document.getElementById('stat-warnings').textContent  = warnCount;
-      document.getElementById('stat-workers').textContent   = workers;
-      document.getElementById('stat-companies').textContent = companies;
-      document.getElementById('stats-row').style.display    = '';
-
-      if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">✅</div>No exceptions found for the selected period.</td></tr>';
-        document.getElementById('result-count').style.display = 'none';
-        return;
-      }
-
-      const rc = document.getElementById('result-count');
-      rc.textContent = `${filtered.length} exception${filtered.length === 1 ? '' : 's'} found`;
-      rc.style.display = '';
-
-      tbody.innerHTML = filtered.map(({ flag, session, company, detail }) => {
-        const dateStr = new Date(session.date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-        const badgeClass = flag.severity === 'error' ? 'badge-error' : 'badge-warning';
-        const badgeLabel = flag.severity === 'error' ? '⛔ Error' : '⚠️ Warning';
-        return `<tr>
-          <td><span class="${badgeClass}">${badgeLabel}</span></td>
-          <td style="font-weight:600">${company}</td>
-          <td>${session.worker_name || '—'}</td>
-          <td style="white-space:nowrap">${dateStr}</td>
-          <td>${flag.flag_name}</td>
-          <td style="font-size:.82rem;color:var(--text-secondary)">${detail}</td>
-        </tr>`;
-      }).join('');
-
-    } finally {
-      btn.disabled = false; btn.textContent = 'Run Report';
-    }
-  };
-
-  // ── Re-run automatically when filters change ─────────────
+  // ── Filter change listeners ───────────────────────────────
   ['f-start', 'f-end', 'f-company', 'f-severity'].forEach(id =>
     document.getElementById(id).addEventListener('change', runReport)
   );
 
-  // ── Init: load filter options then auto-run ───────────────
+  // ── Init ──────────────────────────────────────────────────
+  await loadRules();
   await loadCompanyFilter();
   runReport();
 </script>
