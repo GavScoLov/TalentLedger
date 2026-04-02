@@ -378,6 +378,19 @@
         } catch { shiftData[emp.id] = []; }
       }));
 
+      // 3a. Attach company info from Supabase workers table
+      const { data: workerRows } = await supabase
+        .from('workers')
+        .select('employee_id, company')
+        .in('employee_id', allEmployees.map(e => e.id));
+      const companyMap = {};
+      for (const w of (workerRows || [])) {
+        if (w.employee_id) companyMap[String(w.employee_id)] = w.company || '';
+      }
+      for (const emp of allEmployees) {
+        emp.company = companyMap[emp.id] || '';
+      }
+
       // 3. Build dept list from shift department_id values; filter employees by dept
       const deptIds = [...new Set(
         Object.values(shiftData).flat().map(s => s.department_id).filter(Boolean)
@@ -526,6 +539,7 @@
         <div class="emp-card-header" onclick="toggleCard('${emp.id}')">
           <span class="emp-chevron">▾</span>
           <span class="emp-name">${escHtml(emp.name)}${liveBadge}</span>
+          ${emp.company ? `<span style="background:#EDE9FE;color:#5B21B6;border-radius:999px;font-size:.68rem;font-weight:700;padding:2px 9px;white-space:nowrap;">${escHtml(emp.company)}</span>` : ''}
           <span class="emp-dept">${escHtml(emp.dept)}</span>
           <span class="emp-total">${fmtMins(empMins)}</span>
           <button class="emp-approve-week" onclick="event.stopPropagation();approveWeek('${emp.id}')">✓ Approve Week</button>
