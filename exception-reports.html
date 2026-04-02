@@ -293,11 +293,12 @@
   // ── Populate company filter ───────────────────────────────
   async function loadCompanyFilter() {
     const { data } = await supabase.from('employer_settings').select('company_name').order('company_name');
-    if (!data?.length) return;
+    const companies = (data || []).map(r => r.company_name).filter(Boolean);
+    if (!companies.length) return;
     const sel = document.getElementById('f-company');
-    data.forEach(r => {
+    companies.forEach(name => {
       const opt = document.createElement('option');
-      opt.value = r.company_name; opt.textContent = r.company_name;
+      opt.value = name; opt.textContent = name;
       sel.appendChild(opt);
     });
   }
@@ -448,14 +449,13 @@
     document.getElementById('result-count').style.display = 'none';
 
     // Fetch everything needed in parallel
-    // Also fetch any currently-open sessions (no check_out_time) regardless of date range
-    const SELECT_COLS = 'id, worker_name, worker_id, company, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end';
+    // Join workers table to get company via the worker_id UUID FK
+    const SELECT_COLS = 'id, worker_name, worker_id, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end, workers(id, company)';
     const [
       { data: rangedSessions },
       { data: openSessions },
       { data: allSettings },
       { data: allShifts },
-      { data: allWorkers },
     ] = await Promise.all([
       supabase
         .from('worker_sessions')
@@ -469,7 +469,6 @@
         .is('check_out_time', null),
       supabase.from('employer_settings').select('*'),
       supabase.from('employer_shifts').select('*'),
-      supabase.from('workers').select('employee_id, company'),
     ]);
 
     // Merge: ranged sessions + any open sessions not already in the range
@@ -488,17 +487,11 @@
       (shiftsMap[s.company_name] ??= []).push(s);
     }
 
-    // Build worker → company map as fallback
-    const workerCompanyMap = {};
-    for (const w of (allWorkers || [])) {
-      if (w.employee_id) workerCompanyMap[String(w.employee_id)] = w.company;
-    }
-
     // Evaluate
     let violations = [];
     for (const session of (sessions || [])) {
-      // Company: prefer direct field, fall back to workers table lookup
-      const co = session.company || workerCompanyMap[String(session.worker_id)] || null;
+      // Company comes from the joined workers row
+      const co = session.workers?.company || null;
       if (!co) continue;
       if (company && co !== company) continue;
       const settings = settingsMap[co] || null;
