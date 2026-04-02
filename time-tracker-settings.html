@@ -185,13 +185,34 @@
       ══════════════════════════════ -->
       <div class="tab-panel" id="tab-mappings">
         <p style="font-size:.85rem;color:var(--text-secondary);margin:0 0 16px;">
-          Map each TempWorks company to its TimeStation department so clock-in data can be linked to company settings.
+          Map each TimeStation department to the corresponding TempWorks company.
+          Since TimeStation encodes both company and shift in the department name (e.g. <em>Doehler 1st Shift</em>),
+          you can add multiple department entries per company.
         </p>
+
+        <!-- Add mapping row -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:14px 16px;background:var(--bg-default);border:1px solid var(--border-color);border-radius:var(--radius);">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:200px;">
+            <label style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;">TimeStation Department</label>
+            <input class="tbl-input" type="text" id="new-map-dept" placeholder="e.g. Doehler 1st Shift" style="width:100%;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:200px;">
+            <label style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;">TempWorks Company</label>
+            <select class="tbl-select" id="new-map-company" style="width:100%;padding:6px 8px;">
+              <option value="">— Select company —</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;align-self:flex-end;">
+            <button class="btn btn-primary" style="font-size:.82rem;padding:7px 18px;" onclick="addMapping()">+ Add</button>
+          </div>
+          <span id="map-add-msg" style="font-size:.8rem;align-self:flex-end;padding-bottom:2px;"></span>
+        </div>
+
         <div class="table-wrap">
           <table class="data-table">
             <thead><tr>
+              <th>TimeStation Department</th>
               <th>TempWorks Company</th>
-              <th>TimeStation Department ID</th>
               <th>Actions</th>
             </tr></thead>
             <tbody id="map-tbody">
@@ -565,7 +586,7 @@
   // COMPANY MAPPINGS TAB
   // ════════════════════════════════════════════════════════
 
-  let mapCompanies = [];   // [{name, ts_department_id, mapId}]
+  let twCompanyList = [];   // sorted list of TW company names for the dropdown
 
   async function loadMappings() {
     const tbody = document.getElementById('map-tbody');
@@ -576,72 +597,65 @@
       { data: mapData },
     ] = await Promise.all([
       supabase.from('tw_customer_weekly_summary').select('customer_name').not('customer_name','is',null),
-      supabase.from('company_ts_department_map').select('*'),
+      supabase.from('company_ts_department_map').select('*').order('ts_department_id'),
     ]);
 
-    const nameSet = new Set((twData || []).map(r => r.customer_name).filter(Boolean));
-    for (const m of (mapData || [])) { if (m.tw_company_name) nameSet.add(m.tw_company_name); }
+    // Populate TW company dropdown
+    twCompanyList = [...new Set((twData || []).map(r => r.customer_name).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+    const sel = document.getElementById('new-map-company');
+    sel.innerHTML = '<option value="">— Select company —</option>'
+      + twCompanyList.map(n => `<option value="${n}">${n}</option>`).join('');
 
-    const mapById = {};
-    for (const m of (mapData || [])) mapById[m.tw_company_name] = m;
+    renderMappingTable(mapData || []);
+  }
 
-    mapCompanies = [...nameSet].sort((a,b) => a.localeCompare(b)).map((name, i) => ({
-      name,
-      ts_department_id: mapById[name]?.ts_department_id || '',
-      mapId: mapById[name]?.id || null,
-      idx: i,
-    }));
-
-    if (!mapCompanies.length) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No companies found.</td></tr>';
+  function renderMappingTable(rows) {
+    const tbody = document.getElementById('map-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No mappings yet. Add one above.</td></tr>';
       return;
     }
-
-    tbody.innerHTML = mapCompanies.map(({ name, ts_department_id, idx }) => `<tr>
-      <td style="font-weight:600">${name}</td>
+    tbody.innerHTML = rows.map(m => `<tr id="mrow-${m.id}">
+      <td style="font-weight:600">${m.ts_department_id}</td>
+      <td>${m.tw_company_name}</td>
       <td>
-        <input class="tbl-input" style="width:220px;" type="text"
-          id="map-${idx}-dept" value="${ts_department_id}"
-          placeholder="e.g. Warehouse or dept ID from TimeStation">
-      </td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-primary" style="font-size:.72rem;padding:5px 12px;"
-          id="map-${idx}-btn" onclick="saveMappingRow(${idx})">Save</button>
-        <span id="map-${idx}-msg" style="font-size:.72rem;margin-left:6px;"></span>
+        <button class="btn btn-outlined" style="font-size:.72rem;padding:4px 10px;color:#dc2626;border-color:#dc2626;"
+          onclick="deleteMapping('${m.id}')">Remove</button>
       </td>
     </tr>`).join('');
   }
 
-  window.saveMappingRow = async function(idx) {
-    const row   = mapCompanies.find(r => r.idx === idx);
-    if (!row) return;
-    const deptId = document.getElementById(`map-${idx}-dept`).value.trim();
-    const btn    = document.getElementById(`map-${idx}-btn`);
-    const msgEl  = document.getElementById(`map-${idx}-msg`);
+  window.addMapping = async function() {
+    const dept    = document.getElementById('new-map-dept').value.trim();
+    const company = document.getElementById('new-map-company').value;
+    const msgEl   = document.getElementById('map-add-msg');
 
-    btn.disabled = true; btn.textContent = 'Saving…';
-    try {
-      let error;
-      if (row.mapId) {
-        ({ error } = await supabase.from('company_ts_department_map')
-          .update({ ts_department_id: deptId, updated_at: new Date().toISOString() })
-          .eq('id', row.mapId));
-      } else {
-        const { data, error: insertErr } = await supabase.from('company_ts_department_map')
-          .insert({ tw_company_name: row.name, ts_department_id: deptId })
-          .select('id').single();
-        error = insertErr;
-        if (data) row.mapId = data.id;
-      }
-      if (error) throw error;
-      row.ts_department_id = deptId;
-      msgEl.style.color = '#16a34a'; msgEl.textContent = 'Saved ✓';
+    if (!dept || !company) {
+      msgEl.style.color = '#dc2626'; msgEl.textContent = 'Both fields are required.';
       setTimeout(() => { msgEl.textContent = ''; }, 3000);
-    } catch (err) {
-      msgEl.style.color = '#dc2626'; msgEl.textContent = err.message;
-    } finally {
-      btn.disabled = false; btn.textContent = 'Save';
+      return;
     }
+
+    const { error } = await supabase.from('company_ts_department_map')
+      .insert({ ts_department_id: dept, tw_company_name: company });
+
+    if (error) {
+      msgEl.style.color = '#dc2626';
+      msgEl.textContent = error.code === '23505' ? 'That department is already mapped.' : error.message;
+      setTimeout(() => { msgEl.textContent = ''; }, 4000);
+      return;
+    }
+
+    document.getElementById('new-map-dept').value = '';
+    document.getElementById('new-map-company').value = '';
+    msgEl.style.color = '#16a34a'; msgEl.textContent = 'Added ✓';
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+    loadMappings();
+  };
+
+  window.deleteMapping = async function(id) {
+    const { error } = await supabase.from('company_ts_department_map').delete().eq('id', id);
+    if (!error) document.getElementById('mrow-' + id)?.remove();
   };
 
   // ── Initial load ──────────────────────────────────────────
