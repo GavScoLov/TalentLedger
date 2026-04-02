@@ -393,16 +393,25 @@
       }
     }
 
-    // 5. Over Daily Limit
-    if (ruleConfig.over_daily_limit?.enabled && settings && session.hours_worked != null) {
-      const hrs   = parseFloat(session.hours_worked);
-      const limit = parseFloat(settings.daily_hour_limit);
-      if (hrs > limit) {
-        violations.push({
-          type: 'over_daily_limit', name: 'Over Daily Limit',
-          severity: ruleConfig.over_daily_limit.severity,
-          detail: `Worked ${hrs.toFixed(2)} hrs — exceeds the ${limit} hr daily limit`,
-        });
+    // 5. Over Daily Limit (also fires on open/still-clocked-in sessions using elapsed time)
+    if (ruleConfig.over_daily_limit?.enabled && settings) {
+      let hrs;
+      let openSession = false;
+      if (session.hours_worked != null && parseFloat(session.hours_worked) > 0) {
+        hrs = parseFloat(session.hours_worked);
+      } else if (!session.check_out_time && session.check_in_time) {
+        hrs = (Date.now() - new Date(session.check_in_time)) / 3600000;
+        openSession = true;
+      }
+      if (hrs != null) {
+        const limit = parseFloat(settings.daily_hour_limit);
+        if (hrs > limit) {
+          violations.push({
+            type: 'over_daily_limit', name: 'Over Daily Limit',
+            severity: ruleConfig.over_daily_limit.severity,
+            detail: `${openSession ? 'Still clocked in — elapsed' : 'Worked'} ${hrs.toFixed(1)} hrs — exceeds the ${limit} hr daily limit${openSession ? ' (currently clocked in)' : ''}`,
+          });
+        }
       }
     }
 
@@ -439,22 +448,36 @@
     document.getElementById('result-count').style.display = 'none';
 
     // Fetch everything needed in parallel
+    // Also fetch any currently-open sessions (no check_out_time) regardless of date range
+    const SELECT_COLS = 'id, worker_name, worker_id, company, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end';
     const [
-      { data: sessions },
+      { data: rangedSessions },
+      { data: openSessions },
       { data: allSettings },
       { data: allShifts },
       { data: allWorkers },
     ] = await Promise.all([
       supabase
         .from('worker_sessions')
-        .select('id, worker_name, worker_id, company, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end')
+        .select(SELECT_COLS)
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false }),
+      supabase
+        .from('worker_sessions')
+        .select(SELECT_COLS)
+        .is('check_out_time', null),
       supabase.from('employer_settings').select('*'),
       supabase.from('employer_shifts').select('*'),
       supabase.from('workers').select('employee_id, company'),
     ]);
+
+    // Merge: ranged sessions + any open sessions not already in the range
+    const rangedIds = new Set((rangedSessions || []).map(s => s.id));
+    const sessions  = [
+      ...(rangedSessions || []),
+      ...(openSessions  || []).filter(s => !rangedIds.has(s.id)),
+    ];
 
     // Build lookups
     const settingsMap = {};
