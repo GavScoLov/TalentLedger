@@ -120,6 +120,7 @@
       <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('companies')">Company Settings</button>
         <button class="tab-btn"        onclick="switchTab('pay')">Worker Pay Rates</button>
+        <button class="tab-btn"        onclick="switchTab('mappings')">Company Mappings</button>
       </div>
 
       <!-- ══════════════════════════════
@@ -179,6 +180,27 @@
         </div>
       </div>
 
+      <!-- ══════════════════════════════
+           TAB 3: COMPANY MAPPINGS
+      ══════════════════════════════ -->
+      <div class="tab-panel" id="tab-mappings">
+        <p style="font-size:.85rem;color:var(--text-secondary);margin:0 0 16px;">
+          Map each TempWorks company to its TimeStation department so clock-in data can be linked to company settings.
+        </p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>TempWorks Company</th>
+              <th>TimeStation Department ID</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="map-tbody">
+              <tr><td colspan="3" class="empty-state">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -223,10 +245,11 @@
 
   // ── Tab switching ─────────────────────────────────────────
   window.switchTab = function(tab) {
-    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['companies','pay'][i] === tab));
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['companies','pay','mappings'][i] === tab));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
-    if (tab === 'pay') loadPayRates();
+    if (tab === 'pay')      loadPayRates();
+    if (tab === 'mappings') loadMappings();
   };
 
   // ════════════════════════════════════════════════════════
@@ -535,6 +558,89 @@
     } else {
       msgEl.style.color = '#16a34a'; msgEl.textContent = 'Saved ✓';
       setTimeout(() => { msgEl.textContent = ''; }, 3000);
+    }
+  };
+
+  // ════════════════════════════════════════════════════════
+  // COMPANY MAPPINGS TAB
+  // ════════════════════════════════════════════════════════
+
+  let mapCompanies = [];   // [{name, ts_department_id, mapId}]
+
+  async function loadMappings() {
+    const tbody = document.getElementById('map-tbody');
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Loading…</td></tr>';
+
+    const [
+      { data: twData },
+      { data: mapData },
+    ] = await Promise.all([
+      supabase.from('tw_customer_weekly_summary').select('customer_name').not('customer_name','is',null),
+      supabase.from('company_ts_department_map').select('*'),
+    ]);
+
+    const nameSet = new Set((twData || []).map(r => r.customer_name).filter(Boolean));
+    for (const m of (mapData || [])) { if (m.tw_company_name) nameSet.add(m.tw_company_name); }
+
+    const mapById = {};
+    for (const m of (mapData || [])) mapById[m.tw_company_name] = m;
+
+    mapCompanies = [...nameSet].sort((a,b) => a.localeCompare(b)).map((name, i) => ({
+      name,
+      ts_department_id: mapById[name]?.ts_department_id || '',
+      mapId: mapById[name]?.id || null,
+      idx: i,
+    }));
+
+    if (!mapCompanies.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No companies found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = mapCompanies.map(({ name, ts_department_id, idx }) => `<tr>
+      <td style="font-weight:600">${name}</td>
+      <td>
+        <input class="tbl-input" style="width:220px;" type="text"
+          id="map-${idx}-dept" value="${ts_department_id}"
+          placeholder="e.g. Warehouse or dept ID from TimeStation">
+      </td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-primary" style="font-size:.72rem;padding:5px 12px;"
+          id="map-${idx}-btn" onclick="saveMappingRow(${idx})">Save</button>
+        <span id="map-${idx}-msg" style="font-size:.72rem;margin-left:6px;"></span>
+      </td>
+    </tr>`).join('');
+  }
+
+  window.saveMappingRow = async function(idx) {
+    const row   = mapCompanies.find(r => r.idx === idx);
+    if (!row) return;
+    const deptId = document.getElementById(`map-${idx}-dept`).value.trim();
+    const btn    = document.getElementById(`map-${idx}-btn`);
+    const msgEl  = document.getElementById(`map-${idx}-msg`);
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      let error;
+      if (row.mapId) {
+        ({ error } = await supabase.from('company_ts_department_map')
+          .update({ ts_department_id: deptId, updated_at: new Date().toISOString() })
+          .eq('id', row.mapId));
+      } else {
+        const { data, error: insertErr } = await supabase.from('company_ts_department_map')
+          .insert({ tw_company_name: row.name, ts_department_id: deptId })
+          .select('id').single();
+        error = insertErr;
+        if (data) row.mapId = data.id;
+      }
+      if (error) throw error;
+      row.ts_department_id = deptId;
+      msgEl.style.color = '#16a34a'; msgEl.textContent = 'Saved ✓';
+      setTimeout(() => { msgEl.textContent = ''; }, 3000);
+    } catch (err) {
+      msgEl.style.color = '#dc2626'; msgEl.textContent = err.message;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
     }
   };
 
