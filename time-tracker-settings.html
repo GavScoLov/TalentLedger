@@ -317,24 +317,21 @@
     const tbody = document.getElementById('settings-tbody');
     tbody.innerHTML = '<tr><td colspan="11" class="empty-state">Loading…</td></tr>';
 
-    // Fetch all distinct company names + all saved settings in parallel
+    // Fetch all distinct company names from TempWorks + all saved settings in parallel
     const [
-      { data: evtData },
-      { data: wkData },
+      { data: twData },
       { data: settingsData },
     ] = await Promise.all([
-      supabase.from('events').select('company').not('company', 'is', null),
-      supabase.from('workers').select('company').not('company', 'is', null),
+      supabase.from('tw_customer_weekly_summary').select('customer_name').not('customer_name', 'is', null),
       supabase.from('employer_settings').select('*'),
     ]);
 
     // Build full company list (deduplicated, sorted)
-    const nameSet = new Set([
-      ...(evtData  || []).map(r => r.company),
-      ...(wkData   || []).map(r => r.company),
-    ].filter(Boolean));
+    const nameSet = new Set(
+      (twData || []).map(r => r.customer_name).filter(Boolean)
+    );
 
-    // Also include any saved settings companies even if not in events/workers
+    // Also include any saved settings companies in case they aren't in TempWorks
     for (const s of (settingsData || [])) {
       if (s.company_name) nameSet.add(s.company_name);
     }
