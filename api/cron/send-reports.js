@@ -12,38 +12,55 @@ import {
 
 const SUPABASE_URL = 'https://txhyfogbyzwueazhrqax.supabase.co';
 
-/** Check whether an automation is due to run right now (±10 min tolerance). */
+/** Reliably convert `now` into the given IANA timezone and return {hour, dow, dom, year, month, day}. */
+function getLocalParts(now, tz) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', hour12: false,
+    weekday: 'short',
+  }).formatToParts(now);
+  const p = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  const DOW_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    hour:  parseInt(p.hour),
+    dow:   DOW_MAP[p.weekday] ?? now.getUTCDay(),
+    dom:   parseInt(p.day),
+    year:  parseInt(p.year),
+    month: parseInt(p.month),
+    day:   parseInt(p.day),
+  };
+}
+
+/** Check whether an automation is due to run right now. */
 function isDue(automation, now) {
   const { frequency, schedule_days, schedule_date, schedule_time, schedule_tz, last_sent_at } = automation;
 
-  // Convert now → automation's local time
-  const localStr = now.toLocaleString('en-US', { timeZone: schedule_tz || 'America/Chicago' });
-  const local    = new Date(localStr);
-  const hour     = local.getHours();
-  const dow      = local.getDay();   // 0=Sun … 6=Sat
-  const dom      = local.getDate();  // 1 … 31
-
-  const [schedHour] = (schedule_time || '09:00').split(':').map(Number);
-  if (hour !== schedHour) return false;
-
-  // Prevent double-firing in the same clock-hour
+  // Prevent double-firing within 50 minutes
   if (last_sent_at) {
     const msSince = now - new Date(last_sent_at);
-    if (msSince < 50 * 60 * 1000) return false; // < 50 minutes ago
+    if (msSince < 50 * 60 * 1000) return false;
   }
+
+  // Convert now → automation's local time using Intl (reliable in Node.js)
+  const tz    = schedule_tz || 'America/Chicago';
+  const local = getLocalParts(now, tz);
+
+  const [schedHour] = (schedule_time || '09:00').split(':').map(Number);
+  if (local.hour !== schedHour) return false;
 
   switch (frequency) {
     case 'once': {
       if (last_sent_at) return false;
       if (!schedule_date) return false;
-      const sd = new Date(schedule_date);
-      return sd.getFullYear() === local.getFullYear()
-          && sd.getMonth()    === local.getMonth()
-          && sd.getDate()     === local.getDate();
+      const sd = new Date(schedule_date + 'T12:00:00Z');
+      return sd.getUTCFullYear() === local.year
+          && sd.getUTCMonth() + 1 === local.month
+          && sd.getUTCDate()       === local.day;
     }
     case 'daily':   return true;
-    case 'weekly':  return (schedule_days || []).includes(dow);
-    case 'monthly': return (schedule_days || []).includes(dom);
+    case 'weekly':  return (schedule_days || []).includes(local.dow);
+    case 'monthly': return (schedule_days || []).includes(local.dom);
     default:        return false;
   }
 }

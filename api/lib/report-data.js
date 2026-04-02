@@ -97,6 +97,20 @@ function sortedWeeksFrom(weekSet) {
   return [...weekSet].filter(w => w !== '—').sort().concat(weekSet.has('—') ? ['—'] : []);
 }
 
+/** Returns all Sunday (week-end) dates within [start, end] as YYYY-MM-DD strings */
+function getSundaysInRange(start, end) {
+  const sundays = [];
+  const d = new Date(start + 'T12:00:00Z');
+  // Advance to the first Sunday on or after start
+  if (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + (7 - d.getUTCDay()));
+  const endDate = new Date(end + 'T12:00:00Z');
+  while (d <= endDate) {
+    sundays.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 7);
+  }
+  return sundays;
+}
+
 // ── Week date-range label helpers ─────────────────────────────────────────────
 
 /** "2026-04-05" → "3/30-4/5" */
@@ -307,7 +321,15 @@ export async function genDhpHours(start, end) {
 }
 
 export async function genDhpHeadcount(start, end) {
-  const data    = await fetchUniqueCountByCompany(start, end);
+  // Query week-by-week so each Sunday becomes its own column
+  const sundays   = getSundaysInRange(start, end);
+  const weekData  = await Promise.all(sundays.map(async sunday => {
+    const ws = new Date(sunday + 'T12:00:00Z');
+    ws.setUTCDate(ws.getUTCDate() - 6);
+    const rows = await fetchUniqueCountByCompany(ws.toISOString().slice(0, 10), sunday);
+    return rows.map(r => ({ ...r, weekendbill: sunday }));
+  }));
+  const data    = weekData.flat();
   const entries = {};
   const weekSet = new Set();
 

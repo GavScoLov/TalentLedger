@@ -810,6 +810,19 @@
       return (companyName || '').toUpperCase().includes('DHP');
     }
 
+    /** Returns all Sunday (week-end) dates within [start, end] as YYYY-MM-DD strings */
+    function getSundaysInRange(start, end) {
+      const sundays = [];
+      const d = new Date(start + 'T12:00:00Z');
+      if (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + (7 - d.getUTCDay()));
+      const endDate = new Date(end + 'T12:00:00Z');
+      while (d <= endDate) {
+        sundays.push(d.toISOString().slice(0, 10));
+        d.setUTCDate(d.getUTCDate() + 7);
+      }
+      return sundays;
+    }
+
     /** Fetch branch → region map from branch_settings table */
     async function fetchBranchRegionMap() {
       const { data } = await supabase.from('branch_settings').select('branch, region');
@@ -2276,7 +2289,15 @@
 
     /* Monthly DHP Headcount */
     async function genMonthlyDhpHeadcount(start, end) {
-      const headData = await fetchUniqueCountByCompany(start, end);
+      // Query week-by-week so each Sunday becomes its own column
+      const sundays  = getSundaysInRange(start, end);
+      const weekRows = await Promise.all(sundays.map(async sunday => {
+        const ws = new Date(sunday + 'T12:00:00Z');
+        ws.setUTCDate(ws.getUTCDate() - 6);
+        const rows = await fetchUniqueCountByCompany(ws.toISOString().slice(0, 10), sunday);
+        return rows.map(r => ({ ...r, weekendbill: sunday, weekend_bill: sunday }));
+      }));
+      const headData = weekRows.flat();
 
       const branchData = {};
       const weekSet    = new Set();
@@ -2531,15 +2552,21 @@
 
     /* PSA Billing Monthly — grouped by NIL / SCF / MO Offices / GA Offices / NOTS */
     async function genPsaBillingMonthly(start, end) {
-      const invoices = await fetchInvoiceRegister(start, end);
+      const [invoices, branchSettings] = await Promise.all([
+        fetchInvoiceRegister(start, end),
+        supabase.from('branch_settings').select('branch, region').then(r => r.data || []),
+      ]);
 
-      const PSA_GROUPS = [
-        { key: 'NIL',        label: 'NIL',        branches: ['NIL']                                       },
-        { key: 'SCF',        label: 'SCF',        branches: ['SCF']                                       },
-        { key: 'MO Offices', label: 'MO Offices', branches: ['BRI 1.2', 'FVH']                           },
-        { key: 'GA Offices', label: 'GA Offices', branches: ['AUS 1&2', 'AUS 3', 'CAR', 'KEN 1', 'ROM']  },
-        { key: 'NOTS',       label: 'NOTS',       branches: ['NOTS']                                      },
-      ];
+      // Build groups dynamically from branch_settings (same logic as server-side)
+      const regionBranchMap = {};
+      for (const row of branchSettings) {
+        if (!row.branch || !row.region) continue;
+        (regionBranchMap[row.region] ??= []).push(row.branch);
+      }
+      // Sort regions alphabetically, push "Other" to end
+      const PSA_GROUPS = Object.entries(regionBranchMap)
+        .sort(([a], [b]) => a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b))
+        .map(([region, branches]) => ({ key: region, label: region, branches }));
 
       // Build branch → groupKey lookup (case-insensitive)
       const branchToGroup = {};
