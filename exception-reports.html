@@ -438,7 +438,7 @@
   async function runReport() {
     const start    = document.getElementById('f-start').value;
     const end      = document.getElementById('f-end').value;
-    const company  = document.getElementById('f-company').value;
+    const coFilter = document.getElementById('f-company').value;
     const severity = document.getElementById('f-severity').value;
     const tbody    = document.getElementById('results-tbody');
 
@@ -448,35 +448,16 @@
     document.getElementById('stats-row').style.display    = 'none';
     document.getElementById('result-count').style.display = 'none';
 
-    // Fetch everything needed in parallel
-    // Join workers table to get company via the worker_id UUID FK
-    const SELECT_COLS = 'id, worker_name, worker_id, date, check_in_time, check_out_time, hours_worked, lunch_start, lunch_end, workers(id, company)';
+    // 1. Load Supabase config in parallel
     const [
-      { data: rangedSessions },
-      { data: openSessions },
       { data: allSettings },
       { data: allShifts },
+      { data: mappings },
     ] = await Promise.all([
-      supabase
-        .from('worker_sessions')
-        .select(SELECT_COLS)
-        .gte('date', start)
-        .lte('date', end)
-        .order('date', { ascending: false }),
-      supabase
-        .from('worker_sessions')
-        .select(SELECT_COLS)
-        .is('check_out_time', null),
       supabase.from('employer_settings').select('*'),
       supabase.from('employer_shifts').select('*'),
+      supabase.from('company_ts_department_map').select('ts_department_id, tw_company_name'),
     ]);
-
-    // Merge: ranged sessions + any open sessions not already in the range
-    const rangedIds = new Set((rangedSessions || []).map(s => s.id));
-    const sessions  = [
-      ...(rangedSessions || []),
-      ...(openSessions  || []).filter(s => !rangedIds.has(s.id)),
-    ];
 
     // Build lookups
     const settingsMap = {};
@@ -487,13 +468,71 @@
       (shiftsMap[s.company_name] ??= []).push(s);
     }
 
-    // Evaluate
+    // TS department → TW company (case-insensitive key)
+    const deptToCompany = {};
+    for (const m of (mappings || [])) {
+      if (m.ts_department_id && m.tw_company_name)
+        deptToCompany[m.ts_department_id.toLowerCase()] = m.tw_company_name;
+    }
+
+    // 2. Fetch TimeStation employee list
+    let employees = [];
+    try {
+      const res  = await fetch('/api/ts?endpoint=/employees');
+      const json = res.ok ? await res.json() : {};
+      employees  = (json.employees || []).map(e => ({
+        id:   String(e.employee_id || ''),
+        name: e.name || `Employee ${e.employee_id}`,
+      })).filter(e => e.id);
+    } catch { /* TS unavailable */ }
+
+    if (!employees.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="icon">⚠️</div>Could not reach TimeStation API. Check TIMESTATION_API_KEY in Vercel.</td></tr>';
+      document.getElementById('stats-row').style.display = '';
+      return;
+    }
+
+    // 3. Fetch shifts for all employees over the date range
+    const allTsShifts = (await Promise.all(
+      employees.map(async emp => {
+        try {
+          const res = await fetch(`/api/ts?endpoint=/shifts&employee_id=${encodeURIComponent(emp.id)}&start_date=${start}&end_date=${end}`);
+          if (!res.ok) return [];
+          const json = await res.json();
+          return (json.shifts || []).map(s => ({ ...s, _empName: emp.name, _empId: emp.id }));
+        } catch { return []; }
+      })
+    )).flat();
+
+    // Also fetch currently-open shifts (no out time) by checking today separately
+    // These are included in the above if today is within [start, end], which it will be
+    // for open sessions since we always include today.
+
+    // 4. Evaluate each TS shift
     let violations = [];
-    for (const session of (sessions || [])) {
-      // Company comes from the joined workers row
-      const co = session.workers?.company || null;
+    for (const shift of allTsShifts) {
+      const deptRaw = shift.department_id || shift.department || '';
+      const co      = deptToCompany[deptRaw.toLowerCase()] || null;
       if (!co) continue;
-      if (company && co !== company) continue;
+      if (coFilter && co !== coFilter) continue;
+
+      const checkInTime  = shift.in?.time  || null;
+      const checkOutTime = shift.out?.time || null;
+      const totalMins    = shift.total_minutes != null ? parseInt(shift.total_minutes, 10) : null;
+      const hoursWorked  = totalMins != null ? totalMins / 60 : null;
+
+      // Normalize to the shape evaluateSession expects
+      const session = {
+        worker_name:    shift._empName,
+        worker_id:      shift._empId,
+        date:           (checkInTime || '').slice(0, 10),
+        check_in_time:  checkInTime,
+        check_out_time: checkOutTime,
+        hours_worked:   hoursWorked,
+        lunch_start:    null,
+        lunch_end:      null,
+      };
+
       const settings = settingsMap[co] || null;
       const shifts   = shiftsMap[co]   || [];
       violations.push(...evaluateSession(session, co, settings, shifts));
@@ -531,7 +570,11 @@
     rc.style.display = '';
 
     tbody.innerHTML = violations.map(v => {
-      const dateStr = new Date(v.session.date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      const dateRaw = v.session.date || v.session.check_in_time || '';
+      const dateStr = dateRaw
+        ? new Date(dateRaw.length === 10 ? dateRaw + 'T12:00:00Z' : dateRaw)
+            .toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric', timeZone:'UTC' })
+        : '—';
       return `<tr>
         <td><span class="badge-${v.severity}">${v.severity === 'error' ? '⛔ Error' : '⚠️ Warning'}</span></td>
         <td style="font-weight:600">${v.company}</td>
