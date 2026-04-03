@@ -66,8 +66,11 @@ function isDue(automation, now) {
 }
 
 export default async function handler(req, res) {
-  // Vercel automatically sets Authorization: Bearer <CRON_SECRET>
-  if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isDebug = req.method === 'GET' && req.query?.debug === process.env.DEBUG_SECRET;
+
+  // Vercel automatically sets Authorization: Bearer <CRON_SECRET> for cron invocations.
+  // GET ?debug=<DEBUG_SECRET> is allowed for diagnostics.
+  if (!isDebug && req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -91,8 +94,36 @@ export default async function handler(req, res) {
   const now     = new Date();
   const results = [];
 
+  // In debug mode, return diagnostic info without sending anything
+  if (isDebug) {
+    const diagnostics = (automations || []).map(auto => {
+      const tz    = auto.schedule_tz || 'America/Chicago';
+      const local = getLocalParts(now, tz);
+      const [schedHour] = (auto.schedule_time || '09:00').split(':').map(Number);
+      const msSince = auto.last_sent_at ? now - new Date(auto.last_sent_at) : null;
+      return {
+        id: auto.id, name: auto.name, is_active: auto.is_active,
+        frequency: auto.frequency, schedule_days: auto.schedule_days,
+        schedule_time: auto.schedule_time, schedule_tz: tz,
+        last_sent_at: auto.last_sent_at,
+        now_utc: now.toISOString(),
+        local_hour: local.hour, local_dow: local.dow, local_dom: local.dom,
+        sched_hour: schedHour,
+        hour_match: local.hour === schedHour,
+        ms_since_last_send: msSince,
+        within_50min_guard: msSince !== null && msSince < 50 * 60 * 1000,
+        would_fire: isDue(auto, now),
+      };
+    });
+    return res.status(200).json({ now_utc: now.toISOString(), active_automations: automations.length, diagnostics });
+  }
+
+  console.log(`[send-reports] cron fired at ${now.toISOString()}, checking ${(automations||[]).length} active automations`);
+
   for (const auto of automations) {
-    if (!isDue(auto, now)) continue;
+    const due = isDue(auto, now);
+    console.log(`[send-reports] "${auto.name}" (${auto.id}): isDue=${due}, freq=${auto.frequency}, time=${auto.schedule_time}, tz=${auto.schedule_tz}, last_sent=${auto.last_sent_at}`);
+    if (!due) continue;
 
     try {
       const { start, end, label } = getAutoMonthRange(now);
@@ -130,9 +161,10 @@ export default async function handler(req, res) {
         .update({ last_sent_at: now.toISOString() })
         .eq('id', auto.id);
 
+      console.log(`[send-reports] sent "${auto.name}" to ${toEmails.join(', ')}`);
       results.push({ id: auto.id, name: auto.name, status: 'sent', to: toEmails });
     } catch (err) {
-      console.error(`Automation ${auto.id} failed:`, err);
+      console.error(`[send-reports] automation "${auto.name}" (${auto.id}) failed:`, err);
       results.push({ id: auto.id, name: auto.name, status: 'error', error: err.message });
     }
   }
