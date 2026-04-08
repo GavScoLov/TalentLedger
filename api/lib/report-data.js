@@ -1,105 +1,63 @@
-// Server-side PSA data fetcher + report generators (CSV + inline HTML tables)
+// Server-side report generators (CSV + inline HTML tables)
+// Reads from pre-aggregated Supabase tables populated by n8n PSA sync workflow.
 // Used by api/cron/send-reports.js and api/send-report-now.js
 
 import { createClient } from '@supabase/supabase-js';
 
-const PSA_BASE     = 'https://api.psastaffing.com';
 const SUPABASE_URL = 'https://txhyfogbyzwueazhrqax.supabase.co';
 
-async function psaFetch(endpoint, params = {}) {
-  const url = new URL(`${PSA_BASE}${endpoint}`);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-  });
-  const token = process.env.PSA_API_TOKEN;
-  const res = await fetch(url.toString(), {
-    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-  });
-  if (!res.ok) throw new Error(`PSA API ${endpoint} → HTTP ${res.status}`);
-  return res.json();
-}
-
-// ── Field normalisers ─────────────────────────────────────────────────────────
-
-function normInvoice(r) {
-  return {
-    branchname:    r.branch      || r.branchname    || '',
-    customername:  r.customer    || r.customername  || '',
-    weekendbill:   r.weekend_bill || r.weekendbill  || '',
-    invoiceamount: r.amount      ?? r.invoiceamount ?? 0,
-  };
-}
-function normHours(r) {
-  return {
-    branchname:   r.branch       || r.branchname   || '',
-    customername: r.company_name || r.customername || '',
-    weekendbill:  r.weekend_bill || r.weekendbill  || '',
-    hours:        r.total_hours  ?? r.hours        ?? 0,
-  };
-}
-function normHead(r) {
-  return {
-    branchname:       r.branch       || r.branchname   || '',
-    customername:     r.company_name || r.customername || '',
-    weekendbill:      r.weekend_bill || r.weekendbill  || '',
-    unique_row_count: r.unique_row_count ?? 0,
-  };
-}
-
-// ── PSA fetch helpers ─────────────────────────────────────────────────────────
-
-export async function fetchInvoiceRegister(start, end) {
-  const data = await psaFetch('/api/invoice_register/query', { start_date: start, end_date: end });
-  return data.map(normInvoice);
-}
-export async function fetchEmployeeHours(start, end) {
-  const data = await psaFetch('/api/employee_hours/total_hours_by_company', { start_date: start, end_date: end });
-  return data.map(normHours);
-}
-export async function fetchUniqueCountByCompany(start, end) {
-  const data = await psaFetch('/api/employee_hours/unique_count_by_company', { start_date: start, end_date: end });
-  return data.map(normHead);
-}
-
-/** Count distinct TempWorks employees per DHP company + branch + weekend_date. */
-async function fetchDhpHeadcountFromTW(start, end) {
-  const sb = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+function sb() {
+  return createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
 
-  const { data: cards, error: err1 } = await sb
-    .from('tw_timecards')
-    .select('employee_id, customer_name, weekend_date')
+// ── Supabase data helpers ─────────────────────────────────────────────────────
+
+export async function fetchInvoiceRegister(start, end) {
+  const { data, error } = await sb()
+    .from('psa_billing_weekly')
+    .select('*')
+    .gte('weekend_date', start)
+    .lte('weekend_date', end);
+  if (error) throw new Error(`psa_billing_weekly: ${error.message}`);
+  return (data || []).map(r => ({
+    branchname:    r.branch_name,
+    customername:  r.customer_name,
+    weekendbill:   r.weekend_date,
+    invoiceamount: r.invoice_amount,
+  }));
+}
+
+export async function fetchEmployeeHours(start, end) {
+  const { data, error } = await sb()
+    .from('psa_hours_weekly')
+    .select('*')
+    .gte('weekend_date', start)
+    .lte('weekend_date', end);
+  if (error) throw new Error(`psa_hours_weekly: ${error.message}`);
+  return (data || []).map(r => ({
+    branchname:   r.branch_name,
+    customername: r.customer_name,
+    weekendbill:  r.weekend_date,
+    hours:        r.total_hours,
+  }));
+}
+
+/** DHP headcount from tw_headcount_weekly view (pre-aggregated distinct employee IDs). */
+async function fetchDhpHeadcountFromTW(start, end) {
+  const { data, error } = await sb()
+    .from('tw_headcount_weekly')
+    .select('*')
     .gte('weekend_date', start)
     .lte('weekend_date', end)
-    .ilike('customer_name', '%DHP%')
-    .not('employee_id', 'is', null);
-  if (err1) throw new Error(`TW headcount query: ${err1.message}`);
-
-  const uniqueEmpIds = [...new Set((cards || []).map(r => r.employee_id))];
-  const { data: emps, error: err2 } = await sb
-    .from('tw_employees')
-    .select('id, branch_name')
-    .in('id', uniqueEmpIds);
-  if (err2) throw new Error(`TW employees query: ${err2.message}`);
-
-  const branchById = {};
-  for (const e of (emps || [])) branchById[e.id] = e.branch_name || 'Unknown';
-
-  const buckets = {};
-  for (const row of (cards || [])) {
-    const branch  = branchById[row.employee_id] || 'Unknown';
-    const company = row.customer_name || 'Unknown';
-    const week    = row.weekend_date;
-    const key     = `${branch}||${company}||${week}`;
-    if (!buckets[key]) buckets[key] = { branchname: branch, customername: company, weekendbill: week, empSet: new Set() };
-    buckets[key].empSet.add(row.employee_id);
-  }
-  return Object.values(buckets).map(b => ({
-    branchname:       b.branchname,
-    customername:     b.customername,
-    weekendbill:      b.weekendbill,
-    unique_row_count: b.empSet.size,
+    .ilike('customer_name', '%DHP%');
+  if (error) throw new Error(`tw_headcount_weekly: ${error.message}`);
+  return (data || []).map(r => ({
+    branchname:       r.branch_name,
+    customername:     r.customer_name,
+    weekendbill:      r.weekend_date,
+    unique_row_count: r.headcount,
   }));
 }
 
