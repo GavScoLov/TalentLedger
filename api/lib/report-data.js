@@ -66,18 +66,26 @@ async function fetchDhpHeadcountFromTW(start, end) {
   const sb = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data, error } = await sb
-    .from('tw_timecards')
-    .select('employee_id, customer_name, weekend_date, tw_employees!inner(branch_name)')
-    .gte('weekend_date', start)
-    .lte('weekend_date', end)
-    .ilike('customer_name', '%DHP%')
-    .not('employee_id', 'is', null);
-  if (error) throw new Error(`TW headcount query: ${error.message}`);
+
+  const [{ data: cards, error: err1 }, { data: emps, error: err2 }] = await Promise.all([
+    sb.from('tw_timecards')
+      .select('employee_id, customer_name, weekend_date')
+      .gte('weekend_date', start)
+      .lte('weekend_date', end)
+      .ilike('customer_name', '%DHP%')
+      .not('employee_id', 'is', null),
+    sb.from('tw_employees')
+      .select('id, branch_name'),
+  ]);
+  if (err1) throw new Error(`TW headcount query: ${err1.message}`);
+  if (err2) throw new Error(`TW employees query: ${err2.message}`);
+
+  const branchById = {};
+  for (const e of (emps || [])) branchById[e.id] = e.branch_name || 'Unknown';
 
   const buckets = {};
-  for (const row of (data || [])) {
-    const branch  = row.tw_employees?.branch_name || 'Unknown';
+  for (const row of (cards || [])) {
+    const branch  = branchById[row.employee_id] || 'Unknown';
     const company = row.customer_name || 'Unknown';
     const week    = row.weekend_date;
     const key     = `${branch}||${company}||${week}`;
