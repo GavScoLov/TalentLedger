@@ -67,17 +67,20 @@ async function fetchDhpHeadcountFromTW(start, end) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const [{ data: cards, error: err1 }, { data: emps, error: err2 }] = await Promise.all([
-    sb.from('tw_timecards')
-      .select('employee_id, customer_name, weekend_date')
-      .gte('weekend_date', start)
-      .lte('weekend_date', end)
-      .ilike('customer_name', '%DHP%')
-      .not('employee_id', 'is', null),
-    sb.from('tw_employees')
-      .select('id, branch_name'),
-  ]);
+  const { data: cards, error: err1 } = await sb
+    .from('tw_timecards')
+    .select('employee_id, customer_name, weekend_date')
+    .gte('weekend_date', start)
+    .lte('weekend_date', end)
+    .ilike('customer_name', '%DHP%')
+    .not('employee_id', 'is', null);
   if (err1) throw new Error(`TW headcount query: ${err1.message}`);
+
+  const uniqueEmpIds = [...new Set((cards || []).map(r => r.employee_id))];
+  const { data: emps, error: err2 } = await sb
+    .from('tw_employees')
+    .select('id, branch_name')
+    .in('id', uniqueEmpIds);
   if (err2) throw new Error(`TW employees query: ${err2.message}`);
 
   const branchById = {};
