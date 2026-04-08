@@ -61,6 +61,37 @@ export async function fetchUniqueCountByCompany(start, end) {
   return data.map(normHead);
 }
 
+/** Count distinct TempWorks employees per DHP company + branch + weekend_date. */
+async function fetchDhpHeadcountFromTW(start, end) {
+  const sb = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await sb
+    .from('tw_timecards')
+    .select('employee_id, customer_name, weekend_date, tw_employees!inner(branch_name)')
+    .gte('weekend_date', start)
+    .lte('weekend_date', end)
+    .ilike('customer_name', '%DHP%')
+    .not('employee_id', 'is', null);
+  if (error) throw new Error(`TW headcount query: ${error.message}`);
+
+  const buckets = {};
+  for (const row of (data || [])) {
+    const branch  = row.tw_employees?.branch_name || 'Unknown';
+    const company = row.customer_name || 'Unknown';
+    const week    = row.weekend_date;
+    const key     = `${branch}||${company}||${week}`;
+    if (!buckets[key]) buckets[key] = { branchname: branch, customername: company, weekendbill: week, empSet: new Set() };
+    buckets[key].empSet.add(row.employee_id);
+  }
+  return Object.values(buckets).map(b => ({
+    branchname:       b.branchname,
+    customername:     b.customername,
+    weekendbill:      b.weekendbill,
+    unique_row_count: b.empSet.size,
+  }));
+}
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
 function isDHP(name)       { return (name || '').toUpperCase().includes('DHP'); }
@@ -321,20 +352,12 @@ export async function genDhpHours(start, end) {
 }
 
 export async function genDhpHeadcount(start, end) {
-  // Query week-by-week so each Sunday becomes its own column
-  const sundays   = getSundaysInRange(start, end);
-  const weekData  = await Promise.all(sundays.map(async sunday => {
-    const ws = new Date(sunday + 'T12:00:00Z');
-    ws.setUTCDate(ws.getUTCDate() - 6);
-    const rows = await fetchUniqueCountByCompany(ws.toISOString().slice(0, 10), sunday);
-    return rows.map(r => ({ ...r, weekendbill: sunday }));
-  }));
-  const data    = weekData.flat();
+  const data    = await fetchDhpHeadcountFromTW(start, end);
   const entries = {};
   const weekSet = new Set();
 
   for (const r of data) {
-    if (isCorporate(r.branchname) || !isDHP(r.customername)) continue;
+    if (isCorporate(r.branchname)) continue;
     const branch  = r.branchname   || 'Unknown';
     const company = r.customername || 'Unknown';
     const week    = r.weekendbill  || '—';

@@ -2287,27 +2287,43 @@
       };
     }
 
-    /* Monthly DHP Headcount */
-    async function genMonthlyDhpHeadcount(start, end) {
-      // Query week-by-week so each Sunday becomes its own column
-      const sundays  = getSundaysInRange(start, end);
-      const weekRows = await Promise.all(sundays.map(async sunday => {
-        const ws = new Date(sunday + 'T12:00:00Z');
-        ws.setUTCDate(ws.getUTCDate() - 6);
-        const rows = await fetchUniqueCountByCompany(ws.toISOString().slice(0, 10), sunday);
-        return rows.map(r => ({ ...r, weekendbill: sunday, weekend_bill: sunday }));
+    /* Monthly DHP Headcount — counts distinct TempWorks employee IDs per company/branch/week */
+    async function fetchDhpHeadcountFromTW(start, end) {
+      const { data, error } = await supabase
+        .from('tw_timecards')
+        .select('employee_id, customer_name, weekend_date, tw_employees!inner(branch_name)')
+        .gte('weekend_date', start)
+        .lte('weekend_date', end)
+        .ilike('customer_name', '%DHP%')
+        .not('employee_id', 'is', null);
+      if (error) throw new Error(`TW headcount query: ${error.message}`);
+
+      const buckets = {};
+      for (const row of (data || [])) {
+        const branch  = row.tw_employees?.branch_name || 'Unknown';
+        const company = row.customer_name || 'Unknown';
+        const week    = row.weekend_date;
+        const key     = `${branch}||${company}||${week}`;
+        if (!buckets[key]) buckets[key] = { branchname: branch, customername: company, weekendbill: week, empSet: new Set() };
+        buckets[key].empSet.add(row.employee_id);
+      }
+      return Object.values(buckets).map(b => ({
+        branchname: b.branchname, customername: b.customername,
+        weekendbill: b.weekendbill, unique_row_count: b.empSet.size,
       }));
-      const headData = weekRows.flat();
+    }
+
+    async function genMonthlyDhpHeadcount(start, end) {
+      const headData = await fetchDhpHeadcountFromTW(start, end);
 
       const branchData = {};
       const weekSet    = new Set();
 
       for (const r of headData) {
-        const bn = r.branchname || r.branch || 'Unknown';
+        const bn = r.branchname || 'Unknown';
         if (isCorporateBranch(bn)) continue;
-        if (!isDHP(r.customername || r.company_name)) continue;
-        const company = r.customername || r.company_name || 'Unknown';
-        const week    = r.weekendbill || r.weekend_bill || '—';
+        const company = r.customername || 'Unknown';
+        const week    = r.weekendbill || '—';
         const cnt     = Number(r.unique_row_count) || 0;
 
         weekSet.add(week);
