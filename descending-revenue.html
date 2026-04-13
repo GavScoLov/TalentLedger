@@ -55,6 +55,10 @@
                 <div class="report-table-section">
                     <div class="card" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column;">
                         <div class="filter-bar">
+                            <select class="form-select" id="group_by">
+                                <option value="company" selected>Group By: Company</option>
+                                <option value="region">Group By: Region</option>
+                            </select>
                             <select class="form-select" id="table_branch_filter">
                                 <option value="all" selected>All Branches</option>
                             </select>
@@ -70,8 +74,8 @@
                             <table class="data-table" id="revenue-table">
                                 <thead>
                                     <tr>
-                                        <th class="sortable" data-col="company">Company</th>
-                                        <th class="sortable" data-col="branch">Branch</th>
+                                        <th class="sortable" data-col="company" id="col-group-header">Company</th>
+                                        <th class="sortable" data-col="branch" id="col-branch-header">Branch</th>
                                         <th class="sortable" data-col="revenue" style="text-align:right">Revenue</th>
                                     </tr>
                                 </thead>
@@ -107,6 +111,7 @@
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
         import { fetchInvoiceRegister, formatCurrency, getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+        import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
         await checkPageAccess('descending-revenue');
@@ -122,9 +127,20 @@
         let aggregated = [];
         let timeSeriesData = [];
         let uniqueBranches = [];
+        let branchRegionMap = {};
         let revenueChart = null;
         let sortCol = 'revenue';
         let sortDir = 'desc';
+
+        // ── Fetch branch→region mappings from Supabase ────────
+        async function loadBranchRegions() {
+            const { data, error } = await supabase.from('branch_settings').select('branch, region');
+            if (error) { console.error('Error loading branch regions:', error); return; }
+            (data || []).forEach(row => {
+                if (row.branch && row.region) branchRegionMap[row.branch] = row.region;
+            });
+        }
+        await loadBranchRegions();
 
         // ── Init dates ────────────────────────────────────────────
         document.getElementById('start_date').value = getDefaultStartDate();
@@ -149,6 +165,7 @@
         }
 
         function processData() {
+            const groupBy = document.getElementById('group_by').value;
             const branchFilter = document.getElementById('table_branch_filter').value;
             const dhpOn = document.getElementById('dhp_filter').checked;
             const gspOn = document.getElementById('gsp_filter').checked;
@@ -168,17 +185,31 @@
                 return true;
             });
 
-            // Aggregate by company (for table)
-            const agg = {};
-            filtered.forEach(r => {
-                const key = r.customername || 'Unknown';
-                if (!agg[key]) agg[key] = { company: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
-                agg[key].revenue += Number(r.invoiceamount) || 0;
-                if (r.branchname) agg[key].branches.add(r.branchname);
-            });
-            aggregated = Object.values(agg).map(a => ({
-                company: a.company, branch: [...a.branches].join(', '), revenue: a.revenue,
-            }));
+            if (groupBy === 'region') {
+                // Aggregate by region
+                const agg = {};
+                filtered.forEach(r => {
+                    const region = branchRegionMap[r.branchname] || 'Unassigned';
+                    if (!agg[region]) agg[region] = { group: region, revenue: 0, branches: new Set() };
+                    agg[region].revenue += Number(r.invoiceamount) || 0;
+                    if (r.branchname) agg[region].branches.add(r.branchname);
+                });
+                aggregated = Object.values(agg).map(a => ({
+                    company: a.group, branch: [...a.branches].join(', '), revenue: a.revenue,
+                }));
+            } else {
+                // Aggregate by company (default)
+                const agg = {};
+                filtered.forEach(r => {
+                    const key = r.customername || 'Unknown';
+                    if (!agg[key]) agg[key] = { company: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
+                    agg[key].revenue += Number(r.invoiceamount) || 0;
+                    if (r.branchname) agg[key].branches.add(r.branchname);
+                });
+                aggregated = Object.values(agg).map(a => ({
+                    company: a.company, branch: [...a.branches].join(', '), revenue: a.revenue,
+                }));
+            }
 
             // Aggregate by week for time-series chart
             const weekMap = {};
@@ -207,6 +238,12 @@
 
         // ── Render table ──────────────────────────────────────────
         function renderTable() {
+            const groupBy = document.getElementById('group_by').value;
+            const groupHeader = document.getElementById('col-group-header');
+            const branchHeader = document.getElementById('col-branch-header');
+            groupHeader.textContent = groupBy === 'region' ? 'Region' : 'Company';
+            branchHeader.textContent = groupBy === 'region' ? 'Branches' : 'Branch';
+
             const tbody = document.getElementById('revenue-table-body');
             tbody.innerHTML = '';
             let total = 0;
@@ -244,9 +281,11 @@
             if (revenueChart) revenueChart.destroy();
 
             const type = document.getElementById('graph_type').value;
+            const groupBy = document.getElementById('group_by').value;
+            const groupLabel = groupBy === 'region' ? 'Region' : 'Company';
 
             if (type === 'pie') {
-                // Pie: show top companies
+                // Pie: show top groups
                 const top = aggregated.slice(0, 15);
                 const colors = top.map((_, i) => `hsl(${260 + i * 18}, 60%, ${55 + (i % 3) * 8}%)`);
                 revenueChart = new Chart(ctx, {
@@ -265,7 +304,7 @@
                 const labels = timeSeriesData.map(d => d.week);
                 const values = timeSeriesData.map(d => d.revenue);
                 const datasets = [{
-                    label: 'Descending Revenue',
+                    label: `Revenue by ${groupLabel}`,
                     data: values,
                     backgroundColor: 'rgba(124,58,237,0.7)',
                     borderColor: 'rgb(124,58,237)',
@@ -353,6 +392,7 @@
         document.getElementById('end_date').addEventListener('change', loadData);
         document.getElementById('company_search').addEventListener('input', processData);
         document.getElementById('table_branch_filter').addEventListener('change', processData);
+        document.getElementById('group_by').addEventListener('change', processData);
         document.getElementById('dhp_filter').addEventListener('change', processData);
         document.getElementById('gsp_filter').addEventListener('change', processData);
         document.getElementById('graph_type').addEventListener('change', renderChart);
