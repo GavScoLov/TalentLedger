@@ -158,6 +158,7 @@
                             <select class="form-select" id="group_by" style="max-width:150px;">
                                 <option value="company" selected>Group By: Company</option>
                                 <option value="branch">Group By: Branch</option>
+                                <option value="region">Group By: Region</option>
                             </select>
                             <div class="toggle-checkbox">
                                 <input type="checkbox" id="forecast_check">
@@ -233,6 +234,7 @@
             fetchTotalHoursByCompany, fetchTotalBillingByCompany,
             formatCurrency, formatCurrency2, formatNumber, getDefaultStartDate, getDefaultEndDate
         } from './src/apiClient.js';
+        import { supabase } from './src/supabaseClient.js';
 
         await checkAuth();
         await checkPageAccess('data-visualization');
@@ -248,7 +250,18 @@
         // ── State ─────────────────────────────────────────────────
         let rawInvoices = [];
         let rawBillingByBranch = [];
+        let branchRegionMap = {};
         let mainChart = null;
+
+        // ── Fetch branch→region mappings from Supabase ────────
+        async function loadBranchRegions() {
+            const { data, error } = await supabase.from('branch_settings').select('branch, region');
+            if (error) { console.error('Error loading branch regions:', error); return; }
+            (data || []).forEach(row => {
+                if (row.branch && row.region) branchRegionMap[row.branch] = row.region;
+            });
+        }
+        await loadBranchRegions();
 
         // ── Init ──────────────────────────────────────────────────
         document.getElementById('start_date').value = getDefaultStartDate();
@@ -338,7 +351,10 @@
             // Table: aggregate
             const agg = {};
             filtered.forEach(r => {
-                const key = groupBy === 'branch' ? (r.branchname || 'Unknown') : (r.customername || 'Unknown');
+                let key;
+                if (groupBy === 'region') key = branchRegionMap[r.branchname] || 'Unassigned';
+                else if (groupBy === 'branch') key = r.branchname || 'Unknown';
+                else key = r.customername || 'Unknown';
                 if (!agg[key]) agg[key] = { name: key, branch: r.branchname || '', revenue: 0, branches: new Set() };
                 agg[key].revenue += Number(r.invoiceamount) || 0;
                 if (r.branchname) agg[key].branches.add(r.branchname);
@@ -372,6 +388,8 @@
             const thead = document.getElementById('table-header');
             if (groupBy === 'branch') {
                 thead.innerHTML = '<th>Branch</th><th style="text-align:right">Revenue</th>';
+            } else if (groupBy === 'region') {
+                thead.innerHTML = '<th>Region</th><th>Branches</th><th style="text-align:right">Revenue</th>';
             } else {
                 thead.innerHTML = '<th>Company</th><th>Branch</th><th style="text-align:right">Revenue</th>';
             }
