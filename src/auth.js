@@ -43,7 +43,12 @@ export async function login(email, password) {
 
 // Sign in with Google OAuth
 export async function loginWithGoogle() {
-  const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin + '/dashboard.html'
+    }
+  });
   if (error) throw error;
   return data;
 }
@@ -175,6 +180,14 @@ export async function updateUserPages(userId, pages) {
   if (!data || data.length === 0) {
     throw new Error('Update was blocked — check Supabase RLS policies on the profiles table (see supabase-migration.sql for the fix).');
   }
+}
+
+// Send a password reset email to a user
+export async function sendPasswordReset(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://www.talentledger.app/index.html',
+  });
+  if (error) throw error;
 }
 
 // Admin: delete a user's profile (does not delete auth user)

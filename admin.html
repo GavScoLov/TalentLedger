@@ -87,6 +87,9 @@
         .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .delete-btn { padding: 6px 10px; border-radius: var(--radius); border: 1px solid #FCA5A5; background: #FEF2F2; color: #DC2626; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
         .delete-btn:hover { background: #FEE2E2; }
+        .reset-pw-btn { padding: 6px 10px; border-radius: var(--radius); border: 1px solid #93C5FD; background: #EFF6FF; color: #2563EB; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
+        .reset-pw-btn:hover { background: #DBEAFE; }
+        .reset-pw-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* ── Status + misc ──────────────────────────────────────── */
         .status-msg { padding: 8px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 0.875rem; display: none; }
@@ -150,7 +153,7 @@
     </div>
 
     <script type="module">
-        import { checkAuth, isSuperAdmin, getAllUsers, updateUserRole, updateUserPages, deleteUserProfile, createUserWithEmail } from './src/auth.js';
+        import { checkAuth, isSuperAdmin, getAllUsers, updateUserRole, updateUserPages, deleteUserProfile, createUserWithEmail, sendPasswordReset } from './src/auth.js';
         import { initInactivityTimer } from './src/main.js';
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
@@ -373,6 +376,7 @@
                     <td>
                         <div class="admin-actions">
                             <button class="save-btn" data-user-id="${user.id}" ${isCurrentUser ? 'disabled' : ''}>Save</button>
+                            <button class="reset-pw-btn" data-user-id="${user.id}" data-user-email="${user.email || ''}">Reset PW</button>
                             ${!isCurrentUser ? `<button class="delete-btn" data-user-id="${user.id}">Remove</button>` : ''}
                         </div>
                     </td>
@@ -431,6 +435,25 @@
                     }
                     btn.disabled = false;
                     btn.textContent = 'Save';
+                });
+            });
+
+            // Reset password button
+            tbody.querySelectorAll('.reset-pw-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const email = btn.dataset.userEmail;
+                    if (!email) { showStatus('No email address found for this user.', 'error'); return; }
+                    if (!confirm(`Send a password reset email to ${email}?`)) return;
+                    btn.disabled = true;
+                    btn.textContent = 'Sending…';
+                    try {
+                        await sendPasswordReset(email);
+                        showStatus(`Password reset email sent to ${email}.`, 'success');
+                    } catch (err) {
+                        showStatus('Failed to send reset email: ' + err.message, 'error');
+                    }
+                    btn.disabled = false;
+                    btn.textContent = 'Reset PW';
                 });
             });
 
