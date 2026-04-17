@@ -285,11 +285,12 @@
   // TS /employees: status is "in"|"out" (clocked in/out right now), not Active/Inactive
   // Employees have no department field — we populate dept filter from shift data after loading
 
+  // depts = [{ id, name }] — value is the department_id, label is the human name
   function populateDeptFilter(depts, preserveValue) {
     const prev = preserveValue ? document.getElementById('dept-filter').value : '';
     const sel  = document.getElementById('dept-filter');
     sel.innerHTML = '<option value="">All Departments</option>'
-      + depts.map(d => `<option value="${escHtml(d)}"${d===prev?' selected':''}>${escHtml(d)}</option>`).join('');
+      + depts.map(d => `<option value="${escHtml(d.id)}"${d.id===prev?' selected':''}>${escHtml(d.name)}</option>`).join('');
   }
 
   // ── Load employee list (TS API → Supabase fallback) ──────
@@ -391,11 +392,24 @@
         emp.company = companyMap[emp.id] || '';
       }
 
-      // 3. Build dept list from shift department_id values; filter employees by dept
+      // 3. Build dept list from shift department_id values; look up names from ts_departments
       const deptIds = [...new Set(
         Object.values(shiftData).flat().map(s => s.department_id).filter(Boolean)
-      )].sort();
-      populateDeptFilter(deptIds, true);
+      )];
+
+      let deptOptions = [];
+      if (deptIds.length) {
+        const { data: deptRows } = await supabase
+          .from('ts_departments')
+          .select('department_id, name')
+          .in('department_id', deptIds);
+        const deptMap = {};
+        for (const d of (deptRows || [])) deptMap[d.department_id] = d.name || d.department_id;
+        deptOptions = deptIds
+          .map(id => ({ id, name: deptMap[id] || id }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+      populateDeptFilter(deptOptions, true);
 
       employees = dept
         ? allEmployees.filter(emp =>
