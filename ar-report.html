@@ -210,6 +210,9 @@
           <span id="last-upload-label">—</span>
         </div>
         <div class="toolbar-spacer"></div>
+        <button class="btn-upload" id="btn-psa-sync" onclick="syncFromPSA()">
+          ⟳ Sync from PSA
+        </button>
         <button class="btn-upload" onclick="document.getElementById('file-input').click()">
           ↑ Upload CSV
         </button>
@@ -752,6 +755,109 @@
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
+
+  // ── PSA API sync ───────────────────────────────────────────────
+  window.syncFromPSA = async function() {
+    const btn = document.getElementById('btn-psa-sync');
+    btn.textContent = '⟳ Syncing…';
+    btn.disabled = true;
+    document.getElementById('report-content').innerHTML =
+      '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="margin-top:12px;color:var(--text-secondary);font-size:.85rem;">Fetching invoices from PSA…</p></div>';
+
+    try {
+      const today     = new Date();
+      const startDate = new Date(today);
+      startDate.setFullYear(startDate.getFullYear() - 1); // 1 year back
+
+      const fmt = d => d.toISOString().slice(0, 10);
+      const url = `/api/psa?endpoint=/api/invoice_register/query&start_date=${fmt(startDate)}&end_date=${fmt(today)}`;
+
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `PSA API returned ${res.status}`);
+      }
+
+      const raw = await res.json();
+      if (!Array.isArray(raw) || !raw.length) {
+        document.getElementById('report-content').innerHTML =
+          '<div class="state-msg"><div class="icon">📭</div><div class="label">No open invoices returned from PSA</div></div>';
+        btn.textContent = '⟳ Sync from PSA';
+        btn.disabled = false;
+        return;
+      }
+
+      // Map PSA fields → ar_invoices format; calculate aging buckets
+      const asOf = today;
+      const msPerDay = 86400000;
+
+      const mapped = raw
+        .map(r => {
+          const amount  = parseFloat(r.invoiceamount)  || 0;
+          const paid    = parseFloat(r.payamount)       || 0;
+          const balance = Math.max(0, Math.round((amount - paid) * 100) / 100);
+          if (balance <= 0) return null; // skip fully-paid invoices
+
+          const dueDate = r.duedate ? new Date(r.duedate + 'T12:00:00Z') : null;
+          const daysPast = dueDate ? Math.floor((asOf - dueDate) / msPerDay) : 0;
+
+          let current_bal = 0, d0_30 = 0, d31_60 = 0, d61_90 = 0, d90plus = 0;
+          if (!dueDate || daysPast <= 0) { current_bal = balance; }
+          else if (daysPast <= 30)  { d0_30   = balance; }
+          else if (daysPast <= 60)  { d31_60  = balance; }
+          else if (daysPast <= 90)  { d61_90  = balance; }
+          else                      { d90plus = balance; }
+
+          // Convert YYYY-MM-DD dates to M/D/YYYY for display consistency
+          const isoToMDY = iso => {
+            if (!iso) return '';
+            const [y, m, d] = iso.split('-');
+            return `${parseInt(m)}/${parseInt(d)}/${y}`;
+          };
+
+          return {
+            branch:         r.branchname || '',
+            branch_name:    r.branchname || '',
+            customer_name:  r.customername || '',
+            invoice_date:   isoToMDY(r.weekendbill),
+            due_date:       isoToMDY(r.duedate),
+            invoice_number: String(r.invoicenumber || ''),
+            amount,
+            paid,
+            current:        current_bal,
+            current_bal,
+            d0_30, d31_60, d61_90, d90plus,
+            balance,
+          };
+        })
+        .filter(Boolean);
+
+      if (!mapped.length) {
+        document.getElementById('report-content').innerHTML =
+          '<div class="state-msg"><div class="icon">✅</div><div class="label">All invoices are fully paid — no open balances</div></div>';
+        btn.textContent = '⟳ Sync from PSA';
+        btn.disabled = false;
+        return;
+      }
+
+      // Save to ar_invoices
+      await saveInvoices(mapped, today, `PSA Sync (${currentUserName})`);
+      await loadRegionMapAndNotes();
+
+      showReport(
+        mapped,
+        today,
+        new Date().toISOString(),
+        `PSA Sync (${currentUserName})`,
+      );
+    } catch (err) {
+      alert('PSA sync failed: ' + err.message);
+      document.getElementById('report-content').innerHTML = '';
+    } finally {
+      btn.textContent = '⟳ Sync from PSA';
+      btn.disabled = false;
+    }
+  };
 
   // ── Init: auto-load from Supabase ──────────────────────────────
   await loadRegionMapAndNotes();
