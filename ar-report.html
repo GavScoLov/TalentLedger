@@ -13,6 +13,13 @@
       padding: 0 0 16px;
     }
     .toolbar-spacer { flex: 1; }
+    .date-label { font-size: .8rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+    .date-input {
+      padding: 6px 10px; border: 1px solid #D1D5DB; border-radius: 7px;
+      font-size: .82rem; font-family: inherit; color: #111827;
+      background: #fff; cursor: pointer;
+    }
+    .date-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(234,137,56,.15); }
     .btn-sync {
       padding: 8px 16px; background: var(--primary); color: #fff;
       border: none; border-radius: 8px; font-size: .82rem; font-weight: 700;
@@ -107,8 +114,12 @@
       </div>
 
       <div class="ar-toolbar">
-        <span class="sync-meta" id="sync-meta"></span>
+        <label class="date-label" for="date-from">From</label>
+        <input type="date" class="date-input" id="date-from">
+        <label class="date-label" for="date-to">To</label>
+        <input type="date" class="date-input" id="date-to">
         <div class="toolbar-spacer"></div>
+        <span class="sync-meta" id="sync-meta"></span>
         <button class="btn-sync" id="btn-sync" onclick="syncFromPSA()">⟳ Sync from PSA</button>
       </div>
 
@@ -237,6 +248,11 @@
 
   // ── Sync from PSA ──────────────────────────────────────────────
   window.syncFromPSA = async function() {
+    const startVal = document.getElementById('date-from').value;
+    const endVal   = document.getElementById('date-to').value;
+    if (!startVal || !endVal) { alert('Please select a date range.'); return; }
+    if (startVal > endVal)    { alert('Start date must be before end date.'); return; }
+
     const btn = document.getElementById('btn-sync');
     btn.textContent = '⟳ Syncing…';
     btn.disabled = true;
@@ -245,13 +261,8 @@
     document.getElementById('sync-meta').textContent = '';
 
     try {
-      const today     = new Date();
-      const startDate = new Date(today);
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      const fmt = d => d.toISOString().slice(0, 10);
-
       const res = await fetch(
-        `/api/psa?endpoint=/api/invoice_register/query&start_date=${fmt(startDate)}&end_date=${fmt(today)}`
+        `/api/psa?endpoint=/api/invoice_register/query&start_date=${startVal}&end_date=${endVal}`
       );
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -285,7 +296,15 @@
       .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
-  // ── Init ───────────────────────────────────────────────────────
+  // ── Init — seed date pickers then auto-sync ────────────────────
+  (function seedDates() {
+    const today = new Date();
+    const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const toISO = d => d.toISOString().slice(0, 10);
+    document.getElementById('date-from').value = toISO(firstOfLastMonth);
+    document.getElementById('date-to').value   = toISO(today);
+  })();
+
   await loadRegionMap();
   await syncFromPSA();
 </script>
