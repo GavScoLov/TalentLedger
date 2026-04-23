@@ -39,11 +39,21 @@
     /* ── Region & branch headers ─────────────────────────────── */
     .region-block  { margin-bottom: 32px; }
     .region-header {
+      display: flex; align-items: center; gap: 8px;
       font-size: .72rem; font-weight: 800; text-transform: uppercase;
       letter-spacing: .08em; color: var(--text-secondary);
       padding: 6px 0 8px; margin-bottom: 12px;
       border-bottom: 2px solid var(--border);
+      cursor: pointer; user-select: none;
     }
+    .region-header:hover { color: var(--text-primary); }
+    .region-chevron {
+      display: inline-block; width: 14px; height: 14px; flex-shrink: 0;
+      transition: transform .2s;
+    }
+    .region-block.collapsed .region-chevron { transform: rotate(-90deg); }
+    .region-body { overflow: hidden; }
+    .region-block.collapsed .region-body { display: none; }
     .branch-block  { margin-bottom: 20px; }
     .branch-header {
       font-size: .82rem; font-weight: 700; color: #1E3A5F;
@@ -203,9 +213,10 @@
     }
 
     // Regions
+    const chevronSVG = `<svg class="region-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
+
     for (const region of Object.keys(grouped).sort()) {
-      html += `<div class="region-block">
-        <div class="region-header">Region: ${esc(region)}</div>`;
+      let branchesHTML = '';
 
       for (const branch of Object.keys(grouped[region]).sort()) {
         const rows   = grouped[region][branch];
@@ -220,7 +231,7 @@
           </tr>`;
         }).join('');
 
-        html += `<div class="branch-block">
+        branchesHTML += `<div class="branch-block">
           <div class="branch-header">Branch: ${esc(branch)}</div>
           <table class="inv-table">
             <thead><tr>
@@ -240,7 +251,12 @@
         </div>`;
       }
 
-      html += `</div>`; // end region-block
+      html += `<div class="region-block">
+        <div class="region-header" onclick="this.closest('.region-block').classList.toggle('collapsed')">
+          ${chevronSVG}Region: ${esc(region)}
+        </div>
+        <div class="region-body">${branchesHTML}</div>
+      </div>`;
     }
 
     document.getElementById('report-content').innerHTML = html;
