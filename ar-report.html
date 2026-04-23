@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A/R Report – TalentLedger</title>
+  <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
+  <link rel="stylesheet" href="./src/design-system.css">
+  <style>
+    /* ── Upload zone ─────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 12px;
+      padding: 48px 24px; text-align: center; cursor: pointer;
+      transition: all .2s; background: var(--bg); margin-bottom: 20px;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--primary); background: rgba(var(--primary-rgb),.04);
+    }
+    .upload-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .upload-label { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+    .upload-hint  { font-size: .82rem; color: var(--text-secondary); }
+    .upload-zone.has-file { border-style: solid; border-color: #16a34a; background: #F0FDF4; }
+    .upload-zone.has-file .upload-label { color: #15803d; }
+
+    /* ── Stats bar ───────────────────────────────────────────── */
+    .stats-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .stat-chip {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 16px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; min-width: 140px;
+    }
+    .stat-label { font-size: .72rem; font-weight: 700; text-transform: uppercase;
+                  letter-spacing: .05em; color: var(--text-secondary); }
+    .stat-val   { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+    .stat-chip.past-due .stat-val   { color: #DC2626; }
+    .stat-chip.due-week .stat-val   { color: #D97706; }
+
+    /* ── Color key ───────────────────────────────────────────── */
+    .color-key { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; font-size: .8rem; }
+    .key-item  { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text-secondary); }
+    .key-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+    .key-swatch.past-due  { background: #FEE2E2; border: 1px solid #FCA5A5; }
+    .key-swatch.due-week  { background: #FEF9C3; border: 1px solid #FDE047; }
+    .key-swatch.normal    { background: #fff;    border: 1px solid #E5E7EB; }
+
+    /* ── Region + branch headers ─────────────────────────────── */
+    .region-block   { margin-bottom: 32px; }
+    .region-header  {
+      font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--text-secondary); padding: 6px 0 8px; margin-bottom: 12px;
+      border-bottom: 2px solid var(--border);
+    }
+    .branch-block   { margin-bottom: 20px; }
+    .branch-header  {
+      font-size: .8rem; font-weight: 700; color: #1E3A5F;
+      background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px 6px 0 0;
+      padding: 7px 14px; letter-spacing: .02em;
+    }
+
+    /* ── AR table ────────────────────────────────────────────── */
+    .ar-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .ar-table th {
+      padding: 6px 10px; text-align: right; font-size: .68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; color: #6B7280;
+      background: #F9FAFB; border: 1px solid #E5E7EB; white-space: nowrap;
+    }
+    .ar-table th:first-child, .ar-table th.col-notes { text-align: left; }
+    .ar-table td {
+      padding: 6px 10px; border: 1px solid #F3F4F6; text-align: right;
+      vertical-align: top; color: #111827; white-space: nowrap;
+    }
+    .ar-table td:first-child { text-align: left; min-width: 160px; white-space: normal; font-weight: 500; }
+    .ar-table td.col-date    { color: #6B7280; font-size: .76rem; }
+    .ar-table td.col-invoice { color: #6B7280; font-size: .76rem; }
+    .ar-table td.col-notes   { text-align: left; min-width: 200px; max-width: 280px; white-space: normal; }
+    .ar-table td.amt-zero    { color: #D1D5DB; }
+    .ar-table td.amt-pos     { color: #111827; font-weight: 500; }
+    .ar-table td.amt-neg     { color: #DC2626; font-weight: 500; }
+
+    /* Row colors */
+    .ar-table tr.row-past-due td  { background: #FEF2F2; }
+    .ar-table tr.row-due-week td  { background: #FEFCE8; }
+    .ar-table tr.row-normal td    { background: #fff; }
+
+    /* Totals row */
+    .ar-table tr.totals-row td {
+      font-weight: 700; background: #F1F5F9; border-top: 2px solid #CBD5E1;
+      font-size: .78rem; color: #1E3A5F;
+    }
+    .ar-table tr.totals-row td:first-child { color: #6B7280; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+
+    /* Region totals */
+    .region-totals {
+      display: flex; gap: 24px; flex-wrap: wrap;
+      padding: 10px 14px; background: #EFF6FF; border: 1px solid #BFDBFE;
+      border-radius: 6px; margin-top: 8px; font-size: .8rem;
+    }
+    .region-total-item { display: flex; flex-direction: column; gap: 2px; }
+    .region-total-label { font-size: .68rem; font-weight: 700; text-transform: uppercase;
+                          letter-spacing: .05em; color: #3B82F6; }
+    .region-total-val   { font-weight: 700; color: #1E3A5F; }
+    .region-total-val.danger { color: #DC2626; }
+
+    /* Grand totals */
+    .grand-totals {
+      display: flex; gap: 24px; flex-wrap: wrap;
+      padding: 12px 16px; background: #1E3A5F; border-radius: 8px;
+      margin-top: 24px; font-size: .82rem;
+    }
+    .grand-total-item   { display: flex; flex-direction: column; gap: 2px; }
+    .grand-total-label  { font-size: .68rem; font-weight: 700; text-transform: uppercase;
+                          letter-spacing: .05em; color: #93C5FD; }
+    .grand-total-val    { font-weight: 700; color: #fff; font-size: .95rem; }
+    .grand-total-val.danger { color: #FCA5A5; }
+
+    /* ── Notes cell ──────────────────────────────────────────── */
+    .note-display {
+      cursor: pointer; padding: 3px 6px; border-radius: 5px;
+      transition: background .15s; min-height: 24px;
+    }
+    .note-display:hover { background: #F3F4F6; }
+    .note-text    { font-size: .78rem; color: #374151; line-height: 1.4; }
+    .note-meta    { font-size: .68rem; color: #9CA3AF; margin-top: 2px; }
+    .note-add     { font-size: .75rem; color: #93C5FD; font-style: italic; }
+    .note-editor  { display: none; }
+    .note-editor.active { display: block; }
+    .note-textarea {
+      width: 100%; min-height: 60px; padding: 6px 8px; font-size: .78rem;
+      border: 1.5px solid var(--primary); border-radius: 6px; font-family: inherit;
+      resize: vertical; color: #111827; box-sizing: border-box;
+    }
+    .note-textarea:focus { outline: none; }
+    .note-btns { display: flex; gap: 6px; margin-top: 4px; }
+    .note-save   { padding: 4px 10px; background: var(--primary); color: #fff;
+                   border: none; border-radius: 5px; font-size: .72rem; font-weight: 700; cursor: pointer; }
+    .note-cancel { padding: 4px 8px; background: #F3F4F6; color: #374151;
+                   border: none; border-radius: 5px; font-size: .72rem; cursor: pointer; }
+
+    /* ── Unassigned branch banner ────────────────────────────── */
+    .unassigned-banner {
+      background: #FEF9C3; border: 1px solid #FDE047; border-radius: 8px;
+      padding: 10px 16px; margin-bottom: 16px; font-size: .82rem; color: #854D0E;
+    }
+    .assign-region-select {
+      padding: 3px 8px; border-radius: 5px; border: 1px solid #FDE047;
+      background: #fff; font-size: .78rem; cursor: pointer; margin: 0 6px;
+    }
+    .assign-region-btn {
+      padding: 3px 10px; background: #D97706; color: #fff;
+      border: none; border-radius: 5px; font-size: .72rem; font-weight: 700; cursor: pointer;
+    }
+
+    /* ── Upload re-trigger strip ─────────────────────────────── */
+    .reupload-strip {
+      display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+      background: #F9FAFB; border: 1px solid var(--border); border-radius: 8px;
+      margin-bottom: 16px; font-size: .82rem; color: var(--text-secondary);
+    }
+    .btn-reupload {
+      padding: 5px 12px; background: #fff; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .78rem; cursor: pointer; font-weight: 600;
+    }
+    .btn-reupload:hover { background: #F3F4F6; }
+    .btn-print {
+      padding: 7px 14px; background: #fff; border: 1px solid var(--border);
+      border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-print:hover { background: #F3F4F6; }
+
+    /* ── Print styles ────────────────────────────────────────── */
+    @media print {
+      .sidebar, .navbar, .upload-zone, .reupload-strip, .color-key,
+      .note-editor, .btn-print, .note-add { display: none !important; }
+      .main-content { margin: 0 !important; padding: 0 !important; }
+      .ar-table { font-size: .7rem; }
+      .ar-table th, .ar-table td { padding: 4px 6px; }
+      .branch-block { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div class="main-content">
+    <div class="page-content">
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">A/R Report</h1>
+          <p class="page-subtitle" id="report-subtitle">Upload a PSA Open Invoices CSV to generate the report</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn-print" id="btn-print" style="display:none;" onclick="window.print()">🖨 Print</button>
+        </div>
+      </div>
+
+      <!-- Upload zone -->
+      <div id="upload-zone" class="upload-zone" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📊</div>
+        <div class="upload-label">Upload PSA Open Invoices CSV</div>
+        <div class="upload-hint">Drag & drop or click to browse</div>
+        <input type="file" id="file-input" accept=".csv" style="display:none;">
+      </div>
+
+      <!-- Re-upload strip (shown after first upload) -->
+      <div id="reupload-strip" class="reupload-strip" style="display:none;">
+        <span id="filename-label">—</span>
+        <button class="btn-reupload" onclick="document.getElementById('file-input').click()">↑ Upload New CSV</button>
+      </div>
+
+      <!-- Color key -->
+      <div id="color-key" style="display:none;" class="color-key">
+        <span class="key-item"><span class="key-swatch past-due"></span>Past Due</span>
+        <span class="key-item"><span class="key-swatch due-week"></span>Due This Week</span>
+        <span class="key-item"><span class="key-swatch normal"></span>Current</span>
+      </div>
+
+      <!-- Stats bar -->
+      <div id="stats-bar" style="display:none;" class="stats-bar">
+        <div class="stat-chip past-due"><span class="stat-label">Past Due</span><span class="stat-val" id="stat-past-due">—</span></div>
+        <div class="stat-chip due-week"><span class="stat-label">Due This Week</span><span class="stat-val" id="stat-due-week">—</span></div>
+        <div class="stat-chip"><span class="stat-label">Total Balance</span><span class="stat-val" id="stat-total">—</span></div>
+        <div class="stat-chip"><span class="stat-label">Effective Date</span><span class="stat-val" id="stat-date">—</span></div>
+      </div>
+
+      <!-- Report content -->
+      <div id="report-content"></div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { renderNavbar }  from './src/components/navbar.js';
+  import { renderSidebar } from './src/components/sidebar.js';
+  import { checkAuth, checkPageAccess, getProfile } from './src/auth.js';
+  import { supabase } from './src/supabaseClient.js';
+  import { initInactivityTimer } from './src/main.js';
+
+  await checkAuth();
+  await checkPageAccess('ar-report');
+  renderNavbar();
+  await renderSidebar();
+  initInactivityTimer();
+
+  const profile = await getProfile();
+  const currentUserName = profile?.username || profile?.email || 'Unknown';
+
+  // ── State ─────────────────────────────────────────────────────
+  let regionMap = {};   // branch → region
+  let notes     = {};   // invoice_number → { note_text, author_name, updated_at }
+  let invoices  = [];
+  let effectiveDate = null;
+  let agingDate     = null;
+  let allRegions    = [];   // for unassigned-branch assign dropdown
+
+  // ── Load Supabase data ─────────────────────────────────────────
+  async function loadSupabaseData() {
+    const [{ data: rmRows }, { data: noteRows }] = await Promise.all([
+      supabase.from('ar_region_map').select('branch_name, region'),
+      supabase.from('ar_notes').select('invoice_number, note_text, author_name, updated_at'),
+    ]);
+    regionMap = {};
+    for (const r of (rmRows || [])) regionMap[r.branch_name] = r.region;
+    notes = {};
+    for (const n of (noteRows || [])) notes[n.invoice_number] = n;
+    allRegions = [...new Set(Object.values(regionMap))].sort();
+  }
+
+  // ── CSV parsing ────────────────────────────────────────────────
+  function parseCSVLine(line) {
+    const result = [];
+    let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+      else { cur += ch; }
+    }
+    result.push(cur);
+    return result;
+  }
+
+  function parseMoney(v) {
+    if (!v) return 0;
+    const s = v.trim().replace(/[$,\s]/g, '');
+    return parseFloat(s) || 0;
+  }
+
+  function parseDate(v) {
+    if (!v) return null;
+    const parts = v.trim().split('/');
+    if (parts.length !== 3) return null;
+    const [m, d, y] = parts.map(Number);
+    if (!m || !d || !y) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function extractCsvNote(cols) {
+    const isDollarOrEmpty = v => !v || !v.trim() || /^\s*-?\$?[\d,]+(\.\d{1,2})?\s*$/.test(v.trim());
+    return cols.slice(12).filter(c => !isDollarOrEmpty(c)).join(' ').trim();
+  }
+
+  function parseCSV(text) {
+    const lines = text.split('\n');
+    const result = [];
+    let currentBranch = null;
+    let effDate = null;
+    let agDate  = null;
+
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/\r$/, '');
+      if (!line.trim()) continue;
+      const cols = parseCSVLine(line);
+
+      // Extract effective date from title
+      if (!effDate && cols[0]?.includes('Effective')) {
+        const m = cols[0].match(/Effective\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
+        if (m) effDate = parseDate(m[1]);
+      }
+
+      // Extract aging date
+      if (!agDate && cols[0]?.includes('as of')) {
+        const m = cols[0].match(/as of\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
+        if (m) agDate = parseDate(m[1]);
+      }
+
+      // Branch header
+      if (cols[0]?.startsWith('Branch:')) {
+        currentBranch = cols[0].replace('Branch:', '').trim();
+        continue;
+      }
+
+      if (!currentBranch) continue;
+      const c0 = cols[0]?.trim() || '';
+      if (!c0 || c0 === 'Customer Name' || c0.startsWith('Group Totals')) continue;
+
+      // Must have invoice number in col 3
+      const invNum = cols[3]?.trim();
+      if (!invNum || invNum.length < 3) continue;
+
+      result.push({
+        branch:        currentBranch,
+        customer_name: c0,
+        invoice_date:  cols[1]?.trim() || '',
+        due_date:      cols[2]?.trim() || '',
+        invoice_number: invNum,
+        amount:  parseMoney(cols[4]),
+        paid:    parseMoney(cols[5]),
+        current: parseMoney(cols[6]),
+        d0_30:   parseMoney(cols[7]),
+        d31_60:  parseMoney(cols[8]),
+        d61_90:  parseMoney(cols[9]),
+        d90plus: parseMoney(cols[10]),
+        balance: parseMoney(cols[11]),
+        csv_note: extractCsvNote(cols),
+      });
+    }
+    return { invoices: result, effDate, agDate };
+  }
+
+  // ── Formatting helpers ─────────────────────────────────────────
+  function fmt$(n) {
+    if (!n && n !== 0) return '—';
+    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
+
+  function fmtPct(num, den) {
+    if (!den) return '0%';
+    return Math.round((num / den) * 100) + '%';
+  }
+
+  function amtClass(n) {
+    if (!n || n === 0) return 'amt-zero';
+    if (n < 0)         return 'amt-neg';
+    return 'amt-pos';
+  }
+
+  // ── Row color class ────────────────────────────────────────────
+  function rowClass(inv) {
+    const pastDue = inv.d0_30 + inv.d31_60 + inv.d61_90 + inv.d90plus;
+    if (pastDue > 0) return 'row-past-due';
+    if (effectiveDate && inv.due_date) {
+      const due  = parseDate(inv.due_date);
+      const base = agingDate || effectiveDate;
+      if (due) {
+        // "Due this week" = due within 7 days after effective date AND not past due
+        const msPerDay = 86400000;
+        const diff = (due - base) / msPerDay;
+        if (diff >= 0 && diff <= 7) return 'row-due-week';
+      }
+    }
+    return 'row-normal';
+  }
+
+  // ── Totals accumulator ─────────────────────────────────────────
+  function emptyTotals() {
+    return { amount: 0, paid: 0, current: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90plus: 0, balance: 0 };
+  }
+  function addToTotals(t, inv) {
+    t.amount  += inv.amount;  t.paid    += inv.paid;
+    t.current += inv.current; t.d0_30   += inv.d0_30;
+    t.d31_60  += inv.d31_60;  t.d61_90  += inv.d61_90;
+    t.d90plus += inv.d90plus; t.balance += inv.balance;
+  }
+
+  // ── Render notes cell ──────────────────────────────────────────
+  function renderNoteCell(invNum) {
+    const saved = notes[invNum];
+    const text  = saved?.note_text  || '';
+    const auth  = saved?.author_name || '';
+    const ts    = saved?.updated_at
+      ? new Date(saved.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+      : '';
+
+    const displayHTML = text
+      ? `<div class="note-text">${escHtml(text)}</div>
+         <div class="note-meta">${escHtml(auth)}${ts ? ' · ' + ts : ''}</div>`
+      : `<span class="note-add">+ Add note</span>`;
+
+    return `<td class="col-notes">
+      <div class="note-display" onclick="openNote('${escHtml(invNum)}')" id="nd-${escHtml(invNum)}">${displayHTML}</div>
+      <div class="note-editor" id="ne-${escHtml(invNum)}">
+        <textarea class="note-textarea" id="nt-${escHtml(invNum)}" placeholder="Add a note…">${escHtml(text)}</textarea>
+        <div class="note-btns">
+          <button class="note-save"   onclick="saveNote('${escHtml(invNum)}')">Save</button>
+          <button class="note-cancel" onclick="closeNote('${escHtml(invNum)}')">Cancel</button>
+        </div>
+      </div>
+    </td>`;
+  }
+
+  // ── Render one branch table ────────────────────────────────────
+  function renderBranch(branch, branchInvs) {
+    const tot = emptyTotals();
+    const rows = branchInvs.map(inv => {
+      addToTotals(tot, inv);
+      return `<tr class="${rowClass(inv)}">
+        <td>${escHtml(inv.customer_name)}</td>
+        <td class="col-date">${inv.invoice_date}</td>
+        <td class="col-date">${inv.due_date}</td>
+        <td class="col-invoice">${escHtml(inv.invoice_number)}</td>
+        <td class="${amtClass(inv.amount)}">${fmt$(inv.amount)}</td>
+        <td class="${amtClass(inv.paid)}">${fmt$(inv.paid)}</td>
+        <td class="${amtClass(inv.current)}">${fmt$(inv.current)}</td>
+        <td class="${amtClass(inv.d0_30)}">${fmt$(inv.d0_30)}</td>
+        <td class="${amtClass(inv.d31_60)}">${fmt$(inv.d31_60)}</td>
+        <td class="${amtClass(inv.d61_90)}">${fmt$(inv.d61_90)}</td>
+        <td class="${amtClass(inv.d90plus)}">${fmt$(inv.d90plus)}</td>
+        <td class="${amtClass(inv.balance)}">${fmt$(inv.balance)}</td>
+        ${renderNoteCell(inv.invoice_number)}
+      </tr>`;
+    }).join('');
+
+    const pastDue = tot.d0_30 + tot.d31_60 + tot.d61_90 + tot.d90plus;
+
+    return `
+    <div class="branch-block">
+      <div class="branch-header">Branch: ${escHtml(branch)}</div>
+      <table class="ar-table">
+        <thead><tr>
+          <th style="text-align:left;">Customer Name</th>
+          <th>Inv Date</th><th>Due Date</th><th>Invoice #</th>
+          <th>Amount</th><th>Paid</th><th>Current</th>
+          <th>0–30</th><th>31–60</th><th>61–90</th><th>90+</th>
+          <th>Balance</th><th class="col-notes">Notes</th>
+        </tr></thead>
+        <tbody>
+          ${rows}
+          <tr class="totals-row">
+            <td>Branch Totals</td>
+            <td></td><td></td><td></td>
+            <td>${fmt$(tot.amount)}</td>
+            <td>${fmt$(tot.paid)}</td>
+            <td>${fmt$(tot.current)}</td>
+            <td>${fmt$(tot.d0_30)}</td>
+            <td>${fmt$(tot.d31_60)}</td>
+            <td>${fmt$(tot.d61_90)}</td>
+            <td>${fmt$(tot.d90plus)}</td>
+            <td>${fmt$(tot.balance)}</td>
+            <td class="col-notes" style="font-size:.72rem;color:#94A3B8;">
+              Past Due: ${fmt$(pastDue)} (${fmtPct(pastDue, tot.balance)})
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  // ── Render full report ─────────────────────────────────────────
+  function renderReport() {
+    // Group invoices → region → branch
+    const grouped = {};
+    const unassigned = [];
+
+    for (const inv of invoices) {
+      const region = regionMap[inv.branch];
+      if (!region) { unassigned.push(inv); continue; }
+      if (!grouped[region]) grouped[region] = {};
+      if (!grouped[region][inv.branch]) grouped[region][inv.branch] = [];
+      grouped[region][inv.branch].push(inv);
+    }
+
+    let html = '';
+
+    // Unassigned branch banner
+    if (unassigned.length) {
+      const uniqBranches = [...new Set(unassigned.map(i => i.branch))].sort();
+      html += `<div class="unassigned-banner">
+        ⚠️ <strong>${uniqBranches.length} branch(es) not yet assigned to a region:</strong>
+        ${uniqBranches.map(b => `
+          <span style="margin-left:12px;">
+            <strong>${escHtml(b)}</strong> →
+            <select class="assign-region-select" id="ar-sel-${escHtml(b)}">
+              <option value="">Select region…</option>
+              ${allRegions.map(r => `<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('')}
+              <option value="__new__">+ New region…</option>
+            </select>
+            <button class="assign-region-btn" onclick="assignRegion('${escHtml(b)}')">Assign</button>
+          </span>`).join('')}
+      </div>`;
+    }
+
+    // Grand totals
+    const grand = emptyTotals();
+
+    // Regions sorted
+    const sortedRegions = Object.keys(grouped).sort();
+    for (const region of sortedRegions) {
+      const regTot = emptyTotals();
+      const sortedBranches = Object.keys(grouped[region]).sort();
+      html += `<div class="region-block">
+        <div class="region-header">Region: ${escHtml(region)}</div>`;
+
+      for (const branch of sortedBranches) {
+        html += renderBranch(branch, grouped[region][branch]);
+        grouped[region][branch].forEach(inv => addToTotals(regTot, inv));
+      }
+
+      addToTotals(grand, regTot);
+      const regPastDue = regTot.d0_30 + regTot.d31_60 + regTot.d61_90 + regTot.d90plus;
+
+      html += `<div class="region-totals">
+        <div class="region-total-item">
+          <span class="region-total-label">${escHtml(region)} Past Due</span>
+          <span class="region-total-val danger">${fmt$(regPastDue)}</span>
+        </div>
+        <div class="region-total-item">
+          <span class="region-total-label">${escHtml(region)} Total</span>
+          <span class="region-total-val">${fmt$(regTot.balance)}</span>
+        </div>
+        <div class="region-total-item">
+          <span class="region-total-label">Past Due %</span>
+          <span class="region-total-val">${fmtPct(regPastDue, regTot.balance)}</span>
+        </div>
+        <div class="region-total-item">
+          <span class="region-total-label">0–30</span>
+          <span class="region-total-val">${fmt$(regTot.d0_30)}</span>
+        </div>
+        <div class="region-total-item">
+          <span class="region-total-label">31–60</span>
+          <span class="region-total-val">${fmt$(regTot.d31_60)}</span>
+        </div>
+        <div class="region-total-item">
+          <span class="region-total-label">61–90</span>
+          <span class="region-total-val">${fmt$(regTot.d61_90)}</span>
+        </div>
+        <div class="region-total-item">
+          <span class="region-total-label">90+</span>
+          <span class="region-total-val">${fmt$(regTot.d90plus)}</span>
+        </div>
+      </div>
+      </div>`;
+    }
+
+    // Grand totals strip
+    const grandPastDue = grand.d0_30 + grand.d31_60 + grand.d61_90 + grand.d90plus;
+    html += `<div class="grand-totals">
+      <div class="grand-total-item">
+        <span class="grand-total-label">Grand Total Balance</span>
+        <span class="grand-total-val">${fmt$(grand.balance)}</span>
+      </div>
+      <div class="grand-total-item">
+        <span class="grand-total-label">Total Past Due</span>
+        <span class="grand-total-val danger">${fmt$(grandPastDue)}</span>
+      </div>
+      <div class="grand-total-item">
+        <span class="grand-total-label">Past Due %</span>
+        <span class="grand-total-val">${fmtPct(grandPastDue, grand.balance)}</span>
+      </div>
+      <div class="grand-total-item">
+        <span class="grand-total-label">0–30</span>
+        <span class="grand-total-val">${fmt$(grand.d0_30)}</span>
+      </div>
+      <div class="grand-total-item">
+        <span class="grand-total-label">31–60</span>
+        <span class="grand-total-val">${fmt$(grand.d31_60)}</span>
+      </div>
+      <div class="grand-total-item">
+        <span class="grand-total-label">61–90</span>
+        <span class="grand-total-val">${fmt$(grand.d61_90)}</span>
+      </div>
+      <div class="grand-total-item">
+        <span class="grand-total-label">90+</span>
+        <span class="grand-total-val">${fmt$(grand.d90plus)}</span>
+      </div>
+    </div>`;
+
+    document.getElementById('report-content').innerHTML = html;
+  }
+
+  // ── Update stats bar ───────────────────────────────────────────
+  function updateStats() {
+    let pastDue = 0, dueWeek = 0, total = 0;
+    const base = agingDate || effectiveDate;
+    for (const inv of invoices) {
+      const pd = inv.d0_30 + inv.d31_60 + inv.d61_90 + inv.d90plus;
+      pastDue += pd;
+      total   += inv.balance;
+      if (base && inv.due_date) {
+        const due  = parseDate(inv.due_date);
+        if (due) {
+          const diff = (due - base) / 86400000;
+          if (diff >= 0 && diff <= 7 && pd === 0) dueWeek += inv.balance;
+        }
+      }
+    }
+    document.getElementById('stat-past-due').textContent = fmt$(pastDue);
+    document.getElementById('stat-due-week').textContent = fmt$(dueWeek);
+    document.getElementById('stat-total').textContent    = fmt$(total);
+    document.getElementById('stat-date').textContent     = effectiveDate ? fmtDate(effectiveDate) : '—';
+  }
+
+  // ── Handle file upload ─────────────────────────────────────────
+  async function handleFile(file) {
+    if (!file || !file.name.endsWith('.csv')) return;
+
+    const text = await file.text();
+    const parsed = parseCSV(text);
+    invoices      = parsed.invoices;
+    effectiveDate = parsed.effDate;
+    agingDate     = parsed.agDate;
+
+    if (!invoices.length) {
+      document.getElementById('report-content').innerHTML =
+        '<p style="color:#DC2626;padding:24px;">No invoice rows found. Make sure this is a PSA Open Invoices CSV.</p>';
+      return;
+    }
+
+    // Refresh notes + region map
+    await loadSupabaseData();
+
+    // Show/hide UI elements
+    document.getElementById('upload-zone').style.display    = 'none';
+    document.getElementById('reupload-strip').style.display = '';
+    document.getElementById('filename-label').textContent   = file.name;
+    document.getElementById('color-key').style.display      = '';
+    document.getElementById('stats-bar').style.display      = '';
+    document.getElementById('btn-print').style.display      = '';
+    document.getElementById('report-subtitle').textContent  =
+      effectiveDate ? `Effective ${fmtDate(effectiveDate)}` : `${invoices.length} invoices loaded`;
+
+    updateStats();
+    renderReport();
+  }
+
+  // ── Drag & drop ────────────────────────────────────────────────
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // ── Note open / close / save ───────────────────────────────────
+  window.openNote = function(invNum) {
+    document.getElementById('nd-' + invNum).style.display = 'none';
+    document.getElementById('ne-' + invNum).classList.add('active');
+    document.getElementById('nt-' + invNum).focus();
+  };
+
+  window.closeNote = function(invNum) {
+    document.getElementById('ne-' + invNum).classList.remove('active');
+    document.getElementById('nd-' + invNum).style.display = '';
+  };
+
+  window.saveNote = async function(invNum) {
+    const text = document.getElementById('nt-' + invNum).value.trim();
+    const btn  = document.querySelector(`#ne-${invNum} .note-save`);
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+
+    const payload = {
+      invoice_number: invNum,
+      note_text:      text,
+      author_name:    currentUserName,
+      author_id:      (await supabase.auth.getUser()).data.user?.id || null,
+      updated_at:     new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('ar_notes')
+      .upsert(payload, { onConflict: 'invoice_number' });
+
+    if (error) { alert('Error saving note: ' + error.message); }
+    else {
+      notes[invNum] = payload;
+      // Refresh the display cell
+      const ts   = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+      const disp = document.getElementById('nd-' + invNum);
+      disp.innerHTML = text
+        ? `<div class="note-text">${escHtml(text)}</div>
+           <div class="note-meta">${escHtml(currentUserName)} · ${ts}</div>`
+        : `<span class="note-add">+ Add note</span>`;
+    }
+
+    btn.textContent = 'Save';
+    btn.disabled = false;
+    closeNote(invNum);
+  };
+
+  // ── Assign region to unassigned branch ─────────────────────────
+  window.assignRegion = async function(branch) {
+    const sel    = document.getElementById('ar-sel-' + branch);
+    let   region = sel.value;
+    if (!region) { alert('Please select a region.'); return; }
+
+    if (region === '__new__') {
+      region = prompt('Enter new region name:')?.trim();
+      if (!region) return;
+    }
+
+    const { error } = await supabase
+      .from('ar_region_map')
+      .upsert({ branch_name: branch, region }, { onConflict: 'branch_name' });
+
+    if (error) { alert('Error: ' + error.message); return; }
+
+    regionMap[branch] = region;
+    if (!allRegions.includes(region)) allRegions.push(region);
+    renderReport();
+  };
+
+  // ── Utility ────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // ── Init ───────────────────────────────────────────────────────
+  await loadSupabaseData();
+</script>
+</body>
+</html>

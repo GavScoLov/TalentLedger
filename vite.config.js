@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
           timeTrackerSettings: resolve(__dirnameESM, 'time-tracker-settings.html'),
           timesheetReview:     resolve(__dirnameESM, 'timesheet-review.html'),
           exceptionReports:    resolve(__dirnameESM, 'exception-reports.html'),
+          arReport:            resolve(__dirnameESM, 'ar-report.html'),
         },
       },
     },

@@ -117,6 +117,7 @@ const _PAGE_ORDER = [
   { slug: 'roster-tracker',        file: 'roster-tracker.html' },
   { slug: 'state-tax',             file: 'state-tax.html' },
   { slug: 'settings',              file: 'settings.html' },
+  { slug: 'ar-report',             file: 'ar-report.html' },
 ];
 
 // Get the landing page for the current user (first page they have access to).
