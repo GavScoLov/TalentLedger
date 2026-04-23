@@ -7,191 +7,103 @@
   <link rel="icon" type="image/png" href="./assets/TalentLedger-Icon.png">
   <link rel="stylesheet" href="./src/design-system.css">
   <style>
-    /* ── Empty / loading states ──────────────────────────────── */
-    .state-msg { text-align: center; padding: 60px 24px; color: var(--text-secondary); }
-    .state-msg .icon { font-size: 2.4rem; margin-bottom: 12px; }
-    .state-msg .label { font-size: .95rem; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
-    .state-msg .hint  { font-size: .82rem; }
-    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #E5E7EB;
-               border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     /* ── Toolbar ─────────────────────────────────────────────── */
     .ar-toolbar {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 0 0 16px; margin-bottom: 4px;
+      padding: 0 0 16px;
     }
     .toolbar-spacer { flex: 1; }
-    .btn-upload {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 14px; background: #fff; border: 1px solid var(--border);
-      border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
-      color: var(--text-primary); transition: background .15s;
+    .btn-sync {
+      padding: 8px 16px; background: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: .82rem; font-weight: 700;
+      cursor: pointer; transition: opacity .15s;
     }
-    .btn-upload:hover { background: #F3F4F6; }
-    .btn-print {
-      padding: 8px 14px; background: #fff; border: 1px solid var(--border);
-      border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer;
-    }
-    .btn-print:hover { background: #F3F4F6; }
-    .upload-indicator {
-      font-size: .78rem; color: var(--text-secondary);
-      display: flex; align-items: center; gap: 6px;
-    }
-    .upload-indicator .dot { width: 8px; height: 8px; border-radius: 50%;
-                              background: #16a34a; display: inline-block; }
+    .btn-sync:hover    { opacity: .9; }
+    .btn-sync:disabled { opacity: .5; cursor: not-allowed; }
+    .sync-meta { font-size: .78rem; color: var(--text-secondary); }
 
-    /* ── Stats bar ───────────────────────────────────────────── */
-    .stats-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-    .stat-chip {
-      display: flex; flex-direction: column; gap: 2px;
-      padding: 10px 16px; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 10px; min-width: 140px;
-    }
-    .stat-label { font-size: .72rem; font-weight: 700; text-transform: uppercase;
-                  letter-spacing: .05em; color: var(--text-secondary); }
-    .stat-val   { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
-    .stat-chip.past-due .stat-val { color: #DC2626; }
-    .stat-chip.due-week .stat-val { color: #D97706; }
+    /* ── Spinner ─────────────────────────────────────────────── */
+    .spinner-wrap { text-align: center; padding: 60px; }
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #E5E7EB;
+               border-top-color: var(--primary); border-radius: 50%;
+               animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Color key ───────────────────────────────────────────── */
-    .color-key { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; font-size: .8rem; }
-    .key-item  { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text-secondary); }
-    .key-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
-    .key-swatch.past-due { background: #FEE2E2; border: 1px solid #FCA5A5; }
-    .key-swatch.due-week { background: #FEF9C3; border: 1px solid #FDE047; }
-    .key-swatch.normal   { background: #fff;    border: 1px solid #E5E7EB; }
-
-    /* ── Region + branch headers ─────────────────────────────── */
+    /* ── Region & branch headers ─────────────────────────────── */
     .region-block  { margin-bottom: 32px; }
     .region-header {
-      font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--text-secondary); padding: 6px 0 8px; margin-bottom: 12px;
+      font-size: .72rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-secondary);
+      padding: 6px 0 8px; margin-bottom: 12px;
       border-bottom: 2px solid var(--border);
     }
     .branch-block  { margin-bottom: 20px; }
     .branch-header {
-      font-size: .8rem; font-weight: 700; color: #1E3A5F;
-      background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px 6px 0 0;
-      padding: 7px 14px; letter-spacing: .02em;
+      font-size: .82rem; font-weight: 700; color: #1E3A5F;
+      background: #EFF6FF; border: 1px solid #BFDBFE;
+      border-radius: 6px 6px 0 0; padding: 8px 14px;
     }
 
-    /* ── AR table ────────────────────────────────────────────── */
-    .ar-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
-    .ar-table th {
-      padding: 6px 10px; text-align: right; font-size: .68rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .04em; color: #6B7280;
+    /* ── Invoice table ───────────────────────────────────────── */
+    .inv-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    .inv-table th {
+      padding: 6px 12px; text-align: right;
+      font-size: .68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; color: #6B7280;
       background: #F9FAFB; border: 1px solid #E5E7EB; white-space: nowrap;
     }
-    .ar-table th:first-child, .ar-table th.col-notes { text-align: left; }
-    .ar-table td {
-      padding: 6px 10px; border: 1px solid #F3F4F6; text-align: right;
-      vertical-align: top; color: #111827; white-space: nowrap;
+    .inv-table th.left { text-align: left; }
+    .inv-table td {
+      padding: 7px 12px; border: 1px solid #F3F4F6;
+      text-align: right; color: #111827; white-space: nowrap;
+      vertical-align: middle;
     }
-    .ar-table td:first-child { text-align: left; min-width: 160px; white-space: normal; font-weight: 500; }
-    .ar-table td.col-date    { color: #6B7280; font-size: .76rem; }
-    .ar-table td.col-invoice { color: #6B7280; font-size: .76rem; }
-    .ar-table td.col-notes   { text-align: left; min-width: 200px; max-width: 300px; white-space: normal; }
-    .ar-table td.amt-zero    { color: #D1D5DB; }
-    .ar-table td.amt-pos     { color: #111827; font-weight: 500; }
-    .ar-table td.amt-neg     { color: #DC2626; font-weight: 500; }
+    .inv-table td.left  { text-align: left; font-weight: 500; }
+    .inv-table td.muted { color: #6B7280; font-size: .76rem; }
+    .inv-table tr:hover td { background: #FAFAFA; }
 
-    /* Row colors */
-    .ar-table tr.row-past-due td { background: #FEF2F2; }
-    .ar-table tr.row-due-week td { background: #FEFCE8; }
-    .ar-table tr.row-normal   td { background: #fff; }
-
-    /* Totals row */
-    .ar-table tr.totals-row td {
-      font-weight: 700; background: #F1F5F9; border-top: 2px solid #CBD5E1;
-      font-size: .78rem; color: #1E3A5F;
+    /* Branch totals row */
+    .inv-table tr.totals td {
+      font-weight: 700; background: #F1F5F9;
+      border-top: 2px solid #CBD5E1; color: #1E3A5F;
     }
-    .ar-table tr.totals-row td:first-child { color: #6B7280; font-size: .72rem;
-      text-transform: uppercase; letter-spacing: .04em; }
-
-    /* Region totals */
-    .region-totals {
-      display: flex; gap: 24px; flex-wrap: wrap;
-      padding: 10px 14px; background: #EFF6FF; border: 1px solid #BFDBFE;
-      border-radius: 6px; margin-top: 8px; font-size: .8rem;
+    .inv-table tr.totals td.left {
+      font-size: .72rem; text-transform: uppercase;
+      letter-spacing: .04em; color: #6B7280;
     }
-    .region-total-item { display: flex; flex-direction: column; gap: 2px; }
-    .region-total-label { font-size: .68rem; font-weight: 700; text-transform: uppercase;
-                          letter-spacing: .05em; color: #3B82F6; }
-    .region-total-val   { font-weight: 700; color: #1E3A5F; }
-    .region-total-val.danger { color: #DC2626; }
 
-    /* Grand totals */
-    .grand-totals {
-      display: flex; gap: 24px; flex-wrap: wrap;
-      padding: 12px 16px; background: #1E3A5F; border-radius: 8px;
-      margin-top: 24px; font-size: .82rem;
-    }
-    .grand-total-item  { display: flex; flex-direction: column; gap: 2px; }
-    .grand-total-label { font-size: .68rem; font-weight: 700; text-transform: uppercase;
-                         letter-spacing: .05em; color: #93C5FD; }
-    .grand-total-val   { font-weight: 700; color: #fff; font-size: .95rem; }
-    .grand-total-val.danger { color: #FCA5A5; }
+    /* Past due highlight */
+    .inv-table tr.is-past-due td { background: #FEF2F2; }
+    .inv-table tr.is-past-due:hover td { background: #FEE2E2; }
 
-    /* ── Notes cell ──────────────────────────────────────────── */
-    .note-display {
-      cursor: pointer; padding: 3px 6px; border-radius: 5px; transition: background .15s; min-height: 24px;
-    }
-    .note-display:hover { background: #F3F4F6; }
-    .note-text  { font-size: .78rem; color: #374151; line-height: 1.4; }
-    .note-meta  { font-size: .68rem; color: #9CA3AF; margin-top: 2px; }
-    .note-add   { font-size: .75rem; color: #93C5FD; font-style: italic; }
-    .note-editor { display: none; }
-    .note-editor.active { display: block; }
-    .note-textarea {
-      width: 100%; min-height: 60px; padding: 6px 8px; font-size: .78rem;
-      border: 1.5px solid var(--primary); border-radius: 6px; font-family: inherit;
-      resize: vertical; color: #111827; box-sizing: border-box;
-    }
-    .note-textarea:focus { outline: none; }
-    .note-btns { display: flex; gap: 6px; margin-top: 4px; }
-    .note-save   { padding: 4px 10px; background: var(--primary); color: #fff;
-                   border: none; border-radius: 5px; font-size: .72rem; font-weight: 700; cursor: pointer; }
-    .note-cancel { padding: 4px 8px; background: #F3F4F6; color: #374151;
-                   border: none; border-radius: 5px; font-size: .72rem; cursor: pointer; }
-
-    /* ── Unassigned branch banner ────────────────────────────── */
+    /* ── Unassigned banner ───────────────────────────────────── */
     .unassigned-banner {
       background: #FEF9C3; border: 1px solid #FDE047; border-radius: 8px;
       padding: 10px 16px; margin-bottom: 16px; font-size: .82rem; color: #854D0E;
     }
-    .assign-region-select {
+    .assign-select {
       padding: 3px 8px; border-radius: 5px; border: 1px solid #FDE047;
-      background: #fff; font-size: .78rem; cursor: pointer; margin: 0 6px;
+      background: #fff; font-size: .78rem; margin: 0 6px;
     }
-    .assign-region-btn {
+    .assign-btn {
       padding: 3px 10px; background: #D97706; color: #fff;
       border: none; border-radius: 5px; font-size: .72rem; font-weight: 700; cursor: pointer;
     }
 
-    /* ── Upload drop overlay (drag-over whole page) ──────────── */
-    .drop-overlay {
-      position: fixed; inset: 0; background: rgba(var(--primary-rgb),.08);
-      border: 3px dashed var(--primary); z-index: 9999; pointer-events: none;
-      display: none; align-items: center; justify-content: center;
-      font-size: 1.2rem; font-weight: 700; color: var(--primary);
-    }
-    .drop-overlay.active { display: flex; }
+    /* ── Empty state ─────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 60px 24px; color: var(--text-secondary); }
+    .empty-state .icon  { font-size: 2.4rem; margin-bottom: 10px; }
+    .empty-state .label { font-size: .95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
 
     /* ── Print ───────────────────────────────────────────────── */
     @media print {
-      .sidebar, .navbar, .ar-toolbar, .color-key, .note-editor,
-      .unassigned-banner { display: none !important; }
-      .main-content { margin: 0 !important; padding: 0 !important; }
-      .ar-table { font-size: .7rem; }
-      .ar-table th, .ar-table td { padding: 4px 6px; }
+      .sidebar, .navbar, .ar-toolbar, .unassigned-banner { display: none !important; }
+      .inv-table { font-size: .7rem; }
       .branch-block { page-break-inside: avoid; }
     }
   </style>
 </head>
 <body>
-<div class="drop-overlay" id="drop-overlay">Drop CSV to refresh data</div>
-
 <div class="app-layout">
   <div class="main-content">
     <div class="page-content">
@@ -199,45 +111,18 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">A/R Report</h1>
-          <p class="page-subtitle" id="report-subtitle">Loading…</p>
+          <p class="page-subtitle" id="report-subtitle">Invoice Register from PSA</p>
         </div>
       </div>
 
-      <!-- Toolbar (always visible) -->
       <div class="ar-toolbar">
-        <div id="upload-indicator" class="upload-indicator" style="display:none;">
-          <span class="dot"></span>
-          <span id="last-upload-label">—</span>
-        </div>
+        <span class="sync-meta" id="sync-meta"></span>
         <div class="toolbar-spacer"></div>
-        <button class="btn-upload" id="btn-psa-sync" onclick="syncFromPSA()">
-          ⟳ Sync from PSA
-        </button>
-        <button class="btn-upload" onclick="document.getElementById('file-input').click()">
-          ↑ Upload CSV
-        </button>
-        <button class="btn-print" id="btn-print" style="display:none;" onclick="window.print()">🖨 Print</button>
-        <input type="file" id="file-input" accept=".csv" style="display:none;">
+        <button class="btn-sync" id="btn-sync" onclick="syncFromPSA()">⟳ Sync from PSA</button>
       </div>
 
-      <!-- Color key (shown when data loaded) -->
-      <div id="color-key" style="display:none;" class="color-key">
-        <span class="key-item"><span class="key-swatch past-due"></span>Past Due</span>
-        <span class="key-item"><span class="key-swatch due-week"></span>Due This Week</span>
-        <span class="key-item"><span class="key-swatch normal"></span>Current</span>
-      </div>
-
-      <!-- Stats bar -->
-      <div id="stats-bar" style="display:none;" class="stats-bar">
-        <div class="stat-chip past-due"><span class="stat-label">Past Due</span><span class="stat-val" id="stat-past-due">—</span></div>
-        <div class="stat-chip due-week"><span class="stat-label">Due This Week</span><span class="stat-val" id="stat-due-week">—</span></div>
-        <div class="stat-chip"><span class="stat-label">Total Balance</span><span class="stat-val" id="stat-total">—</span></div>
-        <div class="stat-chip"><span class="stat-label">Effective Date</span><span class="stat-val" id="stat-date">—</span></div>
-      </div>
-
-      <!-- Main content area -->
       <div id="report-content">
-        <div style="text-align:center;padding:40px;"><div class="spinner"></div></div>
+        <div class="spinner-wrap"><div class="spinner"></div></div>
       </div>
 
     </div>
@@ -247,7 +132,7 @@
 <script type="module">
   import { renderNavbar }  from './src/components/navbar.js';
   import { renderSidebar } from './src/components/sidebar.js';
-  import { checkAuth, checkPageAccess, getProfile } from './src/auth.js';
+  import { checkAuth, checkPageAccess } from './src/auth.js';
   import { supabase } from './src/supabaseClient.js';
   import { initInactivityTimer } from './src/main.js';
 
@@ -257,485 +142,186 @@
   await renderSidebar();
   initInactivityTimer();
 
-  const profile = await getProfile();
-  const currentUserName = profile?.username || profile?.email || 'Unknown';
-
   // ── State ──────────────────────────────────────────────────────
-  let regionMap     = {};   // branch → region
-  let notes         = {};   // invoice_number → { note_text, author_name, updated_at }
-  let invoices      = [];   // current working set
-  let effectiveDate = null;
-  let allRegions    = [];
+  let regionMap  = {};   // branchname → region
+  let allRegions = [];
+  let lastData   = [];
 
-  // ── Supabase helpers ───────────────────────────────────────────
-  async function loadRegionMapAndNotes() {
-    const [{ data: rmRows }, { data: noteRows }] = await Promise.all([
-      supabase.from('ar_region_map').select('branch_name, region'),
-      supabase.from('ar_notes').select('invoice_number, note_text, author_name, updated_at'),
-    ]);
-    regionMap = {};
-    for (const r of (rmRows || [])) regionMap[r.branch_name] = r.region;
-    notes = {};
-    for (const n of (noteRows || [])) notes[n.invoice_number] = n;
+  // ── Load region map ────────────────────────────────────────────
+  async function loadRegionMap() {
+    const { data } = await supabase.from('ar_region_map').select('branch_name, region');
+    regionMap  = {};
+    for (const r of (data || [])) regionMap[r.branch_name] = r.region;
     allRegions = [...new Set(Object.values(regionMap))].sort();
   }
 
-  // Auto-load saved invoices from ar_invoices table
-  async function loadSavedInvoices() {
-    // Get the most recent effective_date batch
-    const { data: latest } = await supabase
-      .from('ar_invoices')
-      .select('effective_date')
-      .order('uploaded_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!latest) return null;
-
-    const { data: rows } = await supabase
-      .from('ar_invoices')
-      .select('*')
-      .eq('effective_date', latest.effective_date)
-      .order('customer_name');
-
-    return rows || [];
-  }
-
-  // Save invoices to ar_invoices (replace all — open invoices snapshot)
-  async function saveInvoices(invList, effDate, uploadedBy) {
-    // Delete all existing rows first (open invoices replace previous snapshot)
-    await supabase.from('ar_invoices').delete().neq('id', 0);
-
-    if (!invList.length) return;
-
-    const rows = invList.map(inv => ({
-      invoice_number: inv.invoice_number,
-      branch_name:    inv.branch,
-      customer_name:  inv.customer_name,
-      invoice_date:   inv.invoice_date,
-      due_date:       inv.due_date,
-      amount:         inv.amount,
-      paid:           inv.paid,
-      current_bal:    inv.current,
-      d0_30:          inv.d0_30,
-      d31_60:         inv.d31_60,
-      d61_90:         inv.d61_90,
-      d90plus:        inv.d90plus,
-      balance:        inv.balance,
-      effective_date: effDate
-        ? `${effDate.getFullYear()}-${String(effDate.getMonth()+1).padStart(2,'0')}-${String(effDate.getDate()).padStart(2,'0')}`
-        : null,
-      uploaded_at:    new Date().toISOString(),
-      uploaded_by:    uploadedBy,
-    }));
-
-    // Upsert in batches of 500
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error } = await supabase
-        .from('ar_invoices')
-        .upsert(rows.slice(i, i + 500), { onConflict: 'invoice_number' });
-      if (error) throw error;
-    }
-  }
-
-  // ── CSV parsing ────────────────────────────────────────────────
-  function parseCSVLine(line) {
-    const result = [];
-    let cur = '', inQ = false;
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
-      else { cur += ch; }
-    }
-    result.push(cur);
-    return result;
-  }
-
-  function parseMoney(v) {
-    if (!v) return 0;
-    return parseFloat(v.trim().replace(/[$,\s]/g, '')) || 0;
-  }
-
-  function parseDate(v) {
-    if (!v) return null;
-    const parts = v.trim().split('/');
-    if (parts.length !== 3) return null;
-    const [m, d, y] = parts.map(Number);
-    if (!m || !d || !y) return null;
-    return new Date(y, m - 1, d);
-  }
-
-  function extractCsvNote(cols) {
-    const isDollarOrEmpty = v => !v || !v.trim() || /^\s*-?\$?[\d,]+(\.\d{1,2})?\s*$/.test(v.trim());
-    return cols.slice(12).filter(c => !isDollarOrEmpty(c)).join(' ').trim();
-  }
-
-  function parseCSV(text) {
-    const result = [];
-    let currentBranch = null, effDate = null, agDate = null;
-
-    for (const rawLine of text.split('\n')) {
-      const line = rawLine.replace(/\r$/, '');
-      if (!line.trim()) continue;
-      const cols = parseCSVLine(line);
-
-      if (!effDate && cols[0]?.includes('Effective')) {
-        const m = cols[0].match(/Effective\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
-        if (m) effDate = parseDate(m[1]);
-      }
-      if (!agDate && cols[0]?.includes('as of')) {
-        const m = cols[0].match(/as of\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
-        if (m) agDate = parseDate(m[1]);
-      }
-      if (cols[0]?.startsWith('Branch:')) {
-        currentBranch = cols[0].replace('Branch:', '').trim(); continue;
-      }
-      if (!currentBranch) continue;
-      const c0 = cols[0]?.trim() || '';
-      if (!c0 || c0 === 'Customer Name' || c0.startsWith('Group Totals')) continue;
-      const invNum = cols[3]?.trim();
-      if (!invNum || invNum.length < 3) continue;
-
-      result.push({
-        branch:         currentBranch,
-        customer_name:  c0,
-        invoice_date:   cols[1]?.trim() || '',
-        due_date:       cols[2]?.trim() || '',
-        invoice_number: invNum,
-        amount:  parseMoney(cols[4]),
-        paid:    parseMoney(cols[5]),
-        current: parseMoney(cols[6]),
-        d0_30:   parseMoney(cols[7]),
-        d31_60:  parseMoney(cols[8]),
-        d61_90:  parseMoney(cols[9]),
-        d90plus: parseMoney(cols[10]),
-        balance: parseMoney(cols[11]),
-        csv_note: extractCsvNote(cols),
-      });
-    }
-    return { invoices: result, effDate, agDate };
-  }
-
-  // ── Formatting helpers ─────────────────────────────────────────
+  // ── Formatting ─────────────────────────────────────────────────
   function fmt$(n) {
-    if (!n && n !== 0) return '—';
-    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    return (n ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   }
-  function fmtPct(num, den) { return den ? Math.round((num / den) * 100) + '%' : '0%'; }
-  function fmtDate(d) {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-  }
-  function amtClass(n) { return !n || n === 0 ? 'amt-zero' : n < 0 ? 'amt-neg' : 'amt-pos'; }
 
-  function rowClass(inv) {
-    const pd = inv.d0_30 + inv.d31_60 + inv.d61_90 + inv.d90plus;
-    if (pd > 0) return 'row-past-due';
-    if (effectiveDate && inv.due_date) {
-      const due  = parseDate(inv.due_date);
-      const base = effectiveDate;
-      if (due) {
-        const diff = (due - base) / 86400000;
-        if (diff >= 0 && diff <= 7) return 'row-due-week';
-      }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('T')[0].split('-');
+    return `${parseInt(m)}/${parseInt(d)}/${y}`;
+  }
+
+  // ── Render ─────────────────────────────────────────────────────
+  function render(invoices) {
+    lastData = invoices;
+    if (!invoices.length) {
+      document.getElementById('report-content').innerHTML =
+        `<div class="empty-state"><div class="icon">📭</div>
+         <div class="label">No open invoices returned from PSA</div></div>`;
+      return;
     }
-    return 'row-normal';
-  }
 
-  // ── Totals accumulator ─────────────────────────────────────────
-  function emptyTotals() {
-    return { amount: 0, paid: 0, current: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90plus: 0, balance: 0 };
-  }
-  function addToTotals(t, inv) {
-    t.amount  += inv.amount   || 0; t.paid    += inv.paid     || 0;
-    t.current += inv.current  || 0; t.d0_30   += inv.d0_30   || 0;
-    t.d31_60  += inv.d31_60   || 0; t.d61_90  += inv.d61_90  || 0;
-    t.d90plus += inv.d90plus  || 0; t.balance += inv.balance  || 0;
-  }
-
-  // ── Notes cell ─────────────────────────────────────────────────
-  function renderNoteCell(invNum) {
-    const saved = notes[invNum];
-    const text  = saved?.note_text || '';
-    const auth  = saved?.author_name || '';
-    const ts    = saved?.updated_at
-      ? new Date(saved.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
-      : '';
-    const id = CSS.escape(invNum);
-    const displayHTML = text
-      ? `<div class="note-text">${escHtml(text)}</div><div class="note-meta">${escHtml(auth)}${ts ? ' · ' + ts : ''}</div>`
-      : `<span class="note-add">+ Add note</span>`;
-    return `<td class="col-notes">
-      <div class="note-display" onclick="openNote('${escHtml(invNum)}')" id="nd-${id}">${displayHTML}</div>
-      <div class="note-editor" id="ne-${id}">
-        <textarea class="note-textarea" id="nt-${id}" placeholder="Add a note…">${escHtml(text)}</textarea>
-        <div class="note-btns">
-          <button class="note-save"   onclick="saveNote('${escHtml(invNum)}')">Save</button>
-          <button class="note-cancel" onclick="closeNote('${escHtml(invNum)}')">Cancel</button>
-        </div>
-      </div>
-    </td>`;
-  }
-
-  // ── Render branch ──────────────────────────────────────────────
-  function renderBranch(branch, branchInvs) {
-    const tot  = emptyTotals();
-    const rows = branchInvs.map(inv => {
-      addToTotals(tot, inv);
-      return `<tr class="${rowClass(inv)}">
-        <td>${escHtml(inv.customer_name)}</td>
-        <td class="col-date">${inv.invoice_date}</td>
-        <td class="col-date">${inv.due_date}</td>
-        <td class="col-invoice">${escHtml(inv.invoice_number)}</td>
-        <td class="${amtClass(inv.amount)}">${fmt$(inv.amount)}</td>
-        <td class="${amtClass(inv.paid)}">${fmt$(inv.paid)}</td>
-        <td class="${amtClass(inv.current)}">${fmt$(inv.current)}</td>
-        <td class="${amtClass(inv.d0_30)}">${fmt$(inv.d0_30)}</td>
-        <td class="${amtClass(inv.d31_60)}">${fmt$(inv.d31_60)}</td>
-        <td class="${amtClass(inv.d61_90)}">${fmt$(inv.d61_90)}</td>
-        <td class="${amtClass(inv.d90plus)}">${fmt$(inv.d90plus)}</td>
-        <td class="${amtClass(inv.balance)}">${fmt$(inv.balance)}</td>
-        ${renderNoteCell(inv.invoice_number)}
-      </tr>`;
-    }).join('');
-
-    const pastDue = tot.d0_30 + tot.d31_60 + tot.d61_90 + tot.d90plus;
-    return `<div class="branch-block">
-      <div class="branch-header">Branch: ${escHtml(branch)}</div>
-      <table class="ar-table">
-        <thead><tr>
-          <th style="text-align:left;">Customer Name</th>
-          <th>Inv Date</th><th>Due Date</th><th>Invoice #</th>
-          <th>Amount</th><th>Paid</th><th>Current</th>
-          <th>0–30</th><th>31–60</th><th>61–90</th><th>90+</th>
-          <th>Balance</th><th class="col-notes">Notes</th>
-        </tr></thead>
-        <tbody>
-          ${rows}
-          <tr class="totals-row">
-            <td>Branch Totals</td><td></td><td></td><td></td>
-            <td>${fmt$(tot.amount)}</td><td>${fmt$(tot.paid)}</td><td>${fmt$(tot.current)}</td>
-            <td>${fmt$(tot.d0_30)}</td><td>${fmt$(tot.d31_60)}</td>
-            <td>${fmt$(tot.d61_90)}</td><td>${fmt$(tot.d90plus)}</td>
-            <td>${fmt$(tot.balance)}</td>
-            <td class="col-notes" style="font-size:.72rem;color:#94A3B8;">
-              Past Due: ${fmt$(pastDue)} (${fmtPct(pastDue, tot.balance)})
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>`;
-  }
-
-  // ── Render full report ─────────────────────────────────────────
-  function renderReport() {
+    // Group: region → branch → invoices
     const grouped    = {};
     const unassigned = [];
 
     for (const inv of invoices) {
-      const region = regionMap[inv.branch || inv.branch_name];
-      const branch = inv.branch || inv.branch_name;
-      if (!region) { unassigned.push({ ...inv, branch }); continue; }
-      if (!grouped[region])        grouped[region] = {};
-      if (!grouped[region][branch]) grouped[region][branch] = [];
-      grouped[region][branch].push({ ...inv, branch });
+      const region = regionMap[inv.branchname];
+      if (!region) { unassigned.push(inv); continue; }
+      if (!grouped[region])              grouped[region] = {};
+      if (!grouped[region][inv.branchname]) grouped[region][inv.branchname] = [];
+      grouped[region][inv.branchname].push(inv);
     }
 
     let html = '';
 
-    // Unassigned branches
+    // Unassigned banner
     if (unassigned.length) {
-      const uniqBranches = [...new Set(unassigned.map(i => i.branch))].sort();
+      const branches = [...new Set(unassigned.map(i => i.branchname))].sort();
       html += `<div class="unassigned-banner">
-        ⚠️ <strong>${uniqBranches.length} branch(es) not assigned to a region:</strong>
-        ${uniqBranches.map(b => `
+        ⚠️ <strong>${branches.length} branch(es) not yet assigned to a region:</strong>
+        ${branches.map(b => `
           <span style="margin-left:12px;">
-            <strong>${escHtml(b)}</strong> →
-            <select class="assign-region-select" id="ar-sel-${escHtml(b)}">
+            <strong>${esc(b)}</strong> →
+            <select class="assign-select" id="asel-${esc(b)}">
               <option value="">Select region…</option>
-              ${allRegions.map(r => `<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('')}
+              ${allRegions.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}
               <option value="__new__">+ New region…</option>
             </select>
-            <button class="assign-region-btn" onclick="assignRegion('${escHtml(b)}')">Assign</button>
+            <button class="assign-btn" onclick="assignRegion('${esc(b)}')">Assign</button>
           </span>`).join('')}
       </div>`;
     }
 
-    const grand = emptyTotals();
+    // Regions
     for (const region of Object.keys(grouped).sort()) {
-      const regTot = emptyTotals();
-      html += `<div class="region-block"><div class="region-header">Region: ${escHtml(region)}</div>`;
-      for (const branch of Object.keys(grouped[region]).sort()) {
-        html += renderBranch(branch, grouped[region][branch]);
-        grouped[region][branch].forEach(inv => addToTotals(regTot, inv));
-      }
-      addToTotals(grand, regTot);
-      const regPD = regTot.d0_30 + regTot.d31_60 + regTot.d61_90 + regTot.d90plus;
-      html += `<div class="region-totals">
-        <div class="region-total-item"><span class="region-total-label">${escHtml(region)} Past Due</span><span class="region-total-val danger">${fmt$(regPD)}</span></div>
-        <div class="region-total-item"><span class="region-total-label">${escHtml(region)} Total</span><span class="region-total-val">${fmt$(regTot.balance)}</span></div>
-        <div class="region-total-item"><span class="region-total-label">Past Due %</span><span class="region-total-val">${fmtPct(regPD, regTot.balance)}</span></div>
-        <div class="region-total-item"><span class="region-total-label">0–30</span><span class="region-total-val">${fmt$(regTot.d0_30)}</span></div>
-        <div class="region-total-item"><span class="region-total-label">31–60</span><span class="region-total-val">${fmt$(regTot.d31_60)}</span></div>
-        <div class="region-total-item"><span class="region-total-label">61–90</span><span class="region-total-val">${fmt$(regTot.d61_90)}</span></div>
-        <div class="region-total-item"><span class="region-total-label">90+</span><span class="region-total-val">${fmt$(regTot.d90plus)}</span></div>
-      </div></div>`;
-    }
+      html += `<div class="region-block">
+        <div class="region-header">Region: ${esc(region)}</div>`;
 
-    const grandPD = grand.d0_30 + grand.d31_60 + grand.d61_90 + grand.d90plus;
-    html += `<div class="grand-totals">
-      <div class="grand-total-item"><span class="grand-total-label">Grand Total Balance</span><span class="grand-total-val">${fmt$(grand.balance)}</span></div>
-      <div class="grand-total-item"><span class="grand-total-label">Total Past Due</span><span class="grand-total-val danger">${fmt$(grandPD)}</span></div>
-      <div class="grand-total-item"><span class="grand-total-label">Past Due %</span><span class="grand-total-val">${fmtPct(grandPD, grand.balance)}</span></div>
-      <div class="grand-total-item"><span class="grand-total-label">0–30</span><span class="grand-total-val">${fmt$(grand.d0_30)}</span></div>
-      <div class="grand-total-item"><span class="grand-total-label">31–60</span><span class="grand-total-val">${fmt$(grand.d31_60)}</span></div>
-      <div class="grand-total-item"><span class="grand-total-label">61–90</span><span class="grand-total-val">${fmt$(grand.d61_90)}</span></div>
-      <div class="grand-total-item"><span class="grand-total-label">90+</span><span class="grand-total-val">${fmt$(grand.d90plus)}</span></div>
-    </div>`;
+      for (const branch of Object.keys(grouped[region]).sort()) {
+        const rows    = grouped[region][branch];
+        let totAmount = 0, totPaid = 0, totBalance = 0;
+
+        const rowsHTML = rows.map(inv => {
+          const balance = Math.max(0, (inv.invoiceamount || 0) - (inv.payamount || 0));
+          totAmount  += inv.invoiceamount || 0;
+          totPaid    += inv.payamount     || 0;
+          totBalance += balance;
+
+          const pastDue = (inv.pastdue || 0) > 0;
+          return `<tr${pastDue ? ' class="is-past-due"' : ''}>
+            <td class="left">${esc(inv.customername || '')}</td>
+            <td class="muted">${fmtDate(inv.weekendbill)}</td>
+            <td class="muted">${fmtDate(inv.duedate)}</td>
+            <td class="muted">${esc(String(inv.invoicenumber || ''))}</td>
+            <td>${fmt$(inv.invoiceamount)}</td>
+            <td>${fmt$(inv.payamount)}</td>
+            <td style="${balance > 0 ? 'font-weight:600;' : 'color:#9CA3AF;'}">${fmt$(balance)}</td>
+            <td class="muted">${inv.dso ?? '—'}</td>
+            <td style="${pastDue ? 'color:#DC2626;font-weight:600;' : 'color:#9CA3AF;'}">${inv.pastdue ?? '—'}</td>
+          </tr>`;
+        }).join('');
+
+        html += `<div class="branch-block">
+          <div class="branch-header">Branch: ${esc(branch)}</div>
+          <table class="inv-table">
+            <thead><tr>
+              <th class="left">Customer</th>
+              <th>Invoice Date</th>
+              <th>Due Date</th>
+              <th>Invoice #</th>
+              <th>Amount</th>
+              <th>Paid</th>
+              <th>Balance</th>
+              <th>DSO</th>
+              <th>Past Due</th>
+            </tr></thead>
+            <tbody>
+              ${rowsHTML}
+              <tr class="totals">
+                <td class="left">Branch Totals — ${rows.length} invoice${rows.length !== 1 ? 's' : ''}</td>
+                <td></td><td></td><td></td>
+                <td>${fmt$(totAmount)}</td>
+                <td>${fmt$(totPaid)}</td>
+                <td>${fmt$(totBalance)}</td>
+                <td></td><td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
+      }
+
+      html += `</div>`; // end region-block
+    }
 
     document.getElementById('report-content').innerHTML = html;
   }
 
-  // ── Update stats bar ───────────────────────────────────────────
-  function updateStats() {
-    let pastDue = 0, dueWeek = 0, total = 0;
-    for (const inv of invoices) {
-      const pd = (inv.d0_30||0) + (inv.d31_60||0) + (inv.d61_90||0) + (inv.d90plus||0);
-      pastDue += pd;
-      total   += inv.balance || 0;
-      if (effectiveDate && inv.due_date) {
-        const due  = parseDate(inv.due_date);
-        if (due) {
-          const diff = (due - effectiveDate) / 86400000;
-          if (diff >= 0 && diff <= 7 && pd === 0) dueWeek += inv.balance || 0;
-        }
-      }
-    }
-    document.getElementById('stat-past-due').textContent = fmt$(pastDue);
-    document.getElementById('stat-due-week').textContent = fmt$(dueWeek);
-    document.getElementById('stat-total').textContent    = fmt$(total);
-    document.getElementById('stat-date').textContent     = effectiveDate ? fmtDate(effectiveDate) : '—';
-  }
-
-  // ── Show data (from DB or CSV) ─────────────────────────────────
-  function showReport(rows, effDate, uploadedAt, uploaderName) {
-    invoices      = rows;
-    effectiveDate = effDate;
-
-    document.getElementById('color-key').style.display  = '';
-    document.getElementById('stats-bar').style.display  = '';
-    document.getElementById('btn-print').style.display  = '';
-
-    if (uploadedAt) {
-      const d = new Date(uploadedAt).toLocaleDateString('en-US',
-        { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-      document.getElementById('upload-indicator').style.display = '';
-      document.getElementById('last-upload-label').textContent  =
-        `Last updated ${d}${uploaderName ? ' by ' + uploaderName : ''}`;
-    }
-
-    document.getElementById('report-subtitle').textContent = effDate
-      ? `Effective ${fmtDate(effDate)}`
-      : `${rows.length} invoices`;
-
-    updateStats();
-    renderReport();
-  }
-
-  // ── Handle file upload ─────────────────────────────────────────
-  async function handleFile(file) {
-    if (!file?.name.endsWith('.csv')) return;
-    const btn = document.querySelector('.btn-upload');
-    btn.textContent = '↑ Uploading…';
+  // ── Sync from PSA ──────────────────────────────────────────────
+  window.syncFromPSA = async function() {
+    const btn = document.getElementById('btn-sync');
+    btn.textContent = '⟳ Syncing…';
     btn.disabled = true;
+    document.getElementById('report-content').innerHTML =
+      '<div class="spinner-wrap"><div class="spinner"></div></div>';
+    document.getElementById('sync-meta').textContent = '';
 
     try {
-      const text   = await file.text();
-      const parsed = parseCSV(text);
+      const today     = new Date();
+      const startDate = new Date(today);
+      startDate.setFullYear(startDate.getFullYear() - 1);
+      const fmt = d => d.toISOString().slice(0, 10);
 
-      if (!parsed.invoices.length) {
-        alert('No invoice rows found. Make sure this is a PSA Open Invoices CSV.');
-        return;
+      const res = await fetch(
+        `/api/psa?endpoint=/api/invoice_register/query&start_date=${fmt(startDate)}&end_date=${fmt(today)}`
+      );
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || `PSA API ${res.status}`);
       }
 
-      // Save to Supabase
-      await saveInvoices(parsed.invoices, parsed.effDate, currentUserName);
+      const raw = await res.json();
+      if (!Array.isArray(raw)) throw new Error('Unexpected response format from PSA');
 
-      // Reload region map + notes
-      await loadRegionMapAndNotes();
+      // Keep only invoices with an outstanding balance
+      const open = raw.filter(r => ((r.invoiceamount || 0) - (r.payamount || 0)) > 0.005);
 
-      showReport(
-        parsed.invoices.map(inv => ({ ...inv, branch_name: inv.branch })),
-        parsed.effDate,
-        new Date().toISOString(),
-        currentUserName,
-      );
+      await loadRegionMap();
+      render(open);
+
+      const ts = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      document.getElementById('sync-meta').textContent =
+        `${open.length} open invoices · synced at ${ts}`;
     } catch (err) {
-      alert('Upload failed: ' + err.message);
+      document.getElementById('report-content').innerHTML =
+        `<div class="empty-state"><div class="icon">⚠️</div>
+         <div class="label" style="color:#DC2626;">Sync failed</div>
+         <div>${esc(err.message)}</div></div>`;
     } finally {
-      btn.textContent = '↑ Upload CSV';
+      btn.textContent = '⟳ Sync from PSA';
       btn.disabled = false;
     }
-  }
-
-  // ── Drag & drop (whole page) ───────────────────────────────────
-  const overlay = document.getElementById('drop-overlay');
-  let dragCounter = 0;
-  document.addEventListener('dragenter', e => {
-    if (e.dataTransfer?.types?.includes('Files')) { dragCounter++; overlay.classList.add('active'); }
-  });
-  document.addEventListener('dragleave', () => { if (--dragCounter <= 0) { dragCounter = 0; overlay.classList.remove('active'); } });
-  document.addEventListener('dragover',  e => e.preventDefault());
-  document.addEventListener('drop', e => {
-    e.preventDefault(); dragCounter = 0; overlay.classList.remove('active');
-    handleFile(e.dataTransfer.files[0]);
-  });
-  document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
-
-  // ── Notes ──────────────────────────────────────────────────────
-  window.openNote = function(invNum) {
-    const id = CSS.escape(invNum);
-    document.getElementById('nd-' + id).style.display = 'none';
-    document.getElementById('ne-' + id).classList.add('active');
-    document.getElementById('nt-' + id).focus();
-  };
-  window.closeNote = function(invNum) {
-    const id = CSS.escape(invNum);
-    document.getElementById('ne-' + id).classList.remove('active');
-    document.getElementById('nd-' + id).style.display = '';
-  };
-  window.saveNote = async function(invNum) {
-    const id   = CSS.escape(invNum);
-    const text = document.getElementById('nt-' + id).value.trim();
-    const btn  = document.querySelector(`#ne-${id} .note-save`);
-    btn.textContent = 'Saving…'; btn.disabled = true;
-
-    const payload = {
-      invoice_number: invNum,
-      note_text:      text,
-      author_name:    currentUserName,
-      author_id:      (await supabase.auth.getUser()).data.user?.id || null,
-      updated_at:     new Date().toISOString(),
-    };
-    const { error } = await supabase.from('ar_notes')
-      .upsert(payload, { onConflict: 'invoice_number' });
-
-    if (error) { alert('Error saving note: ' + error.message); }
-    else {
-      notes[invNum] = payload;
-      const ts   = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-      document.getElementById('nd-' + id).innerHTML = text
-        ? `<div class="note-text">${escHtml(text)}</div><div class="note-meta">${escHtml(currentUserName)} · ${ts}</div>`
-        : `<span class="note-add">+ Add note</span>`;
-    }
-    btn.textContent = 'Save'; btn.disabled = false;
-    closeNote(invNum);
   };
 
   // ── Assign region ──────────────────────────────────────────────
   window.assignRegion = async function(branch) {
-    const sel = document.getElementById('ar-sel-' + branch);
-    let region = sel.value;
+    const sel = document.getElementById('asel-' + branch);
+    let region = sel?.value;
     if (!region) { alert('Please select a region.'); return; }
     if (region === '__new__') {
       region = prompt('Enter new region name:')?.trim();
@@ -746,136 +332,19 @@
     if (error) { alert('Error: ' + error.message); return; }
     regionMap[branch] = region;
     if (!allRegions.includes(region)) { allRegions.push(region); allRegions.sort(); }
-    renderReport();
+    render(lastData);
   };
 
   // ── Utility ────────────────────────────────────────────────────
-  function escHtml(s) {
+  function esc(s) {
     return String(s ?? '')
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
-  // ── PSA API sync ───────────────────────────────────────────────
-  window.syncFromPSA = async function() {
-    const btn = document.getElementById('btn-psa-sync');
-    btn.textContent = '⟳ Syncing…';
-    btn.disabled = true;
-    document.getElementById('report-content').innerHTML =
-      '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="margin-top:12px;color:var(--text-secondary);font-size:.85rem;">Fetching invoices from PSA…</p></div>';
-
-    try {
-      const today     = new Date();
-      const startDate = new Date(today);
-      startDate.setFullYear(startDate.getFullYear() - 1); // 1 year back
-
-      const fmt = d => d.toISOString().slice(0, 10);
-      const url = `/api/psa?endpoint=/api/invoice_register/query&start_date=${fmt(startDate)}&end_date=${fmt(today)}`;
-
-      const res = await fetch(url);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `PSA API returned ${res.status}`);
-      }
-
-      const raw = await res.json();
-      if (!Array.isArray(raw) || !raw.length) {
-        document.getElementById('report-content').innerHTML =
-          '<div class="state-msg"><div class="icon">📭</div><div class="label">No open invoices returned from PSA</div></div>';
-        btn.textContent = '⟳ Sync from PSA';
-        btn.disabled = false;
-        return;
-      }
-
-      // Map PSA fields → ar_invoices format; calculate aging buckets
-      const asOf = today;
-      const msPerDay = 86400000;
-
-      const mapped = raw
-        .map(r => {
-          const amount  = parseFloat(r.invoiceamount)  || 0;
-          const paid    = parseFloat(r.payamount)       || 0;
-          const balance = Math.max(0, Math.round((amount - paid) * 100) / 100);
-          if (balance <= 0) return null; // skip fully-paid invoices
-
-          const dueDate = r.duedate ? new Date(r.duedate + 'T12:00:00Z') : null;
-          const daysPast = dueDate ? Math.floor((asOf - dueDate) / msPerDay) : 0;
-
-          let current_bal = 0, d0_30 = 0, d31_60 = 0, d61_90 = 0, d90plus = 0;
-          if (!dueDate || daysPast <= 0) { current_bal = balance; }
-          else if (daysPast <= 30)  { d0_30   = balance; }
-          else if (daysPast <= 60)  { d31_60  = balance; }
-          else if (daysPast <= 90)  { d61_90  = balance; }
-          else                      { d90plus = balance; }
-
-          // Convert YYYY-MM-DD dates to M/D/YYYY for display consistency
-          const isoToMDY = iso => {
-            if (!iso) return '';
-            const [y, m, d] = iso.split('-');
-            return `${parseInt(m)}/${parseInt(d)}/${y}`;
-          };
-
-          return {
-            branch:         r.branchname || '',
-            branch_name:    r.branchname || '',
-            customer_name:  r.customername || '',
-            invoice_date:   isoToMDY(r.weekendbill),
-            due_date:       isoToMDY(r.duedate),
-            invoice_number: String(r.invoicenumber || ''),
-            amount,
-            paid,
-            current:        current_bal,
-            current_bal,
-            d0_30, d31_60, d61_90, d90plus,
-            balance,
-          };
-        })
-        .filter(Boolean);
-
-      if (!mapped.length) {
-        document.getElementById('report-content').innerHTML =
-          '<div class="state-msg"><div class="icon">✅</div><div class="label">All invoices are fully paid — no open balances</div></div>';
-        btn.textContent = '⟳ Sync from PSA';
-        btn.disabled = false;
-        return;
-      }
-
-      // Save to ar_invoices
-      await saveInvoices(mapped, today, `PSA Sync (${currentUserName})`);
-      await loadRegionMapAndNotes();
-
-      showReport(
-        mapped,
-        today,
-        new Date().toISOString(),
-        `PSA Sync (${currentUserName})`,
-      );
-    } catch (err) {
-      alert('PSA sync failed: ' + err.message);
-      document.getElementById('report-content').innerHTML = '';
-    } finally {
-      btn.textContent = '⟳ Sync from PSA';
-      btn.disabled = false;
-    }
-  };
-
-  // ── Init: auto-load from Supabase ──────────────────────────────
-  await loadRegionMapAndNotes();
-  const saved = await loadSavedInvoices();
-
-  if (saved && saved.length) {
-    const effDate = saved[0].effective_date ? new Date(saved[0].effective_date + 'T12:00:00Z') : null;
-    showReport(saved, effDate, saved[0].uploaded_at, saved[0].uploaded_by);
-  } else {
-    document.getElementById('report-subtitle').textContent = 'No data yet — upload a PSA Open Invoices CSV to get started';
-    document.getElementById('report-content').innerHTML = `
-      <div class="state-msg">
-        <div class="icon">📊</div>
-        <div class="label">No invoice data yet</div>
-        <div class="hint">Click <strong>Upload CSV</strong> above to load a PSA Open Invoices report.<br>
-          The data will be saved and auto-loaded on every future visit.</div>
-      </div>`;
-  }
+  // ── Init ───────────────────────────────────────────────────────
+  await loadRegionMap();
+  await syncFromPSA();
 </script>
 </body>
 </html>
