@@ -56,10 +56,21 @@
     .region-block.collapsed .region-body { display: none; }
     .branch-block  { margin-bottom: 20px; }
     .branch-header {
+      display: flex; align-items: center; gap: 8px;
       font-size: .82rem; font-weight: 700; color: #1E3A5F;
       background: #EFF6FF; border: 1px solid #BFDBFE;
       border-radius: 6px 6px 0 0; padding: 8px 14px;
+      cursor: pointer; user-select: none;
     }
+    .branch-header:hover { background: #DBEAFE; }
+    .branch-chevron {
+      display: inline-block; width: 13px; height: 13px; flex-shrink: 0;
+      transition: transform .2s;
+    }
+    .branch-block.collapsed .branch-chevron { transform: rotate(-90deg); }
+    .branch-block.collapsed .branch-header  { border-radius: 6px; }
+    .branch-body { overflow: hidden; }
+    .branch-block.collapsed .branch-body    { display: none; }
 
     /* ── Invoice table ───────────────────────────────────────── */
     .inv-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
@@ -213,7 +224,8 @@
     }
 
     // Regions
-    const chevronSVG = `<svg class="region-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
+    const chevronSVG  = `<svg class="region-chevron"  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
+    const bChevronSVG = `<svg class="branch-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
 
     for (const region of Object.keys(grouped).sort()) {
       let branchesHTML = '';
@@ -232,22 +244,26 @@
         }).join('');
 
         branchesHTML += `<div class="branch-block">
-          <div class="branch-header">Branch: ${esc(branch)}</div>
-          <table class="inv-table">
-            <thead><tr>
-              <th class="left">Customer</th>
-              <th>Invoice Date</th>
-              <th>Amount</th>
-            </tr></thead>
-            <tbody>
-              ${rowsHTML}
-              <tr class="totals">
-                <td class="left">Branch Totals — ${rows.length} record${rows.length !== 1 ? 's' : ''}</td>
-                <td></td>
-                <td>${fmt$(totAmount)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="branch-header" onclick="this.closest('.branch-block').classList.toggle('collapsed')">
+            ${bChevronSVG}Branch: ${esc(branch)}
+          </div>
+          <div class="branch-body">
+            <table class="inv-table">
+              <thead><tr>
+                <th class="left">Customer</th>
+                <th>Invoice Date</th>
+                <th>Amount</th>
+              </tr></thead>
+              <tbody>
+                ${rowsHTML}
+                <tr class="totals">
+                  <td class="left">Branch Totals — ${rows.length} record${rows.length !== 1 ? 's' : ''}</td>
+                  <td></td>
+                  <td>${fmt$(totAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>`;
       }
 
