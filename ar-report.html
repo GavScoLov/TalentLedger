@@ -172,7 +172,7 @@
     if (!invoices.length) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">📭</div>
-         <div class="label">No open invoices returned from PSA</div></div>`;
+         <div class="label">No invoices returned from PSA</div></div>`;
       return;
     }
 
@@ -181,18 +181,18 @@
     const unassigned = [];
 
     for (const inv of invoices) {
-      const region = regionMap[inv.branchname];
+      const region = regionMap[inv.branch];
       if (!region) { unassigned.push(inv); continue; }
-      if (!grouped[region])              grouped[region] = {};
-      if (!grouped[region][inv.branchname]) grouped[region][inv.branchname] = [];
-      grouped[region][inv.branchname].push(inv);
+      if (!grouped[region])               grouped[region] = {};
+      if (!grouped[region][inv.branch])   grouped[region][inv.branch] = [];
+      grouped[region][inv.branch].push(inv);
     }
 
     let html = '';
 
     // Unassigned banner
     if (unassigned.length) {
-      const branches = [...new Set(unassigned.map(i => i.branchname))].sort();
+      const branches = [...new Set(unassigned.map(i => i.branch))].filter(Boolean).sort();
       html += `<div class="unassigned-banner">
         ⚠️ <strong>${branches.length} branch(es) not yet assigned to a region:</strong>
         ${branches.map(b => `
@@ -214,26 +214,15 @@
         <div class="region-header">Region: ${esc(region)}</div>`;
 
       for (const branch of Object.keys(grouped[region]).sort()) {
-        const rows    = grouped[region][branch];
-        let totAmount = 0, totPaid = 0, totBalance = 0;
+        const rows   = grouped[region][branch];
+        let totAmount = 0;
 
         const rowsHTML = rows.map(inv => {
-          const balance = Math.max(0, (inv.invoiceamount || 0) - (inv.payamount || 0));
-          totAmount  += inv.invoiceamount || 0;
-          totPaid    += inv.payamount     || 0;
-          totBalance += balance;
-
-          const pastDue = (inv.pastdue || 0) > 0;
-          return `<tr${pastDue ? ' class="is-past-due"' : ''}>
-            <td class="left">${esc(inv.customername || '')}</td>
-            <td class="muted">${fmtDate(inv.weekendbill)}</td>
-            <td class="muted">${fmtDate(inv.duedate)}</td>
-            <td class="muted">${esc(String(inv.invoicenumber || ''))}</td>
-            <td>${fmt$(inv.invoiceamount)}</td>
-            <td>${fmt$(inv.payamount)}</td>
-            <td style="${balance > 0 ? 'font-weight:600;' : 'color:#9CA3AF;'}">${fmt$(balance)}</td>
-            <td class="muted">${inv.dso ?? '—'}</td>
-            <td style="${pastDue ? 'color:#DC2626;font-weight:600;' : 'color:#9CA3AF;'}">${inv.pastdue ?? '—'}</td>
+          totAmount += inv.amount || 0;
+          return `<tr>
+            <td class="left">${esc(inv.customer || '')}</td>
+            <td class="muted">${fmtDate(inv.weekend_bill)}</td>
+            <td style="font-weight:600;">${fmt$(inv.amount)}</td>
           </tr>`;
         }).join('');
 
@@ -243,23 +232,14 @@
             <thead><tr>
               <th class="left">Customer</th>
               <th>Invoice Date</th>
-              <th>Due Date</th>
-              <th>Invoice #</th>
               <th>Amount</th>
-              <th>Paid</th>
-              <th>Balance</th>
-              <th>DSO</th>
-              <th>Past Due</th>
             </tr></thead>
             <tbody>
               ${rowsHTML}
               <tr class="totals">
-                <td class="left">Branch Totals — ${rows.length} invoice${rows.length !== 1 ? 's' : ''}</td>
-                <td></td><td></td><td></td>
+                <td class="left">Branch Totals — ${rows.length} record${rows.length !== 1 ? 's' : ''}</td>
+                <td></td>
                 <td>${fmt$(totAmount)}</td>
-                <td>${fmt$(totPaid)}</td>
-                <td>${fmt$(totBalance)}</td>
-                <td></td><td></td>
               </tr>
             </tbody>
           </table>
@@ -298,15 +278,12 @@
       const raw = await res.json();
       if (!Array.isArray(raw)) throw new Error('Unexpected response format from PSA');
 
-      // Keep only invoices with an outstanding balance
-      const open = raw.filter(r => ((r.invoiceamount || 0) - (r.payamount || 0)) > 0.005);
-
       await loadRegionMap();
-      render(open);
+      render(raw);
 
       const ts = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       document.getElementById('sync-meta').textContent =
-        `${open.length} open invoices · synced at ${ts}`;
+        `${raw.length} records · synced at ${ts}`;
     } catch (err) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">⚠️</div>
