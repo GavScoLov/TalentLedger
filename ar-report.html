@@ -81,15 +81,6 @@
       background: #FEF9C3; border: 1px solid #FDE047; border-radius: 8px;
       padding: 10px 16px; margin-bottom: 16px; font-size: .82rem; color: #854D0E;
     }
-    .assign-select {
-      padding: 3px 8px; border-radius: 5px; border: 1px solid #FDE047;
-      background: #fff; font-size: .78rem; margin: 0 6px;
-    }
-    .assign-btn {
-      padding: 3px 10px; background: #D97706; color: #fff;
-      border: none; border-radius: 5px; font-size: .72rem; font-weight: 700; cursor: pointer;
-    }
-
     /* ── Empty state ─────────────────────────────────────────── */
     .empty-state { text-align: center; padding: 60px 24px; color: var(--text-secondary); }
     .empty-state .icon  { font-size: 2.4rem; margin-bottom: 10px; }
@@ -143,16 +134,16 @@
   initInactivityTimer();
 
   // ── State ──────────────────────────────────────────────────────
-  let regionMap  = {};   // branchname → region
-  let allRegions = [];
-  let lastData   = [];
+  let regionMap = {};   // branch → region  (from branch_settings)
+  let lastData  = [];
 
-  // ── Load region map ────────────────────────────────────────────
+  // ── Load region map from branch_settings ──────────────────────
   async function loadRegionMap() {
-    const { data } = await supabase.from('ar_region_map').select('branch_name, region');
-    regionMap  = {};
-    for (const r of (data || [])) regionMap[r.branch_name] = r.region;
-    allRegions = [...new Set(Object.values(regionMap))].sort();
+    const { data } = await supabase.from('branch_settings').select('branch, region');
+    regionMap = {};
+    for (const r of (data || [])) {
+      if (r.branch && r.region) regionMap[r.branch] = r.region;
+    }
   }
 
   // ── Formatting ─────────────────────────────────────────────────
@@ -194,17 +185,9 @@
     if (unassigned.length) {
       const branches = [...new Set(unassigned.map(i => i.branch))].filter(Boolean).sort();
       html += `<div class="unassigned-banner">
-        ⚠️ <strong>${branches.length} branch(es) not yet assigned to a region:</strong>
-        ${branches.map(b => `
-          <span style="margin-left:12px;">
-            <strong>${esc(b)}</strong> →
-            <select class="assign-select" id="asel-${esc(b)}">
-              <option value="">Select region…</option>
-              ${allRegions.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}
-              <option value="__new__">+ New region…</option>
-            </select>
-            <button class="assign-btn" onclick="assignRegion('${esc(b)}')">Assign</button>
-          </span>`).join('')}
+        ⚠️ <strong>${branches.length} branch(es) have no region assigned:</strong>
+        ${branches.map(b => `<strong style="margin-left:8px;">${esc(b)}</strong>`).join(',')}
+        &nbsp;— <a href="./settings.html" style="color:#854D0E;font-weight:700;text-decoration:underline;">Go to Settings → Branch</a> to assign regions.
       </div>`;
     }
 
@@ -293,23 +276,6 @@
       btn.textContent = '⟳ Sync from PSA';
       btn.disabled = false;
     }
-  };
-
-  // ── Assign region ──────────────────────────────────────────────
-  window.assignRegion = async function(branch) {
-    const sel = document.getElementById('asel-' + branch);
-    let region = sel?.value;
-    if (!region) { alert('Please select a region.'); return; }
-    if (region === '__new__') {
-      region = prompt('Enter new region name:')?.trim();
-      if (!region) return;
-    }
-    const { error } = await supabase.from('ar_region_map')
-      .upsert({ branch_name: branch, region }, { onConflict: 'branch_name' });
-    if (error) { alert('Error: ' + error.message); return; }
-    regionMap[branch] = region;
-    if (!allRegions.includes(region)) { allRegions.push(region); allRegions.sort(); }
-    render(lastData);
   };
 
   // ── Utility ────────────────────────────────────────────────────
