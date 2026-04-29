@@ -62,6 +62,34 @@ export default defineConfig(({ mode }) => {
             })
           },
         },
+        '/api/tw-invoice': {
+          target: 'https://api.ontempworks.com',
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const reqUrl    = new URL(req.url, 'http://localhost');
+              const startDate = reqUrl.searchParams.get('start_date') || '';
+              const endDate   = reqUrl.searchParams.get('end_date')   || '';
+              const exportId  = env.TW_INVOICE_EXPORT_ID || '';
+              const startId   = env.TW_INVOICE_START_ID  || '';
+              const endId     = env.TW_INVOICE_END_ID    || '';
+
+              proxyReq.method = 'POST';
+              proxyReq.path   = `/utilities/dataExport/exports/${exportId}`;
+
+              const body    = JSON.stringify({ parameters: [
+                { exportParameterId: startId, value: startDate },
+                { exportParameterId: endId,   value: endDate   },
+              ]});
+              const bodyBuf = Buffer.from(body);
+              proxyReq.setHeader('x-tw-token',     env.TW_INVOICE_BEARER || '');
+              proxyReq.setHeader('accept',          'text/plain');
+              proxyReq.setHeader('Content-Type',    'application/vnd.textus+jsonld');
+              proxyReq.setHeader('Content-Length',  bodyBuf.length);
+              proxyReq.write(bodyBuf);
+            });
+          },
+        },
         '/api/psa': {
           target: 'https://api.psastaffing.com',
           changeOrigin: true,

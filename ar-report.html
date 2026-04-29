@@ -16,8 +16,7 @@
     .date-label { font-size: .8rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
     .date-input {
       padding: 6px 10px; border: 1px solid #D1D5DB; border-radius: 7px;
-      font-size: .82rem; font-family: inherit; color: #111827;
-      background: #fff; cursor: pointer;
+      font-size: .82rem; font-family: inherit; color: #111827; background: #fff; cursor: pointer;
     }
     .date-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(234,137,56,.15); }
     .btn-sync {
@@ -36,7 +35,7 @@
                animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Region & branch headers ─────────────────────────────── */
+    /* ── Region headers ──────────────────────────────────────── */
     .region-block  { margin-bottom: 32px; }
     .region-header {
       display: flex; align-items: center; gap: 8px;
@@ -47,13 +46,12 @@
       cursor: pointer; user-select: none;
     }
     .region-header:hover { color: var(--text-primary); }
-    .region-chevron {
-      display: inline-block; width: 14px; height: 14px; flex-shrink: 0;
-      transition: transform .2s;
-    }
+    .region-chevron { display: inline-block; width: 14px; height: 14px; flex-shrink: 0; transition: transform .2s; }
     .region-block.collapsed .region-chevron { transform: rotate(-90deg); }
     .region-body { overflow: hidden; }
     .region-block.collapsed .region-body { display: none; }
+
+    /* ── Branch headers ──────────────────────────────────────── */
     .branch-block  { margin-bottom: 20px; }
     .branch-header {
       display: flex; align-items: center; gap: 8px;
@@ -63,10 +61,7 @@
       cursor: pointer; user-select: none;
     }
     .branch-header:hover { background: #DBEAFE; }
-    .branch-chevron {
-      display: inline-block; width: 13px; height: 13px; flex-shrink: 0;
-      transition: transform .2s;
-    }
+    .branch-chevron { display: inline-block; width: 13px; height: 13px; flex-shrink: 0; transition: transform .2s; }
     .branch-block.collapsed .branch-chevron { transform: rotate(-90deg); }
     .branch-block.collapsed .branch-header  { border-radius: 6px; }
     .branch-body { overflow: hidden; }
@@ -83,8 +78,7 @@
     .inv-table th.left { text-align: left; }
     .inv-table td {
       padding: 7px 12px; border: 1px solid #F3F4F6;
-      text-align: right; color: #111827; white-space: nowrap;
-      vertical-align: middle;
+      text-align: right; color: #111827; white-space: nowrap; vertical-align: middle;
     }
     .inv-table td.left  { text-align: left; font-weight: 500; }
     .inv-table td.muted { color: #6B7280; font-size: .76rem; }
@@ -96,11 +90,10 @@
       border-top: 2px solid #CBD5E1; color: #1E3A5F;
     }
     .inv-table tr.totals td.left {
-      font-size: .72rem; text-transform: uppercase;
-      letter-spacing: .04em; color: #6B7280;
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: #6B7280;
     }
 
-    /* Past due highlight */
+    /* Past-due row highlight */
     .inv-table tr.is-past-due td { background: #FEF2F2; }
     .inv-table tr.is-past-due:hover td { background: #FEE2E2; }
 
@@ -109,7 +102,8 @@
       background: #FEF9C3; border: 1px solid #FDE047; border-radius: 8px;
       padding: 10px 16px; margin-bottom: 16px; font-size: .82rem; color: #854D0E;
     }
-    /* ── Empty state ─────────────────────────────────────────── */
+
+    /* ── Empty / error state ─────────────────────────────────── */
     .empty-state { text-align: center; padding: 60px 24px; color: var(--text-secondary); }
     .empty-state .icon  { font-size: 2.4rem; margin-bottom: 10px; }
     .empty-state .label { font-size: .95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
@@ -130,7 +124,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">A/R Report</h1>
-          <p class="page-subtitle" id="report-subtitle">Invoice Register from PSA</p>
+          <p class="page-subtitle">Invoice Register from TempWorks</p>
         </div>
       </div>
 
@@ -141,7 +135,7 @@
         <input type="date" class="date-input" id="date-to">
         <div class="toolbar-spacer"></div>
         <span class="sync-meta" id="sync-meta"></span>
-        <button class="btn-sync" id="btn-sync" onclick="syncFromPSA()">⟳ Sync from PSA</button>
+        <button class="btn-sync" id="btn-sync" onclick="syncNow()">⟳ Sync from TempWorks</button>
       </div>
 
       <div id="report-content">
@@ -166,10 +160,9 @@
   initInactivityTimer();
 
   // ── State ──────────────────────────────────────────────────────
-  let regionMap = {};   // branch → region  (from branch_settings)
-  let lastData  = [];
+  let regionMap = {};   // branchname → region (from branch_settings)
 
-  // ── Load region map from branch_settings ──────────────────────
+  // ── Load region map ────────────────────────────────────────────
   async function loadRegionMap() {
     const { data } = await supabase.from('branch_settings').select('branch, region');
     regionMap = {};
@@ -182,20 +175,22 @@
   function fmt$(n) {
     return (n ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   }
-
   function fmtDate(iso) {
     if (!iso) return '—';
     const [y, m, d] = iso.split('T')[0].split('-');
     return `${parseInt(m)}/${parseInt(d)}/${y}`;
   }
 
+  // ── SVG chevrons ───────────────────────────────────────────────
+  const rChevron = `<svg class="region-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
+  const bChevron = `<svg class="branch-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
+
   // ── Render ─────────────────────────────────────────────────────
   function render(invoices) {
-    lastData = invoices;
     if (!invoices.length) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">📭</div>
-         <div class="label">No invoices returned from PSA</div></div>`;
+         <div class="label">No open invoices found for this date range</div></div>`;
       return;
     }
 
@@ -204,62 +199,80 @@
     const unassigned = [];
 
     for (const inv of invoices) {
-      const region = regionMap[inv.branch];
+      const region = regionMap[inv.branchname];
       if (!region) { unassigned.push(inv); continue; }
-      if (!grouped[region])               grouped[region] = {};
-      if (!grouped[region][inv.branch])   grouped[region][inv.branch] = [];
-      grouped[region][inv.branch].push(inv);
+      if (!grouped[region])                  grouped[region] = {};
+      if (!grouped[region][inv.branchname])  grouped[region][inv.branchname] = [];
+      grouped[region][inv.branchname].push(inv);
     }
 
     let html = '';
 
     // Unassigned banner
     if (unassigned.length) {
-      const branches = [...new Set(unassigned.map(i => i.branch))].filter(Boolean).sort();
+      const branches = [...new Set(unassigned.map(i => i.branchname))].filter(Boolean).sort();
       html += `<div class="unassigned-banner">
         ⚠️ <strong>${branches.length} branch(es) have no region assigned:</strong>
-        ${branches.map(b => `<strong style="margin-left:8px;">${esc(b)}</strong>`).join(',')}
+        ${branches.map(b => `<strong style="margin-left:8px;">${esc(b)}</strong>`).join(', ')}
         &nbsp;— <a href="./settings.html" style="color:#854D0E;font-weight:700;text-decoration:underline;">Go to Settings → Branch</a> to assign regions.
       </div>`;
     }
 
-    // Regions
-    const chevronSVG  = `<svg class="region-chevron"  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
-    const bChevronSVG = `<svg class="branch-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
-
+    // Regions (sorted A-Z)
     for (const region of Object.keys(grouped).sort()) {
       let branchesHTML = '';
 
+      // Branches (sorted A-Z)
       for (const branch of Object.keys(grouped[region]).sort()) {
-        const rows   = grouped[region][branch];
-        let totAmount = 0;
+        const rows = grouped[region][branch];
+        let totInvoiced = 0, totPaid = 0, totBalance = 0;
 
         const rowsHTML = rows.map(inv => {
-          totAmount += inv.amount || 0;
-          return `<tr>
-            <td class="left">${esc(inv.customer || '')}</td>
-            <td class="muted">${fmtDate(inv.weekend_bill)}</td>
-            <td style="font-weight:600;">${fmt$(inv.amount)}</td>
+          const balance  = inv.balanceamount ?? 0;
+          const pastDue  = !!(inv.pastdue && String(inv.pastdue).trim());
+          totInvoiced   += inv.invoiceamount ?? 0;
+          totPaid       += inv.payamount     ?? 0;
+          totBalance    += balance;
+
+          return `<tr${pastDue ? ' class="is-past-due"' : ''}>
+            <td class="left">${esc(inv.customername || '')}</td>
+            <td class="muted">${fmtDate(inv.weekendbill)}</td>
+            <td class="muted">${fmtDate(inv.duedate)}</td>
+            <td class="muted">${esc(String(inv.invoicenumber || ''))}</td>
+            <td>${fmt$(inv.invoiceamount)}</td>
+            <td>${fmt$(inv.payamount)}</td>
+            <td style="${balance > 0 ? 'font-weight:700;color:#B45309;' : 'color:#9CA3AF;'}">${fmt$(balance)}</td>
+            <td class="muted">${esc(inv.dso || '—')}</td>
+            <td style="${pastDue ? 'color:#DC2626;font-weight:700;' : 'color:#9CA3AF;'}">${esc(inv.pastdue || '—')}</td>
           </tr>`;
         }).join('');
 
         branchesHTML += `<div class="branch-block">
           <div class="branch-header" onclick="this.closest('.branch-block').classList.toggle('collapsed')">
-            ${bChevronSVG}Branch: ${esc(branch)}
+            ${bChevron}Branch: ${esc(branch)}
           </div>
           <div class="branch-body">
             <table class="inv-table">
               <thead><tr>
                 <th class="left">Customer</th>
                 <th>Invoice Date</th>
+                <th>Due Date</th>
+                <th>Invoice #</th>
                 <th>Amount</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>DSO</th>
+                <th>Past Due</th>
               </tr></thead>
               <tbody>
                 ${rowsHTML}
                 <tr class="totals">
-                  <td class="left">Branch Totals — ${rows.length} record${rows.length !== 1 ? 's' : ''}</td>
-                  <td></td>
-                  <td>${fmt$(totAmount)}</td>
+                  <td class="left">Branch Totals — ${rows.length} invoice${rows.length !== 1 ? 's' : ''}</td>
+                  <td></td><td></td><td></td>
+                  <td>${fmt$(totInvoiced)}</td>
+                  <td>${fmt$(totPaid)}</td>
+                  <td>${fmt$(totBalance)}</td>
+                  <td></td><td></td>
                 </tr>
               </tbody>
             </table>
@@ -269,7 +282,7 @@
 
       html += `<div class="region-block">
         <div class="region-header" onclick="this.closest('.region-block').classList.toggle('collapsed')">
-          ${chevronSVG}Region: ${esc(region)}
+          ${rChevron}Region: ${esc(region)}
         </div>
         <div class="region-body">${branchesHTML}</div>
       </div>`;
@@ -278,8 +291,8 @@
     document.getElementById('report-content').innerHTML = html;
   }
 
-  // ── Sync from PSA ──────────────────────────────────────────────
-  window.syncFromPSA = async function() {
+  // ── Sync ───────────────────────────────────────────────────────
+  window.syncNow = async function() {
     const startVal = document.getElementById('date-from').value;
     const endVal   = document.getElementById('date-to').value;
     if (!startVal || !endVal) { alert('Please select a date range.'); return; }
@@ -287,37 +300,38 @@
 
     const btn = document.getElementById('btn-sync');
     btn.textContent = '⟳ Syncing…';
-    btn.disabled = true;
+    btn.disabled    = true;
     document.getElementById('report-content').innerHTML =
       '<div class="spinner-wrap"><div class="spinner"></div></div>';
     document.getElementById('sync-meta').textContent = '';
 
     try {
-      const res = await fetch(
-        `/api/psa?endpoint=/api/invoice_register/query&start_date=${startVal}&end_date=${endVal}`
-      );
+      const res = await fetch(`/api/tw-invoice?start_date=${startVal}&end_date=${endVal}`);
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || `PSA API ${res.status}`);
+        throw new Error(e.error || `API error ${res.status}`);
       }
 
       const raw = await res.json();
-      if (!Array.isArray(raw)) throw new Error('Unexpected response format from PSA');
+      if (!Array.isArray(raw)) throw new Error('Unexpected response format');
+
+      // Keep only invoices with an outstanding balance
+      const open = raw.filter(r => (r.balanceamount ?? 0) > 0.005);
 
       await loadRegionMap();
-      render(raw);
+      render(open);
 
       const ts = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       document.getElementById('sync-meta').textContent =
-        `${raw.length} records · synced at ${ts}`;
+        `${open.length} open invoice${open.length !== 1 ? 's' : ''} of ${raw.length} total · synced at ${ts}`;
     } catch (err) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">⚠️</div>
          <div class="label" style="color:#DC2626;">Sync failed</div>
          <div>${esc(err.message)}</div></div>`;
     } finally {
-      btn.textContent = '⟳ Sync from PSA';
-      btn.disabled = false;
+      btn.textContent = '⟳ Sync from TempWorks';
+      btn.disabled    = false;
     }
   };
 
@@ -328,9 +342,9 @@
       .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
-  // ── Init — seed date pickers then auto-sync ────────────────────
+  // ── Init ───────────────────────────────────────────────────────
   (function seedDates() {
-    const today = new Date();
+    const today           = new Date();
     const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const toISO = d => d.toISOString().slice(0, 10);
     document.getElementById('date-from').value = toISO(firstOfLastMonth);
@@ -338,7 +352,7 @@
   })();
 
   await loadRegionMap();
-  await syncFromPSA();
+  await syncNow();
 </script>
 </body>
 </html>
