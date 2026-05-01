@@ -113,14 +113,6 @@
     .status-dot.collections { background: #DC2626; }
     .status-dot.write_off   { background: #111827; }
 
-    /* ── Late fee badge ──────────────────────────────────────── */
-    .late-fee-badge {
-      display: inline-block; font-size: 9px; font-weight: 700;
-      background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;
-      border-radius: 4px; padding: 1px 5px; margin-left: 4px;
-      vertical-align: middle; white-space: nowrap;
-    }
-
     /* ── Unassigned banner ───────────────────────────────────── */
     .unassigned-banner {
       background: #FEF9C3; border: 1px solid #FDE047; border-radius: 8px;
@@ -225,7 +217,6 @@
     .inv-mini-due { color: var(--text-secondary); }
     .inv-mini-bal { font-weight: 700; color: #B45309; }
     .inv-mini-pd  { font-size: .68rem; font-weight: 700; color: #DC2626; margin-left: 4px; }
-    .late-fee-note { font-size: .68rem; color: #92400E; margin-top: 1px; }
 
     /* ── Tabs ────────────────────────────────────────────────── */
     .drawer-tabs {
@@ -852,7 +843,6 @@
           const balance  = inv.balanceamount ?? 0;
           const pastDue  = !!(inv.pastdue && String(inv.pastdue).trim());
           const overDays = daysOverdue(inv.duedate);
-          const lateFee  = overDays >= 3;
           const key      = `${inv.customername}||${inv.branchname}`;
           const status   = customerStatuses[key]?.status || 'normal';
           totInvoiced   += inv.invoiceamount ?? 0;
@@ -860,12 +850,10 @@
           totBalance    += balance;
 
           const statusDot = `<span class="status-dot ${status}" title="${esc(STATUS_LABELS[status] || status)}"></span>`;
-          const lateBadge = lateFee ? `<span class="late-fee-badge">Late Fee</span>` : '';
 
           return `<tr${pastDue ? ' class="is-past-due"' : ''}>
             <td class="left">
               <button class="customer-link" data-key="${escAttr(key)}">${statusDot}${esc(inv.customername || '')}</button>
-              ${lateBadge}
             </td>
             <td class="muted">${fmtDate(inv.weekendbill)}</td>
             <td class="muted">${fmtDate(inv.duedate)}</td>
@@ -968,7 +956,7 @@
       return `<div class="inv-mini">
         <span class="inv-mini-num">#${esc(String(inv.invoicenumber || '—'))}</span>
         <span class="inv-mini-due">Due ${fmtDate(inv.duedate)}${pastDue ? `<span class="inv-mini-pd">PAST DUE</span>` : ''}</span>
-        <span class="inv-mini-bal">${fmt$(balance)}${overDays >= 3 ? `<span class="late-fee-badge">Late Fee</span>` : ''}</span>
+        <span class="inv-mini-bal">${fmt$(balance)}</span>
       </div>`;
     }).join('');
 
@@ -1720,10 +1708,9 @@ PlaceSmart Agency`,
       if (currentView === 'todo')        renderTodoQueue();
       else if (currentView === 'forecast') renderForecast();
 
-      const lateFeeCount = open.filter(i => daysOverdue(i.duedate) >= 3).length;
       const ts = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       document.getElementById('sync-meta').textContent =
-        `${open.length} open invoice${open.length !== 1 ? 's' : ''} of ${raw.length} total · ${lateFeeCount} late fee eligible · synced at ${ts}`;
+        `${open.length} open invoice${open.length !== 1 ? 's' : ''} of ${raw.length} total · synced at ${ts}`;
     } catch (err) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">⚠️</div>
