@@ -90,6 +90,22 @@ export default defineConfig(({ mode }) => {
             });
           },
         },
+        // /api/tw?endpoint=/Customers/123/contacts → TempWorks REST API
+        '/api/tw': {
+          target: 'https://api.ontempworks.com',
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq, req) => {
+              const reqUrl   = new URL(req.url, 'http://localhost');
+              const endpoint = reqUrl.searchParams.get('endpoint') || '';
+              reqUrl.searchParams.delete('endpoint');
+              const remaining = reqUrl.searchParams.toString();
+              proxyReq.path = endpoint + (remaining ? '?' + remaining : '');
+              proxyReq.setHeader('x-tw-token', env.TW_INVOICE_BEARER || '');
+              proxyReq.setHeader('Accept', 'application/json');
+            });
+          },
+        },
         '/api/psa': {
           target: 'https://api.psastaffing.com',
           changeOrigin: true,

@@ -368,7 +368,7 @@
         import { renderNavbar } from './src/components/navbar.js';
         import { renderSidebar } from './src/components/sidebar.js';
         import { supabase } from './src/supabaseClient.js';
-        import { getDefaultStartDate, getDefaultEndDate } from './src/apiClient.js';
+        import { getDefaultStartDate, getDefaultEndDate, fetchInvoiceRegister } from './src/apiClient.js';
 
         await checkAuth();
         await checkPageAccess('settings');
@@ -393,15 +393,10 @@
         async function fetchBranches() {
             const startDate = getDefaultStartDate();
             const endDate = getDefaultEndDate();
-            const url = new URL('/api/psa', window.location.origin);
-            url.searchParams.set('endpoint', '/api/invoice_register/query');
-            url.searchParams.set('start_date', startDate);
-            url.searchParams.set('end_date', endDate);
-            const res = await fetch(url.toString());
-            const data = await res.json();
+            const data = await fetchInvoiceRegister(startDate, endDate);
             const branches = new Set();
             data.forEach(r => {
-                const b = r.branch || r.branchname || '';
+                const b = r.branchname || '';
                 const n = b.toLowerCase();
                 if (b && !n.includes('corporate') && !n.includes('_corp')) branches.add(b);
             });

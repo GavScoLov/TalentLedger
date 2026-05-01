@@ -1,105 +1,166 @@
-// PSAStaffing API Client
-// In production: calls /api/psa (Vercel serverless proxy — token stays server-side)
-// In dev: calls /api/psa (Vite proxy forwards to PSAStaffing API with token)
+// TalentLedger Data Client — TempWorks Edition
+//
+// Invoice / billing data  → TempWorks Invoice Register export  (/api/tw-invoice)
+// Hours / headcount data  → Supabase tw_* tables (synced hourly by n8n from TempWorks)
+//
+// All exported functions maintain the same signatures and return shapes as the
+// former PSA-based implementation so that existing page code requires no changes.
 
-const PROXY_BASE = '/api/psa';
+import { supabase } from './supabaseClient.js';
 
-async function psaFetch(endpoint, params = {}) {
-  const url = new URL(PROXY_BASE, window.location.origin);
-  url.searchParams.set('endpoint', endpoint);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
-  });
+// ── Internal: TW Invoice Cache ─────────────────────────────────────────────
+// The invoice export is fetched once per (startDate, endDate) pair and shared
+// across all aggregation helpers so we never hit the API twice for one render.
 
-  const res = await fetch(url.toString());
+let _invoiceCache = null;
+let _invoiceCacheKey = null;
+
+async function fetchTWInvoices(startDate, endDate) {
+  const cacheKey = `${startDate}_${endDate}`;
+  if (_invoiceCacheKey === cacheKey && _invoiceCache) return _invoiceCache;
+
+  const res = await fetch(`/api/tw-invoice?start_date=${startDate}&end_date=${endDate}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `API error ${res.status}`);
+    throw new Error(body.error || `TW Invoice API error ${res.status}`);
   }
-  return res.json();
+  _invoiceCache = await res.json();
+  _invoiceCacheKey = cacheKey;
+  return _invoiceCache;
 }
 
-// ── Invoice Register ──────────────────────────────────────────────
+// ── Invoice Register ───────────────────────────────────────────────────────
+// Returns all invoices in the date range.
+// Fields: branchname, customername, weekendbill, invoiceamount,
+//         payamount, balanceamount, invoicenumber, duedate, dso, pastdue
 
 export async function fetchInvoiceRegister(startDate, endDate) {
-  const data = await psaFetch('/api/invoice_register/query', {
-    start_date: startDate,
-    end_date: endDate,
-  });
-  // Normalize API field names to consistent names used across pages
-  return data.map(r => ({
-    ...r,
-    branchname: r.branch || r.branchname || '',
-    customername: r.customer || r.customername || '',
-    weekendbill: r.weekend_bill || r.weekendbill || '',
-    invoiceamount: r.amount ?? r.invoiceamount ?? 0,
-  }));
+  return fetchTWInvoices(startDate, endDate);
 }
 
-// ── Employee Hours — By Company (for GSP commission) ─────────────
+// ── Employee Hours — by company (used by commission page) ─────────────────
 
 export async function fetchEmployeeHours(startDate, endDate) {
-  const data = await psaFetch('/api/employee_hours/total_hours_by_company', {
-    start_date: startDate,
-    end_date: endDate,
-  });
-  // Normalize field names (total_hours_by_company returns: branch, company_name, weekend_bill, total_hours, producer_name)
-  return data.map(r => ({
-    ...r,
-    branchname: r.branch || r.branchname || '',
-    customername: r.company_name || r.customer || r.customername || '',
-    weekendbill: r.weekend_bill || r.weekendbill || '',
-    hours: r.total_hours ?? r.hours ?? 0,
+  const rows = await fetchTotalHoursByCompany(startDate, endDate);
+  return rows.map(r => ({
+    branchname:   r.branch,
+    customername: r.company_name,
+    weekendbill:  r.weekend_bill,
+    hours:        r.total_hours,
   }));
 }
 
-// ── Employee Hours — Aggregated Queries ───────────────────────────
-
-export async function fetchTotalHoursByBranch(startDate, endDate) {
-  return psaFetch('/api/employee_hours/total_hours_by_branch', {
-    start_date: startDate,
-    end_date: endDate,
-  });
-}
-
-export async function fetchTotalHoursByCompany(startDate, endDate) {
-  return psaFetch('/api/employee_hours/total_hours_by_company', {
-    start_date: startDate,
-    end_date: endDate,
-  });
-}
+// ── Billing Aggregations — derived from TW invoice data ───────────────────
 
 export async function fetchTotalBillingByBranch(startDate, endDate) {
-  return psaFetch('/api/employee_hours/total_billing_by_branch', {
-    start_date: startDate,
-    end_date: endDate,
-  });
+  const invoices = await fetchTWInvoices(startDate, endDate);
+  const byKey = {};
+  for (const r of invoices) {
+    const key = `${r.branchname}||${r.weekendbill}`;
+    if (!byKey[key]) {
+      byKey[key] = { branch: r.branchname, weekend_bill: r.weekendbill, total_billing: 0 };
+    }
+    byKey[key].total_billing += r.invoiceamount || 0;
+  }
+  return Object.values(byKey);
 }
 
 export async function fetchTotalBillingByCompany(startDate, endDate) {
-  return psaFetch('/api/employee_hours/total_billing_by_company', {
-    start_date: startDate,
-    end_date: endDate,
-  });
+  const invoices = await fetchTWInvoices(startDate, endDate);
+  const byKey = {};
+  for (const r of invoices) {
+    const key = `${r.customername}||${r.branchname}||${r.weekendbill}`;
+    if (!byKey[key]) {
+      byKey[key] = {
+        company_name: r.customername,
+        branch:       r.branchname,
+        weekend_bill: r.weekendbill,
+        total_billing: 0,
+      };
+    }
+    byKey[key].total_billing += r.invoiceamount || 0;
+  }
+  return Object.values(byKey);
+}
+
+// ── Hours Aggregations — from Supabase tw_ tables ─────────────────────────
+// tw_customer_weekly_summary has total_hours per customer per week, but no
+// branch field.  We infer branch by matching customer+week against the invoice
+// register (which does carry branchname).
+
+export async function fetchTotalHoursByCompany(startDate, endDate) {
+  const [{ data: hoursData }, invoices] = await Promise.all([
+    supabase
+      .from('tw_customer_weekly_summary')
+      .select('customer_name, weekend_date, total_hours, total_regular, total_overtime, headcount')
+      .gte('weekend_date', startDate)
+      .lte('weekend_date', endDate),
+    fetchTWInvoices(startDate, endDate),
+  ]);
+
+  // Build branch lookup: customer+week → branch (exact match)
+  // and customer → branch (fallback — most-recently-seen branch)
+  const branchByWeek     = {};
+  const branchByCustomer = {};
+  for (const r of invoices) {
+    if (r.customername && r.branchname) {
+      branchByWeek[`${r.customername}||${r.weekendbill}`] = r.branchname;
+      if (!branchByCustomer[r.customername]) branchByCustomer[r.customername] = r.branchname;
+    }
+  }
+
+  return (hoursData || []).map(r => ({
+    company_name: r.customer_name,
+    total_hours:  r.total_hours  || 0,
+    branch:       branchByWeek[`${r.customer_name}||${r.weekend_date}`]
+                  || branchByCustomer[r.customer_name]
+                  || '',
+    weekend_bill: r.weekend_date,
+  }));
+}
+
+export async function fetchTotalHoursByBranch(startDate, endDate) {
+  const { data } = await supabase
+    .from('tw_branch_weekly_summary')
+    .select('branch_name, weekend_date, total_hours, headcount')
+    .gte('weekend_date', startDate)
+    .lte('weekend_date', endDate);
+  return (data || []).map(r => ({
+    branch:       r.branch_name,
+    total_hours:  r.total_hours || 0,
+    weekend_bill: r.weekend_date,
+  }));
 }
 
 export async function fetchUniqueCountByBranch(startDate, endDate) {
-  return psaFetch('/api/employee_hours/unique_count_by_branch', {
-    start_date: startDate,
-    end_date: endDate,
-  });
+  const { data } = await supabase
+    .from('tw_branch_weekly_summary')
+    .select('branch_name, weekend_date, headcount')
+    .gte('weekend_date', startDate)
+    .lte('weekend_date', endDate);
+  return (data || []).map(r => ({
+    branch:       r.branch_name,
+    unique_count: r.headcount || 0,
+    weekend_bill: r.weekend_date,
+  }));
 }
 
 export async function fetchUniqueCountByCompany(startDate, endDate) {
-  return psaFetch('/api/employee_hours/unique_count_by_company', {
-    start_date: startDate,
-    end_date: endDate,
-  });
+  const { data } = await supabase
+    .from('tw_customer_weekly_summary')
+    .select('customer_name, weekend_date, headcount')
+    .gte('weekend_date', startDate)
+    .lte('weekend_date', endDate);
+  return (data || []).map(r => ({
+    company_name: r.customer_name,
+    unique_count: r.headcount || 0,
+    weekend_bill: r.weekend_date,
+  }));
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Format a number as USD currency string */
+/** Format a number as USD currency string (no decimals) */
 export function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

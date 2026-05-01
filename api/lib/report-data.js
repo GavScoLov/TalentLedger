@@ -1,64 +1,136 @@
-// Server-side PSA data fetcher + report generators (CSV + inline HTML tables)
+// Server-side TempWorks data fetcher + report generators (CSV + inline HTML tables)
 // Used by api/cron/send-reports.js and api/send-report-now.js
 
 import { createClient } from '@supabase/supabase-js';
 
-const PSA_BASE     = 'https://api.psastaffing.com';
 const SUPABASE_URL = 'https://txhyfogbyzwueazhrqax.supabase.co';
 
-async function psaFetch(endpoint, params = {}) {
-  const url = new URL(`${PSA_BASE}${endpoint}`);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+// ── TempWorks Invoice Export ──────────────────────────────────────────────────
+// Calls the same export endpoint used by api/tw-invoice.js.
+// Returns normalised records with lowercase snake_case field names.
+
+async function twInvoiceFetch(start, end) {
+  const bearer   = process.env.TW_INVOICE_BEARER;
+  const exportId = process.env.TW_INVOICE_EXPORT_ID;
+  const startId  = process.env.TW_INVOICE_START_ID;
+  const endId    = process.env.TW_INVOICE_END_ID;
+
+  if (!bearer || !exportId || !startId || !endId) {
+    throw new Error('TempWorks Invoice export credentials not configured');
+  }
+
+  const res = await fetch(
+    `https://api.ontempworks.com/utilities/dataExport/exports/${exportId}`,
+    {
+      method: 'POST',
+      headers: {
+        'accept':       'text/plain',
+        'x-tw-token':   bearer,
+        'Content-Type': 'application/vnd.textus+jsonld',
+      },
+      body: JSON.stringify({
+        parameters: [
+          { exportParameterId: startId, value: start },
+          { exportParameterId: endId,   value: end   },
+        ],
+      }),
+    }
+  );
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`TW Invoice export HTTP ${res.status}: ${msg}`);
+  }
+  const data = JSON.parse(await res.text());
+  return data.map(r => ({
+    branchname:    r.BranchName    || '',
+    weekendbill:   r.WeekendBill   ? r.WeekendBill.split('T')[0] : '',
+    invoicenumber: r.InvoiceNumber || '',
+    customerid:    r.CustomerId    ?? null,
+    customername:  r.CustomerName  || '',
+    duedate:       r.DueDate       ? r.DueDate.split('T')[0] : '',
+    invoiceamount: r.InvoiceAmount ?? 0,
+    payamount:     r.PayAmount     ?? 0,
+    balanceamount: r.BalanceAmount ?? 0,
+    dso:           r.DSO           || '',
+    pastdue:       r.PastDue       || '',
+  }));
+}
+
+// Module-level invoice cache — avoids redundant API calls within a single report run
+let _invoiceCache    = null;
+let _invoiceCacheKey = null;
+
+async function getInvoices(start, end) {
+  const key = `${start}_${end}`;
+  if (_invoiceCacheKey === key && _invoiceCache) return _invoiceCache;
+  _invoiceCache    = await twInvoiceFetch(start, end);
+  _invoiceCacheKey = key;
+  return _invoiceCache;
+}
+
+// ── Supabase client factory (uses service role for server-side access) ─────────
+
+function makeSB() {
+  return createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
   });
-  const token = process.env.PSA_API_TOKEN;
-  const res = await fetch(url.toString(), {
-    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-  });
-  if (!res.ok) throw new Error(`PSA API ${endpoint} → HTTP ${res.status}`);
-  return res.json();
 }
 
-// ── Field normalisers ─────────────────────────────────────────────────────────
+// ── Branch lookup helper ───────────────────────────────────────────────────────
+// Derive customer → branch from invoice data (invoices carry both fields).
 
-function normInvoice(r) {
-  return {
-    branchname:    r.branch      || r.branchname    || '',
-    customername:  r.customer    || r.customername  || '',
-    weekendbill:   r.weekend_bill || r.weekendbill  || '',
-    invoiceamount: r.amount      ?? r.invoiceamount ?? 0,
-  };
-}
-function normHours(r) {
-  return {
-    branchname:   r.branch       || r.branchname   || '',
-    customername: r.company_name || r.customername || '',
-    weekendbill:  r.weekend_bill || r.weekendbill  || '',
-    hours:        r.total_hours  ?? r.hours        ?? 0,
-  };
-}
-function normHead(r) {
-  return {
-    branchname:       r.branch       || r.branchname   || '',
-    customername:     r.company_name || r.customername || '',
-    weekendbill:      r.weekend_bill || r.weekendbill  || '',
-    unique_row_count: r.unique_row_count ?? 0,
-  };
+function buildBranchLookup(invoices) {
+  const byWeek     = {};
+  const byCustomer = {};
+  for (const r of invoices) {
+    if (r.customername && r.branchname) {
+      byWeek[`${r.customername}||${r.weekendbill}`] = r.branchname;
+      if (!byCustomer[r.customername]) byCustomer[r.customername] = r.branchname;
+    }
+  }
+  return { byWeek, byCustomer };
 }
 
-// ── PSA fetch helpers ─────────────────────────────────────────────────────────
+// ── Public fetch helpers ───────────────────────────────────────────────────────
 
 export async function fetchInvoiceRegister(start, end) {
-  const data = await psaFetch('/api/invoice_register/query', { start_date: start, end_date: end });
-  return data.map(normInvoice);
+  return getInvoices(start, end);
 }
+
 export async function fetchEmployeeHours(start, end) {
-  const data = await psaFetch('/api/employee_hours/total_hours_by_company', { start_date: start, end_date: end });
-  return data.map(normHours);
+  const sb = makeSB();
+  const [{ data: hoursData }, invoices] = await Promise.all([
+    sb.from('tw_customer_weekly_summary')
+      .select('customer_name, weekend_date, total_hours')
+      .gte('weekend_date', start)
+      .lte('weekend_date', end),
+    getInvoices(start, end),
+  ]);
+  const { byWeek, byCustomer } = buildBranchLookup(invoices);
+  return (hoursData || []).map(r => ({
+    branchname:   byWeek[`${r.customer_name}||${r.weekend_date}`] || byCustomer[r.customer_name] || '',
+    customername: r.customer_name,
+    weekendbill:  r.weekend_date,
+    hours:        r.total_hours || 0,
+  }));
 }
+
 export async function fetchUniqueCountByCompany(start, end) {
-  const data = await psaFetch('/api/employee_hours/unique_count_by_company', { start_date: start, end_date: end });
-  return data.map(normHead);
+  const sb = makeSB();
+  const [{ data: headData }, invoices] = await Promise.all([
+    sb.from('tw_customer_weekly_summary')
+      .select('customer_name, weekend_date, headcount')
+      .gte('weekend_date', start)
+      .lte('weekend_date', end),
+    getInvoices(start, end),
+  ]);
+  const { byWeek, byCustomer } = buildBranchLookup(invoices);
+  return (headData || []).map(r => ({
+    branchname:       byWeek[`${r.customer_name}||${r.weekend_date}`] || byCustomer[r.customer_name] || '',
+    customername:     r.customer_name,
+    weekendbill:      r.weekend_date,
+    unique_row_count: r.headcount || 0,
+  }));
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -321,15 +393,8 @@ export async function genDhpHours(start, end) {
 }
 
 export async function genDhpHeadcount(start, end) {
-  // Query week-by-week so each Sunday becomes its own column
-  const sundays   = getSundaysInRange(start, end);
-  const weekData  = await Promise.all(sundays.map(async sunday => {
-    const ws = new Date(sunday + 'T12:00:00Z');
-    ws.setUTCDate(ws.getUTCDate() - 6);
-    const rows = await fetchUniqueCountByCompany(ws.toISOString().slice(0, 10), sunday);
-    return rows.map(r => ({ ...r, weekendbill: sunday }));
-  }));
-  const data    = weekData.flat();
+  // Single call for the full date range — tw_customer_weekly_summary has per-week rows
+  const data    = await fetchUniqueCountByCompany(start, end);
   const entries = {};
   const weekSet = new Set();
 
@@ -441,9 +506,7 @@ export async function genPsaBillingMonthly(start, end) {
   }
 
   // Fetch branch → region mapping from Supabase
-  const sb = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const sb = makeSB();
   const { data: branchSettings } = await sb.from('branch_settings').select('branch, region');
   const branchRegionMap = {};
   for (const row of (branchSettings || [])) {
