@@ -389,6 +389,130 @@
     }
     .ar-toast.show { opacity: 1; }
 
+    /* ── View mode tabs ─────────────────────────────────────── */
+    .view-tabs {
+      display: flex; gap: 4px; margin-bottom: 18px;
+      border-bottom: 2px solid var(--border);
+    }
+    .view-tab {
+      padding: 7px 18px; border: none; background: none;
+      font-size: .82rem; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px;
+      border-radius: 6px 6px 0 0; transition: all .15s; font-family: inherit;
+    }
+    .view-tab.active {
+      color: var(--primary); border-bottom-color: var(--primary); background: #FFF7ED;
+    }
+    .view-tab:hover:not(.active) { color: var(--text-primary); background: #F9FAFB; }
+
+    /* ── To-Do Queue ─────────────────────────────────────────── */
+    .todo-summary { font-size:.8rem; color:var(--text-secondary); margin-bottom:14px; }
+    .todo-list    { display:flex; flex-direction:column; gap:10px; }
+    .todo-card {
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 14px; background: #fff;
+      display: flex; align-items: flex-start; gap: 12px;
+      cursor: pointer; transition: box-shadow .15s;
+    }
+    .todo-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.09); }
+    .todo-urgency-bar {
+      width: 4px; border-radius: 4px; flex-shrink: 0;
+      align-self: stretch; min-height: 40px;
+    }
+    .todo-urgency-bar.high   { background: #DC2626; }
+    .todo-urgency-bar.medium { background: #D97706; }
+    .todo-urgency-bar.low    { background: #2563EB; }
+    .todo-card-main   { flex: 1; min-width: 0; }
+    .todo-card-name   { font-weight: 700; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .todo-card-branch { font-size: .72rem; color: var(--text-secondary); margin-top: 1px; }
+    .todo-card-row    { display: flex; align-items: center; gap: 8px; margin-top: 7px; flex-wrap: wrap; }
+    .todo-balance     { font-weight: 700; font-size: .88rem; color: #B45309; }
+    .todo-overdue     { font-size: .73rem; background: #FEF2F2; color: #DC2626; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+    .todo-overdue.ok  { background: #F0FDF4; color: #166534; }
+    .todo-contact-chip      { font-size: .72rem; color: var(--text-secondary); background: #F3F4F6; padding: 2px 8px; border-radius: 10px; }
+    .todo-contact-chip.warn { background: #FEF9C3; color: #854D0E; }
+    .todo-status-chip       { font-size: .7rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+    .todo-card-right  { text-align: right; flex-shrink: 0; }
+    .todo-rank        { font-size: .68rem; color: #9CA3AF; margin-bottom: 4px; }
+    .todo-open-btn    {
+      padding: 5px 10px; background: var(--primary); color: #fff;
+      border: none; border-radius: 6px; font-size: .75rem; font-weight: 700; cursor: pointer;
+    }
+    .todo-open-btn:hover { opacity: .88; }
+    .todo-empty { text-align: center; padding: 56px 24px; color: var(--text-secondary); }
+
+    /* ── Collections Tracker ─────────────────────────────────── */
+    .col-summary { font-size:.8rem; color:var(--text-secondary); margin-bottom:14px; }
+    .col-table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    .col-table th {
+      padding: 7px 12px; text-align: left;
+      font-size: .68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .04em; color: #6B7280;
+      background: #F9FAFB; border: 1px solid #E5E7EB; white-space: nowrap;
+    }
+    .col-table th.right { text-align: right; }
+    .col-table td { padding: 8px 12px; border: 1px solid #F3F4F6; font-size: .8rem; }
+    .col-table td.right { text-align: right; font-weight: 700; }
+    .col-table tr:hover td { background: #FAFAFA; }
+    .col-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: .7rem; font-weight: 700; white-space: nowrap;
+    }
+    .col-badge.collections { background: #FEE2E2; color: #DC2626; }
+    .col-badge.write_off   { background: #F3F4F6; color: #374151; }
+    .col-empty { text-align: center; padding: 56px 24px; color: var(--text-secondary); }
+
+    /* ── Aging / Forecast ────────────────────────────────────── */
+    .aging-cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 12px; margin-bottom: 28px;
+    }
+    .aging-card { border-radius: 10px; padding: 14px; border: 1px solid var(--border); background: #fff; }
+    .aging-card-label  { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+    .aging-card-amount { font-size:1.2rem; font-weight:800; }
+    .aging-card-count  { font-size:.72rem; color:var(--text-secondary); margin-top:2px; }
+    .aging-card.ag-current { border-color:#BBF7D0; background:#F0FDF4; }
+    .aging-card.ag-current .aging-card-label  { color:#166534; }
+    .aging-card.ag-current .aging-card-amount { color:#15803D; }
+    .aging-card.ag-d30  { border-color:#FDE68A; background:#FFFBEB; }
+    .aging-card.ag-d30 .aging-card-label  { color:#92400E; }
+    .aging-card.ag-d30 .aging-card-amount { color:#B45309; }
+    .aging-card.ag-d60  { border-color:#FDBA74; background:#FFF7ED; }
+    .aging-card.ag-d60 .aging-card-label  { color:#9A3412; }
+    .aging-card.ag-d60 .aging-card-amount { color:#C2410C; }
+    .aging-card.ag-d90  { border-color:#FCA5A5; background:#FEF2F2; }
+    .aging-card.ag-d90 .aging-card-label  { color:#991B1B; }
+    .aging-card.ag-d90 .aging-card-amount { color:#B91C1C; }
+    .aging-card.ag-d90p { border-color:#E5E7EB; background:#111827; }
+    .aging-card.ag-d90p .aging-card-label  { color:#9CA3AF; }
+    .aging-card.ag-d90p .aging-card-amount { color:#F9FAFB; }
+    .aging-card.ag-d90p .aging-card-count  { color:#6B7280; }
+    .forecast-section { margin-bottom:28px; }
+    .forecast-section-title {
+      font-size:.78rem; font-weight:800; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--text-secondary);
+      padding-bottom:8px; margin-bottom:14px; border-bottom:2px solid var(--border);
+    }
+    .forecast-row {
+      display:flex; align-items:flex-start; justify-content:space-between;
+      padding:10px 0; border-bottom:1px solid #F3F4F6; font-size:.85rem;
+    }
+    .forecast-row:last-child { border-bottom:none; }
+    .forecast-row-label { font-weight:500; color:var(--text-primary); }
+    .forecast-row-note  { font-size:.72rem; color:var(--text-secondary); margin-top:2px; }
+    .forecast-row-val   { font-weight:800; font-size:1rem; text-align:right; }
+    .cust-aging-tbl { width:100%; border-collapse:collapse; font-size:.78rem; }
+    .cust-aging-tbl th {
+      padding:6px 10px; text-align:right; background:#F9FAFB; white-space:nowrap;
+      border:1px solid #E5E7EB; font-size:.66rem; font-weight:700;
+      text-transform:uppercase; letter-spacing:.04em; color:#6B7280;
+    }
+    .cust-aging-tbl th.left { text-align:left; }
+    .cust-aging-tbl td { padding:6px 10px; border:1px solid #F3F4F6; text-align:right; white-space:nowrap; }
+    .cust-aging-tbl td.left { text-align:left; font-weight:600; }
+    .cust-aging-tbl tr:hover td { background:#FAFAFA; }
+    .cust-aging-tbl tr.totals td { font-weight:700; background:#F1F5F9; border-top:2px solid #CBD5E1; color:#1E3A5F; }
+
     /* ── Print ───────────────────────────────────────────────── */
     @media print {
       .sidebar, .navbar, .ar-toolbar, .unassigned-banner { display: none !important; }
@@ -424,9 +548,20 @@
         <button class="btn-sync" id="btn-sync" onclick="syncNow()">⟳ Sync from TempWorks</button>
       </div>
 
+      <!-- View mode tabs -->
+      <div class="view-tabs" id="view-tabs">
+        <button class="view-tab active" data-view="register">📋 Invoice Register</button>
+        <button class="view-tab" data-view="todo">✅ To-Do Queue</button>
+        <button class="view-tab" data-view="collections">🏦 Collections</button>
+        <button class="view-tab" data-view="forecast">📊 Forecast</button>
+      </div>
+
       <div id="report-content">
         <div class="spinner-wrap"><div class="spinner"></div></div>
       </div>
+      <div id="todo-content"        style="display:none;"></div>
+      <div id="collections-content" style="display:none;"></div>
+      <div id="forecast-content"    style="display:none;"></div>
 
     </div>
   </div>
@@ -575,13 +710,16 @@
   initInactivityTimer();
 
   // ── Global state ───────────────────────────────────────────
-  let regionMap        = {};
-  let customerStatuses = {};   // "name||branch" → status record
-  let activityCounts   = {};   // "name||branch" → count
-  let customerLookup   = {};   // "name||branch" → { name, branch, customerId, invoices }
-  let drawerCurrent    = null; // currently open customer object
-  let drawerActType    = 'call';
-  let drawerTab        = 'contacts';
+  let regionMap         = {};
+  let customerStatuses  = {};   // "name||branch" → status record
+  let activityCounts    = {};   // "name||branch" → count
+  let lastActivityDates = {};   // "name||branch" → most recent created_at ISO string
+  let customerLookup    = {};   // "name||branch" → { name, branch, customerId, invoices }
+  let loadedInvoices    = [];   // latest synced open invoices (all views share this)
+  let currentView       = 'register';
+  let drawerCurrent     = null; // currently open customer object
+  let drawerActType     = 'call';
+  let drawerTab         = 'contacts';
 
   // ── Utilities ──────────────────────────────────────────────
   function fmt$(n)    { return (n ?? 0).toLocaleString('en-US', { style:'currency', currency:'USD' }); }
@@ -626,9 +764,13 @@
     const names = [...new Set(invoices.map(i => i.customername).filter(Boolean))];
     if (!names.length) return;
 
-    const [{ data: statuses }, { data: acts }] = await Promise.all([
+    const [{ data: statuses }, { data: acts }, { data: recent }] = await Promise.all([
       supabase.from('ar_customer_status').select('*').in('customer_name', names),
       supabase.from('ar_activity_log').select('customer_name, branch').in('customer_name', names),
+      supabase.from('ar_activity_log')
+        .select('customer_name, branch, created_at')
+        .in('customer_name', names)
+        .order('created_at', { ascending: false }),
     ]);
 
     customerStatuses = {};
@@ -640,6 +782,12 @@
     for (const a of (acts || [])) {
       const k = `${a.customer_name}||${a.branch}`;
       activityCounts[k] = (activityCounts[k] || 0) + 1;
+    }
+
+    lastActivityDates = {};
+    for (const a of (recent || [])) {
+      const k = `${a.customer_name}||${a.branch}`;
+      if (!lastActivityDates[k]) lastActivityDates[k] = a.created_at; // first = most recent
     }
   }
 
@@ -1187,6 +1335,356 @@ PlaceSmart Agency`,
     return letters[type] || null;
   }
 
+  // ══════════════════════════════════════════════════════════
+  // ── VIEW SWITCHING ────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  function switchView(view) {
+    currentView = view;
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+    const ids = { register: 'report-content', todo: 'todo-content', collections: 'collections-content', forecast: 'forecast-content' };
+    for (const [v, id] of Object.entries(ids)) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = v === view ? '' : 'none';
+    }
+    if (view === 'todo'        && loadedInvoices.length) renderTodoQueue();
+    if (view === 'collections')                          renderCollections();
+    if (view === 'forecast'    && loadedInvoices.length) renderForecast();
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── TO-DO QUEUE ───────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  function buildTodoQueue() {
+    const now = new Date();
+    const items = [];
+
+    for (const [key, customer] of Object.entries(customerLookup)) {
+      const status = customerStatuses[key]?.status || 'normal';
+      if (status === 'write_off') continue;
+
+      const totalBalance    = customer.invoices.reduce((s, i) => s + (i.balanceamount ?? 0), 0);
+      if (totalBalance < 0.01) continue;
+
+      const maxOverdue = Math.max(0, ...customer.invoices.map(i => daysOverdue(i.duedate)));
+
+      const lastAct = lastActivityDates[key];
+      const daysSinceContact = lastAct
+        ? Math.floor((now - new Date(lastAct)) / 86400000)
+        : 9999;
+
+      // Priority score: balance × overdue factor × recency factor × status multiplier
+      let score = totalBalance;
+      if (maxOverdue > 0) score *= Math.log2(maxOverdue + 2);
+      score *= (1 + Math.min(daysSinceContact, 90) / 90);
+      if (status === 'collections') score *= 0.25;  // already actioned
+      else if (status === 'suspended') score *= 1.5;
+      else if (status === 'rep_visit') score *= 1.2;
+
+      let urgency;
+      if      (maxOverdue >= 90 || (maxOverdue >= 60 && totalBalance >= 3000)) urgency = 'high';
+      else if (maxOverdue >= 30 || totalBalance >= 8000)                        urgency = 'medium';
+      else                                                                       urgency = 'low';
+
+      items.push({ key, customer, status, totalBalance, maxOverdue, daysSinceContact, lastAct, score, urgency });
+    }
+
+    return items.sort((a, b) => b.score - a.score);
+  }
+
+  const STATUS_CHIP_STYLE = {
+    rep_visit:   { bg: '#DBEAFE', color: '#1E40AF', label: 'Rep Visit Needed' },
+    suspended:   { bg: '#FEF3C7', color: '#92400E', label: 'Suspended'        },
+    collections: { bg: '#FEE2E2', color: '#DC2626', label: 'Collections'      },
+  };
+
+  function renderTodoQueue() {
+    const el = document.getElementById('todo-content');
+    const items = buildTodoQueue();
+
+    if (!items.length) {
+      el.innerHTML = `<div class="todo-empty">
+        <div style="font-size:2.2rem;margin-bottom:8px;">✅</div>
+        <div style="font-weight:700;font-size:.95rem;color:var(--text-primary);">Queue is clear</div>
+        <div style="font-size:.82rem;margin-top:4px;">No open AR items need attention right now.</div>
+      </div>`;
+      return;
+    }
+
+    let html = `<div class="todo-summary">${items.length} account${items.length !== 1 ? 's' : ''} need attention &nbsp;·&nbsp; sorted by priority score</div>
+    <div class="todo-list">`;
+
+    items.forEach((item, idx) => {
+      const { key, customer, status, totalBalance, maxOverdue, daysSinceContact, urgency } = item;
+
+      const overdueChip = maxOverdue > 0
+        ? `<span class="todo-overdue">${maxOverdue}d overdue</span>`
+        : `<span class="todo-overdue ok">Not past due</span>`;
+
+      const contactChip = daysSinceContact >= 9999
+        ? `<span class="todo-contact-chip warn">⚠️ Never contacted</span>`
+        : daysSinceContact <= 7
+          ? `<span class="todo-contact-chip">Contacted ${daysSinceContact}d ago</span>`
+          : `<span class="todo-contact-chip warn">Last contact: ${daysSinceContact}d ago</span>`;
+
+      const chip = STATUS_CHIP_STYLE[status];
+      const statusChip = chip
+        ? `<span class="todo-status-chip" style="background:${chip.bg};color:${chip.color};">${esc(chip.label)}</span>`
+        : '';
+
+      html += `<div class="todo-card" data-key="${escAttr(key)}">
+        <div class="todo-urgency-bar ${urgency}"></div>
+        <div class="todo-card-main">
+          <div class="todo-card-name">${esc(customer.name)}</div>
+          <div class="todo-card-branch">${esc(customer.branch)}</div>
+          <div class="todo-card-row">
+            <span class="todo-balance">${fmt$(totalBalance)}</span>
+            ${overdueChip}
+            ${contactChip}
+            ${statusChip}
+          </div>
+        </div>
+        <div class="todo-card-right">
+          <div class="todo-rank">#${idx + 1}</div>
+          <button class="todo-open-btn" data-key="${escAttr(key)}">Open →</button>
+        </div>
+      </div>`;
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+
+    el.addEventListener('click', e => {
+      const btn = e.target.closest('[data-key]');
+      if (!btn) return;
+      const c = customerLookup[btn.dataset.key];
+      if (c) openDrawer(c);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── COLLECTIONS TRACKER ───────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  async function renderCollections() {
+    const el = document.getElementById('collections-content');
+    el.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div></div>';
+
+    try {
+      const { data, error } = await supabase
+        .from('ar_customer_status')
+        .select('*')
+        .in('status', ['collections', 'write_off'])
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!data?.length) {
+        el.innerHTML = `<div class="col-empty">
+          <div style="font-size:2.2rem;margin-bottom:8px;">🏦</div>
+          <div style="font-weight:700;font-size:.95rem;color:var(--text-primary);">No collection accounts</div>
+          <div style="font-size:.82rem;margin-top:4px;">Accounts marked as "Sent to Collections" or "Write-Off" will appear here.</div>
+        </div>`;
+        return;
+      }
+
+      const now = new Date();
+
+      let html = `<div class="col-summary">${data.length} account${data.length !== 1 ? 's' : ''} in collections or write-off</div>
+      <div style="overflow-x:auto;">
+      <table class="col-table">
+        <thead><tr>
+          <th>Customer</th>
+          <th>Branch</th>
+          <th>Status</th>
+          <th class="right">Open Balance</th>
+          <th>Agency</th>
+          <th>Date Referred</th>
+          <th class="right">Days in Status</th>
+          <th>Last Updated</th>
+        </tr></thead>
+        <tbody>`;
+
+      for (const row of data) {
+        const key = `${row.customer_name}||${row.branch}`;
+        const bal = customerLookup[key]?.invoices?.reduce((s,i) => s + (i.balanceamount ?? 0), 0) ?? null;
+        const updDate = new Date(row.updated_at);
+        const daysIn  = Math.floor((now - updDate) / 86400000);
+        const lbl     = row.status === 'write_off' ? 'Write-Off' : 'Collections';
+        const canOpen = !!customerLookup[key];
+
+        html += `<tr>
+          <td>
+            ${canOpen
+              ? `<button class="customer-link" data-key="${escAttr(key)}">${esc(row.customer_name)}</button>`
+              : `<span style="color:var(--text-secondary);">${esc(row.customer_name)}</span>`}
+          </td>
+          <td style="color:var(--text-secondary);">${esc(row.branch || '—')}</td>
+          <td><span class="col-badge ${row.status}">${esc(lbl)}</span></td>
+          <td class="right">${bal != null ? fmt$(bal) : '<span style="color:#9CA3AF;">Not in range</span>'}</td>
+          <td>${esc(row.collection_agency || '—')}</td>
+          <td>${row.collection_date ? fmtDate(row.collection_date) : '—'}</td>
+          <td class="right">${daysIn}d</td>
+          <td style="color:var(--text-secondary);">${updDate.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}</td>
+        </tr>`;
+      }
+
+      html += '</tbody></table></div>';
+      el.innerHTML = html;
+
+      el.addEventListener('click', e => {
+        const btn = e.target.closest('.customer-link');
+        if (!btn || !customerLookup[btn.dataset.key]) return;
+        openDrawer(customerLookup[btn.dataset.key]);
+      });
+
+    } catch (err) {
+      el.innerHTML = `<div style="color:#DC2626;padding:24px;font-size:.85rem;">Error loading collections: ${esc(err.message)}</div>`;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── AGING / FORECAST ──────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  function renderForecast() {
+    const el = document.getElementById('forecast-content');
+    if (!loadedInvoices.length) {
+      el.innerHTML = '<div class="empty-state"><div class="label">Sync invoices first to see the forecast.</div></div>';
+      return;
+    }
+
+    // ── Build aging buckets ───────────────────────────────
+    const B = {
+      current: { label:'Not Yet Due', cls:'ag-current', count:0, bal:0 },
+      d30:     { label:'1–30 Days',   cls:'ag-d30',     count:0, bal:0 },
+      d60:     { label:'31–60 Days',  cls:'ag-d60',     count:0, bal:0 },
+      d90:     { label:'61–90 Days',  cls:'ag-d90',     count:0, bal:0 },
+      d90p:    { label:'90+ Days',    cls:'ag-d90p',    count:0, bal:0 },
+    };
+
+    // Per-customer aging
+    const custAging = {};
+
+    let totalAR = 0;
+    for (const inv of loadedInvoices) {
+      const days = daysOverdue(inv.duedate);
+      const bal  = inv.balanceamount ?? 0;
+      totalAR   += bal;
+
+      let b;
+      if      (days <= 0)  b = B.current;
+      else if (days <= 30) b = B.d30;
+      else if (days <= 60) b = B.d60;
+      else if (days <= 90) b = B.d90;
+      else                 b = B.d90p;
+      b.count++; b.bal += bal;
+
+      const key = `${inv.customername}||${inv.branchname}`;
+      if (!custAging[key]) custAging[key] = { name: inv.customername, branch: inv.branchname, current:0, d30:0, d60:0, d90:0, d90p:0, total:0 };
+      const c = custAging[key]; c.total += bal;
+      if      (days <= 0)  c.current += bal;
+      else if (days <= 30) c.d30     += bal;
+      else if (days <= 60) c.d60     += bal;
+      else if (days <= 90) c.d90     += bal;
+      else                 c.d90p    += bal;
+    }
+
+    // ── Cash flow estimates ───────────────────────────────
+    const dueIn7  = loadedInvoices.filter(i => { const d = daysOverdue(i.duedate); return d >= -7 && d <= 0; })
+                      .reduce((s,i) => s + (i.balanceamount ?? 0), 0);
+    const dueIn30 = B.current.bal + B.d30.bal; // current + recently past due
+
+    // ── Render ────────────────────────────────────────────
+    let html = `
+    <!-- Aging summary cards -->
+    <div class="forecast-section">
+      <div class="forecast-section-title">AR Aging Summary</div>
+      <div class="aging-cards">`;
+
+    for (const b of Object.values(B)) {
+      html += `<div class="aging-card ${b.cls}">
+        <div class="aging-card-label">${b.label}</div>
+        <div class="aging-card-amount">${fmt$(b.bal)}</div>
+        <div class="aging-card-count">${b.count} invoice${b.count !== 1 ? 's' : ''}</div>
+      </div>`;
+    }
+
+    html += `</div></div>
+
+    <!-- Expected cash flow -->
+    <div class="forecast-section">
+      <div class="forecast-section-title">Expected Collections</div>
+      <div class="forecast-row">
+        <div>
+          <div class="forecast-row-label">Due within 7 days</div>
+          <div class="forecast-row-note">Invoices whose due date falls in the next 7 days</div>
+        </div>
+        <span class="forecast-row-val" style="color:#15803D;">${fmt$(dueIn7)}</span>
+      </div>
+      <div class="forecast-row">
+        <div>
+          <div class="forecast-row-label">Not yet due + 1–30 days past due</div>
+          <div class="forecast-row-note">Highest collection probability window</div>
+        </div>
+        <span class="forecast-row-val" style="color:#B45309;">${fmt$(dueIn30)}</span>
+      </div>
+      <div class="forecast-row">
+        <div>
+          <div class="forecast-row-label">Total open AR</div>
+          <div class="forecast-row-note">All open invoices in current date range</div>
+        </div>
+        <span class="forecast-row-val">${fmt$(totalAR)}</span>
+      </div>
+    </div>
+
+    <!-- Customer-level aging table -->
+    <div class="forecast-section">
+      <div class="forecast-section-title">Customer Aging Breakdown</div>
+      <div style="overflow-x:auto;">
+      <table class="cust-aging-tbl">
+        <thead><tr>
+          <th class="left">Customer</th>
+          <th class="left">Branch</th>
+          <th>Not Due</th>
+          <th>1–30d</th>
+          <th>31–60d</th>
+          <th>61–90d</th>
+          <th>90d+</th>
+          <th>Total</th>
+        </tr></thead>
+        <tbody>`;
+
+    const dash = `<span style="color:#D1D5DB;">—</span>`;
+    const cell = v => v > 0.005 ? fmt$(v) : dash;
+
+    const rows = Object.values(custAging).sort((a,b) => b.total - a.total);
+    let tC=0, tD30=0, tD60=0, tD90=0, tD90p=0, tT=0;
+    for (const c of rows) {
+      tC += c.current; tD30 += c.d30; tD60 += c.d60; tD90 += c.d90; tD90p += c.d90p; tT += c.total;
+      html += `<tr>
+        <td class="left">${esc(c.name)}</td>
+        <td class="left" style="font-weight:400;color:var(--text-secondary);">${esc(c.branch)}</td>
+        <td>${cell(c.current)}</td>
+        <td>${cell(c.d30)}</td>
+        <td>${cell(c.d60)}</td>
+        <td>${cell(c.d90)}</td>
+        <td>${cell(c.d90p)}</td>
+        <td style="font-weight:700;">${fmt$(c.total)}</td>
+      </tr>`;
+    }
+
+    html += `<tr class="totals">
+      <td class="left" colspan="2">TOTAL</td>
+      <td>${fmt$(tC)}</td><td>${fmt$(tD30)}</td><td>${fmt$(tD60)}</td>
+      <td>${fmt$(tD90)}</td><td>${fmt$(tD90p)}</td><td>${fmt$(tT)}</td>
+    </tr>
+    </tbody></table></div></div>`;
+
+    el.innerHTML = html;
+  }
+
   // ── Sync ───────────────────────────────────────────────────
   window.syncNow = async function() {
     const startVal = document.getElementById('date-from').value;
@@ -1212,10 +1710,15 @@ PlaceSmart Agency`,
       if (!Array.isArray(raw)) throw new Error('Unexpected response format');
 
       const open = raw.filter(r => (r.balanceamount ?? 0) > 0.005);
+      loadedInvoices = open; // share with other views
 
       await loadRegionMap();
       await bulkLoadARData(open);
-      render(open);
+      render(open); // always refresh register
+
+      // If the user is on another view, refresh it too
+      if (currentView === 'todo')        renderTodoQueue();
+      else if (currentView === 'forecast') renderForecast();
 
       const lateFeeCount = open.filter(i => daysOverdue(i.duedate) >= 3).length;
       const ts = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -1233,6 +1736,11 @@ PlaceSmart Agency`,
   };
 
   // ── Event wiring ───────────────────────────────────────────
+
+  // View tabs
+  document.querySelectorAll('.view-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
 
   // Drawer close
   document.getElementById('drawer-close').addEventListener('click', closeDrawer);
