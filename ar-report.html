@@ -83,8 +83,6 @@
     .inv-table td.left  { text-align: left; font-weight: 500; }
     .inv-table td.muted { color: #6B7280; font-size: .76rem; }
     .inv-table tr:hover td { background: #FAFAFA; }
-
-    /* Branch totals row */
     .inv-table tr.totals td {
       font-weight: 700; background: #F1F5F9;
       border-top: 2px solid #CBD5E1; color: #1E3A5F;
@@ -92,10 +90,36 @@
     .inv-table tr.totals td.left {
       font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: #6B7280;
     }
-
-    /* Past-due row highlight */
     .inv-table tr.is-past-due td { background: #FEF2F2; }
     .inv-table tr.is-past-due:hover td { background: #FEE2E2; }
+
+    /* ── Customer link button in table ──────────────────────── */
+    .customer-link {
+      background: none; border: none; padding: 0; cursor: pointer;
+      font-size: inherit; font-weight: 500; font-family: inherit;
+      color: var(--primary); text-decoration: underline; text-underline-offset: 2px;
+      text-align: left; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .customer-link:hover { color: var(--primary-dark); }
+
+    /* ── Status dot (in table rows) ──────────────────────────── */
+    .status-dot {
+      display: inline-block; width: 7px; height: 7px;
+      border-radius: 50%; flex-shrink: 0; margin-right: 2px;
+    }
+    .status-dot.normal      { background: #D1D5DB; }
+    .status-dot.rep_visit   { background: #2563EB; }
+    .status-dot.suspended   { background: #D97706; }
+    .status-dot.collections { background: #DC2626; }
+    .status-dot.write_off   { background: #111827; }
+
+    /* ── Late fee badge ──────────────────────────────────────── */
+    .late-fee-badge {
+      display: inline-block; font-size: 9px; font-weight: 700;
+      background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;
+      border-radius: 4px; padding: 1px 5px; margin-left: 4px;
+      vertical-align: middle; white-space: nowrap;
+    }
 
     /* ── Unassigned banner ───────────────────────────────────── */
     .unassigned-banner {
@@ -108,11 +132,273 @@
     .empty-state .icon  { font-size: 2.4rem; margin-bottom: 10px; }
     .empty-state .label { font-size: .95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
 
+    /* ── Drawer backdrop ─────────────────────────────────────── */
+    .ar-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,0.3);
+    }
+    .ar-backdrop.open { display: block; }
+
+    /* ── Drawer panel ────────────────────────────────────────── */
+    .ar-drawer {
+      position: fixed; right: 0; top: 0; bottom: 0; width: 460px; max-width: 100vw;
+      background: var(--bg-paper); z-index: 301;
+      box-shadow: -6px 0 32px rgba(0,0,0,0.14);
+      display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform .25s ease;
+    }
+    .ar-drawer.open { transform: translateX(0); }
+
+    /* Drawer header */
+    .drawer-hdr {
+      background: var(--primary); color: #fff;
+      padding: 14px 16px 12px; flex-shrink: 0; position: relative;
+    }
+    .drawer-hdr-name {
+      font-size: 1rem; font-weight: 700; margin-right: 32px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .drawer-hdr-branch { font-size: .75rem; opacity: .8; margin-top: 2px; }
+    .drawer-hdr-stats {
+      display: flex; gap: 16px; margin-top: 8px; font-size: .78rem;
+    }
+    .drawer-hdr-stat { display: flex; flex-direction: column; }
+    .drawer-hdr-stat-val { font-weight: 700; font-size: .95rem; }
+    .drawer-hdr-stat-lbl { opacity: .75; font-size: .7rem; margin-top: 1px; }
+    .drawer-close {
+      position: absolute; top: 10px; right: 12px;
+      background: rgba(255,255,255,.2); border: none; color: #fff;
+      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+      font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .drawer-close:hover { background: rgba(255,255,255,.35); }
+
+    /* Status + count row */
+    .drawer-status-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 9px 14px; background: #F8FAFC;
+      border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+    }
+    .status-select {
+      flex: 1; min-width: 140px; padding: 5px 8px;
+      border: 1px solid var(--border-color); border-radius: 6px;
+      font-size: .8rem; font-weight: 600; cursor: pointer; background: #fff;
+    }
+    .contact-count-badge {
+      padding: 4px 10px; border-radius: 20px; font-size: .75rem; font-weight: 700;
+      background: #EFF6FF; color: #1E40AF; white-space: nowrap;
+    }
+    .save-status-btn {
+      padding: 5px 12px; background: var(--primary); color: #fff;
+      border: none; border-radius: 6px; font-size: .78rem; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+    }
+    .save-status-btn:hover { opacity: .88; }
+
+    /* Collection sub-fields */
+    .collection-fields {
+      display: none; padding: 8px 14px; background: #FEF2F2;
+      border-bottom: 1px solid #FECACA; flex-shrink: 0; gap: 8px;
+    }
+    .collection-fields.visible { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .collection-fields label { font-size: .75rem; font-weight: 600; color: #991B1B; white-space: nowrap; }
+    .collection-fields input {
+      padding: 4px 8px; border: 1px solid #FECACA; border-radius: 5px;
+      font-size: .8rem; background: #fff; flex: 1; min-width: 100px;
+    }
+
+    /* Open invoices summary */
+    .drawer-invoices {
+      padding: 8px 14px; border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0; max-height: 130px; overflow-y: auto;
+    }
+    .drawer-invoices-title {
+      font-size: .68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-secondary); margin-bottom: 5px;
+    }
+    .inv-mini {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: .77rem; padding: 3px 0; border-bottom: 1px solid #F3F4F6;
+    }
+    .inv-mini:last-child { border-bottom: none; }
+    .inv-mini-num { color: var(--text-secondary); }
+    .inv-mini-due { color: var(--text-secondary); }
+    .inv-mini-bal { font-weight: 700; color: #B45309; }
+    .inv-mini-pd  { font-size: .68rem; font-weight: 700; color: #DC2626; margin-left: 4px; }
+    .late-fee-note { font-size: .68rem; color: #92400E; margin-top: 1px; }
+
+    /* ── Tabs ────────────────────────────────────────────────── */
+    .drawer-tabs {
+      display: flex; border-bottom: 2px solid var(--border-color);
+      flex-shrink: 0; background: #F8FAFC;
+    }
+    .drawer-tab {
+      flex: 1; padding: 9px 4px; border: none; background: none;
+      font-size: .75rem; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+      transition: color .15s; white-space: nowrap;
+    }
+    .drawer-tab.active { color: var(--primary); border-bottom-color: var(--primary); background: #fff; }
+    .drawer-tab:hover:not(.active) { color: var(--text-primary); }
+
+    /* ── Tab content ─────────────────────────────────────────── */
+    .drawer-body { flex: 1; overflow-y: auto; }
+    .tab-pane { display: none; padding: 14px; }
+    .tab-pane.active { display: block; }
+
+    /* ── Contact cards ───────────────────────────────────────── */
+    .contact-card {
+      border: 1px solid var(--border-color); border-radius: 8px;
+      padding: 12px; margin-bottom: 10px; background: var(--bg-default);
+    }
+    .contact-card-hdr {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .contact-name { font-weight: 700; font-size: .88rem; }
+    .contact-title { font-size: .75rem; color: var(--text-secondary); margin-top: 1px; }
+    .contact-priority-badge {
+      font-size: .65rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      white-space: nowrap; flex-shrink: 0; margin-left: 8px; margin-top: 2px;
+    }
+    .priority-1 { background: var(--primary); color: #fff; }
+    .priority-2 { background: #DBEAFE; color: #1E40AF; }
+    .priority-3 { background: #F3F4F6; color: #6B7280; }
+    .contact-detail {
+      font-size: .78rem; color: var(--text-secondary); margin-top: 3px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .contact-detail a { color: var(--primary); text-decoration: none; }
+    .contact-detail a:hover { text-decoration: underline; }
+
+    /* Terms block */
+    .terms-block {
+      border: 1px solid var(--border-color); border-radius: 8px;
+      padding: 12px; margin-top: 12px; background: #FFFBEB;
+      border-color: #FDE68A;
+    }
+    .terms-block-title {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: #92400E; margin-bottom: 6px;
+    }
+    .terms-row { font-size: .8rem; color: #111827; margin-bottom: 3px; }
+    .terms-row span { font-weight: 600; }
+
+    /* ── Activity log ────────────────────────────────────────── */
+    .activity-add { margin-bottom: 14px; }
+    .activity-type-row {
+      display: flex; gap: 6px; margin-bottom: 8px;
+    }
+    .act-type-btn {
+      padding: 5px 14px; border: 1px solid var(--border-color);
+      border-radius: 20px; background: #fff; font-size: .78rem;
+      cursor: pointer; transition: all .15s; font-family: inherit;
+    }
+    .act-type-btn.active {
+      background: var(--primary); border-color: var(--primary);
+      color: #fff; font-weight: 700;
+    }
+    .activity-textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border-color);
+      border-radius: 7px; font-family: inherit; font-size: .82rem;
+      resize: vertical; min-height: 72px; box-sizing: border-box;
+    }
+    .activity-textarea:focus { outline: none; border-color: var(--primary); }
+    .log-btn {
+      margin-top: 6px; padding: 7px 18px; background: var(--primary); color: #fff;
+      border: none; border-radius: 7px; font-size: .82rem; font-weight: 700;
+      cursor: pointer; width: 100%;
+    }
+    .log-btn:hover { opacity: .88; }
+    .activity-log-list { margin-top: 4px; }
+    .act-entry {
+      padding: 10px 0; border-bottom: 1px solid #F3F4F6; font-size: .8rem;
+    }
+    .act-entry:last-child { border-bottom: none; }
+    .act-entry-meta {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .7rem; color: var(--text-secondary); margin-bottom: 4px;
+    }
+    .act-type-tag {
+      font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+      padding: 1px 7px; border-radius: 10px; font-size: .67rem;
+    }
+    .act-type-tag.call   { background: #DCFCE7; color: #166534; }
+    .act-type-tag.email  { background: #DBEAFE; color: #1E40AF; }
+    .act-type-tag.note   { background: #F3F4F6; color: #374151; }
+    .act-type-tag.letter { background: #FEF3C7; color: #92400E; }
+    .act-entry-body { color: #374151; line-height: 1.45; white-space: pre-wrap; }
+
+    /* ── Form letter ─────────────────────────────────────────── */
+    .letter-select {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border-color);
+      border-radius: 7px; font-family: inherit; font-size: .85rem;
+      margin-bottom: 10px; background: #fff; cursor: pointer;
+    }
+    .letter-preview {
+      background: #F9FAFB; border: 1px solid var(--border-color);
+      border-radius: 7px; padding: 12px; font-size: .78rem;
+      line-height: 1.6; white-space: pre-wrap; color: #374151;
+      max-height: 340px; overflow-y: auto; margin-bottom: 10px;
+      font-family: 'Courier New', monospace;
+    }
+    .letter-subject {
+      font-size: .75rem; font-weight: 700; color: var(--text-secondary);
+      margin-bottom: 6px; padding-bottom: 6px;
+      border-bottom: 1px dashed var(--border-color);
+    }
+    .letter-actions { display: flex; gap: 8px; }
+    .copy-btn {
+      flex: 1; padding: 8px; background: #1E3A5F; color: #fff;
+      border: none; border-radius: 7px; font-size: .82rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .copy-btn:hover { opacity: .88; }
+    .copy-btn.copied { background: #16A34A; }
+    .log-letter-btn {
+      padding: 8px 14px; background: var(--primary); color: #fff;
+      border: none; border-radius: 7px; font-size: .82rem; font-weight: 700;
+      cursor: pointer;
+    }
+    .log-letter-btn:hover { opacity: .88; }
+
+    /* ── Avg days to pay (in activity tab) ───────────────────── */
+    .avg-pay-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 12px;
+      padding: 10px 12px; background: #F0FDF4; border: 1px solid #BBF7D0;
+      border-radius: 7px; font-size: .8rem;
+    }
+    .avg-pay-row label { font-weight: 600; color: #166534; white-space: nowrap; }
+    .avg-pay-input {
+      width: 70px; padding: 4px 8px; border: 1px solid #BBF7D0;
+      border-radius: 5px; font-size: .82rem; text-align: center;
+    }
+    .avg-pay-save {
+      padding: 4px 10px; background: #16A34A; color: #fff;
+      border: none; border-radius: 5px; font-size: .75rem;
+      font-weight: 700; cursor: pointer;
+    }
+    .avg-pay-dso { color: var(--text-secondary); font-size: .75rem; margin-left: 4px; }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    .ar-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1E3A5F; color: #fff; padding: 10px 20px;
+      border-radius: 8px; font-size: .82rem; font-weight: 600;
+      z-index: 400; opacity: 0; transition: opacity .2s; pointer-events: none;
+    }
+    .ar-toast.show { opacity: 1; }
+
     /* ── Print ───────────────────────────────────────────────── */
     @media print {
       .sidebar, .navbar, .ar-toolbar, .unassigned-banner { display: none !important; }
       .inv-table { font-size: .7rem; }
       .branch-block { page-break-inside: avoid; }
+      .ar-drawer, .ar-backdrop { display: none !important; }
+    }
+
+    @media (max-width: 600px) {
+      .ar-drawer { width: 100vw; }
     }
   </style>
 </head>
@@ -124,7 +410,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">A/R Report</h1>
-          <p class="page-subtitle">Invoice Register from TempWorks</p>
+          <p class="page-subtitle">Invoice Register from TempWorks · click a customer to manage</p>
         </div>
       </div>
 
@@ -146,6 +432,135 @@
   </div>
 </div>
 
+<!-- ── Drawer backdrop ──────────────────────────────────────── -->
+<div class="ar-backdrop" id="ar-backdrop"></div>
+
+<!-- ── AR Management Drawer ────────────────────────────────── -->
+<div class="ar-drawer" id="ar-drawer">
+
+  <!-- Header -->
+  <div class="drawer-hdr">
+    <button class="drawer-close" id="drawer-close" title="Close">×</button>
+    <div class="drawer-hdr-name" id="drawer-name">—</div>
+    <div class="drawer-hdr-branch" id="drawer-branch"></div>
+    <div class="drawer-hdr-stats">
+      <div class="drawer-hdr-stat">
+        <span class="drawer-hdr-stat-val" id="drawer-balance">—</span>
+        <span class="drawer-hdr-stat-lbl">Open Balance</span>
+      </div>
+      <div class="drawer-hdr-stat">
+        <span class="drawer-hdr-stat-val" id="drawer-dso">—</span>
+        <span class="drawer-hdr-stat-lbl">Avg DSO (open)</span>
+      </div>
+      <div class="drawer-hdr-stat">
+        <span class="drawer-hdr-stat-val" id="drawer-inv-count">—</span>
+        <span class="drawer-hdr-stat-lbl">Open Invoices</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status row -->
+  <div class="drawer-status-row">
+    <select class="status-select" id="drawer-status-sel">
+      <option value="normal">● Normal</option>
+      <option value="rep_visit">● Rep Visit Needed</option>
+      <option value="suspended">● Suspended</option>
+      <option value="collections">● Sent to Collections</option>
+      <option value="write_off">● Write-Off</option>
+    </select>
+    <span class="contact-count-badge" id="drawer-contact-badge">0 contacts</span>
+    <button class="save-status-btn" id="save-status-btn">Save</button>
+  </div>
+
+  <!-- Collection sub-fields (shown when status = collections) -->
+  <div class="collection-fields" id="collection-fields">
+    <label>Agency:</label>
+    <input type="text" id="collection-agency" placeholder="Agency name">
+    <label>Date Referred:</label>
+    <input type="date" id="collection-date">
+  </div>
+
+  <!-- Open invoices mini-list -->
+  <div class="drawer-invoices">
+    <div class="drawer-invoices-title">Open Invoices</div>
+    <div id="drawer-inv-list"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="drawer-tabs">
+    <button class="drawer-tab active" data-tab="contacts">Contacts</button>
+    <button class="drawer-tab" data-tab="activity">Activity</button>
+    <button class="drawer-tab" data-tab="letters">Form Letter</button>
+  </div>
+
+  <!-- Tab content -->
+  <div class="drawer-body">
+
+    <!-- CONTACTS TAB -->
+    <div class="tab-pane active" id="tab-contacts">
+      <div id="contacts-list">
+        <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:.85rem;">Loading contacts…</div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY TAB -->
+    <div class="tab-pane" id="tab-activity">
+      <!-- Avg days to pay -->
+      <div class="avg-pay-row">
+        <label>Hist. Avg Days to Pay:</label>
+        <input type="number" class="avg-pay-input" id="avg-pay-input" min="0" max="365" placeholder="—">
+        <button class="avg-pay-save" id="avg-pay-save-btn">Save</button>
+        <span class="avg-pay-dso" id="avg-pay-dso-note"></span>
+      </div>
+
+      <!-- Log new activity -->
+      <div class="activity-add" style="margin-top:14px;">
+        <div class="activity-type-row">
+          <button class="act-type-btn active" data-type="call">📞 Call</button>
+          <button class="act-type-btn" data-type="email">✉️ Email</button>
+          <button class="act-type-btn" data-type="note">📝 Note</button>
+        </div>
+        <textarea class="activity-textarea" id="activity-body" placeholder="Add details…"></textarea>
+        <button class="log-btn" id="log-activity-btn">Log Activity</button>
+      </div>
+
+      <!-- Activity history -->
+      <div class="drawer-invoices-title" style="margin-top:4px;">History</div>
+      <div class="activity-log-list" id="activity-log-list">
+        <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:.82rem;">No activity logged yet.</div>
+      </div>
+    </div>
+
+    <!-- FORM LETTER TAB -->
+    <div class="tab-pane" id="tab-letters">
+      <p style="font-size:.78rem;color:var(--text-secondary);margin:0 0 10px;">
+        Select a template. The letter will be pre-filled with customer &amp; invoice data.
+        Copy it into your email client and personalize as needed.
+      </p>
+      <select class="letter-select" id="letter-template-sel">
+        <option value="">— Select template —</option>
+        <option value="inquiry">Invoice Inquiry</option>
+        <option value="ach">ACH Payment Offer</option>
+        <option value="status">Payment Status Request</option>
+        <option value="demand_10">10-Day Demand Letter</option>
+        <option value="final">Final Warning (Pre-Collection)</option>
+      </select>
+      <div id="letter-preview-wrap" style="display:none;">
+        <div class="letter-subject" id="letter-subject-line"></div>
+        <div class="letter-preview" id="letter-preview-body"></div>
+        <div class="letter-actions">
+          <button class="copy-btn" id="copy-letter-btn">📋 Copy Letter</button>
+          <button class="log-letter-btn" id="log-letter-btn">Log as Sent</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="ar-toast" id="ar-toast"></div>
+
 <script type="module">
   import { renderNavbar }  from './src/components/navbar.js';
   import { renderSidebar } from './src/components/sidebar.js';
@@ -159,10 +574,45 @@
   await renderSidebar();
   initInactivityTimer();
 
-  // ── State ──────────────────────────────────────────────────────
-  let regionMap = {};   // branchname → region (from branch_settings)
+  // ── Global state ───────────────────────────────────────────
+  let regionMap        = {};
+  let customerStatuses = {};   // "name||branch" → status record
+  let activityCounts   = {};   // "name||branch" → count
+  let customerLookup   = {};   // "name||branch" → { name, branch, customerId, invoices }
+  let drawerCurrent    = null; // currently open customer object
+  let drawerActType    = 'call';
+  let drawerTab        = 'contacts';
 
-  // ── Load region map ────────────────────────────────────────────
+  // ── Utilities ──────────────────────────────────────────────
+  function fmt$(n)    { return (n ?? 0).toLocaleString('en-US', { style:'currency', currency:'USD' }); }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const [y,m,d] = iso.split('T')[0].split('-');
+    return `${parseInt(m)}/${parseInt(d)}/${y}`;
+  }
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function escAttr(s) { return esc(s).replace(/'/g,'&#39;'); }
+
+  function toast(msg, duration = 2500) {
+    const el = document.getElementById('ar-toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration);
+  }
+
+  function daysOverdue(dueDateStr) {
+    if (!dueDateStr) return 0;
+    const due = new Date(dueDateStr.split('T')[0] + 'T00:00:00');
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    return Math.floor((now - due) / 86400000);
+  }
+
+  // ── Region map ─────────────────────────────────────────────
   async function loadRegionMap() {
     const { data } = await supabase.from('branch_settings').select('branch, region');
     regionMap = {};
@@ -171,22 +621,49 @@
     }
   }
 
-  // ── Formatting ─────────────────────────────────────────────────
-  function fmt$(n) {
-    return (n ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  }
-  function fmtDate(iso) {
-    if (!iso) return '—';
-    const [y, m, d] = iso.split('T')[0].split('-');
-    return `${parseInt(m)}/${parseInt(d)}/${y}`;
+  // ── Bulk load AR data for all visible customers ────────────
+  async function bulkLoadARData(invoices) {
+    const names = [...new Set(invoices.map(i => i.customername).filter(Boolean))];
+    if (!names.length) return;
+
+    const [{ data: statuses }, { data: acts }] = await Promise.all([
+      supabase.from('ar_customer_status').select('*').in('customer_name', names),
+      supabase.from('ar_activity_log').select('customer_name, branch').in('customer_name', names),
+    ]);
+
+    customerStatuses = {};
+    for (const s of (statuses || [])) {
+      customerStatuses[`${s.customer_name}||${s.branch}`] = s;
+    }
+
+    activityCounts = {};
+    for (const a of (acts || [])) {
+      const k = `${a.customer_name}||${a.branch}`;
+      activityCounts[k] = (activityCounts[k] || 0) + 1;
+    }
   }
 
-  // ── SVG chevrons ───────────────────────────────────────────────
+  // ── SVG chevrons ───────────────────────────────────────────
   const rChevron = `<svg class="region-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
   const bChevron = `<svg class="branch-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>`;
 
-  // ── Render ─────────────────────────────────────────────────────
+  // ── Main render ────────────────────────────────────────────
   function render(invoices) {
+    // Build customer lookup (group invoices by name||branch)
+    customerLookup = {};
+    for (const inv of invoices) {
+      const key = `${inv.customername}||${inv.branchname}`;
+      if (!customerLookup[key]) {
+        customerLookup[key] = {
+          name: inv.customername,
+          branch: inv.branchname,
+          customerId: inv.customerid,
+          invoices: [],
+        };
+      }
+      customerLookup[key].invoices.push(inv);
+    }
+
     if (!invoices.length) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">📭</div>
@@ -194,21 +671,19 @@
       return;
     }
 
-    // Group: region → branch → invoices
     const grouped    = {};
     const unassigned = [];
 
     for (const inv of invoices) {
       const region = regionMap[inv.branchname];
       if (!region) { unassigned.push(inv); continue; }
-      if (!grouped[region])                  grouped[region] = {};
-      if (!grouped[region][inv.branchname])  grouped[region][inv.branchname] = [];
+      if (!grouped[region])                 grouped[region] = {};
+      if (!grouped[region][inv.branchname]) grouped[region][inv.branchname] = [];
       grouped[region][inv.branchname].push(inv);
     }
 
     let html = '';
 
-    // Unassigned banner
     if (unassigned.length) {
       const branches = [...new Set(unassigned.map(i => i.branchname))].filter(Boolean).sort();
       html += `<div class="unassigned-banner">
@@ -218,11 +693,9 @@
       </div>`;
     }
 
-    // Regions (sorted A-Z)
     for (const region of Object.keys(grouped).sort()) {
       let branchesHTML = '';
 
-      // Branches (sorted A-Z)
       for (const branch of Object.keys(grouped[region]).sort()) {
         const rows = grouped[region][branch];
         let totInvoiced = 0, totPaid = 0, totBalance = 0;
@@ -230,12 +703,22 @@
         const rowsHTML = rows.map(inv => {
           const balance  = inv.balanceamount ?? 0;
           const pastDue  = !!(inv.pastdue && String(inv.pastdue).trim());
+          const overDays = daysOverdue(inv.duedate);
+          const lateFee  = overDays >= 3;
+          const key      = `${inv.customername}||${inv.branchname}`;
+          const status   = customerStatuses[key]?.status || 'normal';
           totInvoiced   += inv.invoiceamount ?? 0;
           totPaid       += inv.payamount     ?? 0;
           totBalance    += balance;
 
+          const statusDot = `<span class="status-dot ${status}" title="${esc(STATUS_LABELS[status] || status)}"></span>`;
+          const lateBadge = lateFee ? `<span class="late-fee-badge">Late Fee</span>` : '';
+
           return `<tr${pastDue ? ' class="is-past-due"' : ''}>
-            <td class="left">${esc(inv.customername || '')}</td>
+            <td class="left">
+              <button class="customer-link" data-key="${escAttr(key)}">${statusDot}${esc(inv.customername || '')}</button>
+              ${lateBadge}
+            </td>
             <td class="muted">${fmtDate(inv.weekendbill)}</td>
             <td class="muted">${fmtDate(inv.duedate)}</td>
             <td class="muted">${esc(String(inv.invoicenumber || ''))}</td>
@@ -289,9 +772,422 @@
     }
 
     document.getElementById('report-content').innerHTML = html;
+
+    // Event delegation: customer-link clicks
+    document.getElementById('report-content').addEventListener('click', e => {
+      const btn = e.target.closest('.customer-link');
+      if (!btn) return;
+      const c = customerLookup[btn.dataset.key];
+      if (c) openDrawer(c);
+    });
   }
 
-  // ── Sync ───────────────────────────────────────────────────────
+  // ── Status labels ──────────────────────────────────────────
+  const STATUS_LABELS = {
+    normal:      'Normal',
+    rep_visit:   'Rep Visit Needed',
+    suspended:   'Suspended',
+    collections: 'Sent to Collections',
+    write_off:   'Write-Off',
+  };
+
+  // ══════════════════════════════════════════════════════════
+  // ── DRAWER ────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  function openDrawer(customer) {
+    drawerCurrent = customer;
+    drawerTab = 'contacts';
+
+    // Header
+    document.getElementById('drawer-name').textContent    = customer.name || '—';
+    document.getElementById('drawer-branch').textContent  = `Branch: ${customer.branch || '—'}`;
+
+    // Balance & DSO stats
+    const totalBalance = customer.invoices.reduce((s, i) => s + (i.balanceamount ?? 0), 0);
+    const dsoVals = customer.invoices.map(i => parseFloat(i.dso)).filter(n => !isNaN(n) && n > 0);
+    const avgDso  = dsoVals.length ? Math.round(dsoVals.reduce((a,b) => a+b,0) / dsoVals.length) : null;
+    document.getElementById('drawer-balance').textContent   = fmt$(totalBalance);
+    document.getElementById('drawer-dso').textContent       = avgDso != null ? `${avgDso}d` : '—';
+    document.getElementById('drawer-inv-count').textContent = customer.invoices.length;
+
+    // Invoice mini-list
+    const invListEl = document.getElementById('drawer-inv-list');
+    invListEl.innerHTML = customer.invoices.map(inv => {
+      const balance  = inv.balanceamount ?? 0;
+      const pastDue  = !!(inv.pastdue && String(inv.pastdue).trim());
+      const overDays = daysOverdue(inv.duedate);
+      return `<div class="inv-mini">
+        <span class="inv-mini-num">#${esc(String(inv.invoicenumber || '—'))}</span>
+        <span class="inv-mini-due">Due ${fmtDate(inv.duedate)}${pastDue ? `<span class="inv-mini-pd">PAST DUE</span>` : ''}</span>
+        <span class="inv-mini-bal">${fmt$(balance)}${overDays >= 3 ? `<span class="late-fee-badge">Late Fee</span>` : ''}</span>
+      </div>`;
+    }).join('');
+
+    // Status
+    const key    = `${customer.name}||${customer.branch}`;
+    const status = customerStatuses[key];
+    document.getElementById('drawer-status-sel').value      = status?.status || 'normal';
+    document.getElementById('collection-agency').value      = status?.collection_agency || '';
+    document.getElementById('collection-date').value        = status?.collection_date   || '';
+    toggleCollectionFields(status?.status || 'normal');
+
+    // Contact count badge
+    const cnt = activityCounts[key] || 0;
+    document.getElementById('drawer-contact-badge').textContent = `${cnt} contact${cnt !== 1 ? 's' : ''}`;
+
+    // Reset tabs
+    document.querySelectorAll('.drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'contacts'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-contacts'));
+
+    // Open panel
+    document.getElementById('ar-backdrop').classList.add('open');
+    document.getElementById('ar-drawer').classList.add('open');
+
+    // Load tab data
+    loadContacts(customer.customerId);
+    loadActivityTab(customer.name, customer.branch, status);
+  }
+
+  function closeDrawer() {
+    document.getElementById('ar-backdrop').classList.remove('open');
+    document.getElementById('ar-drawer').classList.remove('open');
+    drawerCurrent = null;
+  }
+
+  function switchTab(tab) {
+    drawerTab = tab;
+    document.querySelectorAll('.drawer-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+    if (tab === 'activity' && drawerCurrent) {
+      loadActivityLog(drawerCurrent.name, drawerCurrent.branch);
+    }
+  }
+
+  function toggleCollectionFields(status) {
+    document.getElementById('collection-fields').classList.toggle('visible', status === 'collections');
+  }
+
+  // ── Contacts tab ───────────────────────────────────────────
+  async function loadContacts(customerId) {
+    const el = document.getElementById('contacts-list');
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:.85rem;">Loading…</div>';
+
+    if (!customerId) {
+      el.innerHTML = '<div style="padding:16px;color:var(--text-secondary);font-size:.82rem;">Customer ID not available — cannot fetch TempWorks contacts.</div>';
+      return;
+    }
+
+    try {
+      // Fetch contacts + customer details in parallel
+      const [contactsRes, customerRes] = await Promise.all([
+        fetch(`/api/tw?endpoint=/Customers/${customerId}/contacts`),
+        fetch(`/api/tw?endpoint=/Customers/${customerId}`),
+      ]);
+
+      let contacts = [];
+      if (contactsRes.ok) {
+        const cd = await contactsRes.json();
+        contacts = Array.isArray(cd) ? cd : (cd.data || []);
+      }
+
+      let customerData = null;
+      if (customerRes.ok) customerData = await customerRes.json();
+
+      let html = '';
+
+      // Contacts
+      if (!contacts.length) {
+        html += '<p style="color:var(--text-secondary);font-size:.82rem;padding:8px 0;">No contacts found in TempWorks for this customer.</p>';
+      } else {
+        // Sort: primary first
+        contacts.sort((a,b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
+        contacts.forEach((c, i) => {
+          const name  = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'Unknown';
+          const email = c.email || c.emailAddress || '';
+          const phone = c.phone || c.phoneNumber || c.directPhone || '';
+          const title = c.title || c.jobTitle || '';
+          const priorityClass = i === 0 ? 'priority-1' : i === 1 ? 'priority-2' : 'priority-3';
+          const priorityLabel = i === 0 ? '1st Contact' : i === 1 ? '2nd Contact' : `${i+1}th Contact`;
+
+          html += `<div class="contact-card">
+            <div class="contact-card-hdr">
+              <div>
+                <div class="contact-name">${esc(name)}</div>
+                ${title ? `<div class="contact-title">${esc(title)}</div>` : ''}
+              </div>
+              <span class="contact-priority-badge ${priorityClass}">${priorityLabel}</span>
+            </div>
+            ${email ? `<div class="contact-detail">✉️ <a href="mailto:${esc(email)}">${esc(email)}</a></div>` : ''}
+            ${phone ? `<div class="contact-detail">📞 <a href="tel:${esc(phone)}">${esc(phone)}</a></div>` : ''}
+          </div>`;
+        });
+      }
+
+      // Terms from customer record
+      if (customerData) {
+        const terms   = customerData.paymentTerms || customerData.netTerms || customerData.terms || '';
+        const deliv   = customerData.invoiceDeliveryMethod || customerData.invoiceDelivery || '';
+        const notes   = customerData.billingNotes || customerData.accountingNotes || '';
+        if (terms || deliv || notes) {
+          html += `<div class="terms-block">
+            <div class="terms-block-title">📋 Contract Terms</div>
+            ${terms ? `<div class="terms-row">Net Terms: <span>${esc(terms)}</span></div>` : ''}
+            ${deliv ? `<div class="terms-row">Invoice Delivery: <span>${esc(deliv)}</span></div>` : ''}
+            ${notes ? `<div class="terms-row" style="margin-top:6px;white-space:pre-wrap;">${esc(notes)}</div>` : ''}
+          </div>`;
+        }
+      }
+
+      el.innerHTML = html || '<p style="color:var(--text-secondary);font-size:.82rem;">No contact data available.</p>';
+    } catch (err) {
+      el.innerHTML = `<div style="color:#DC2626;font-size:.82rem;padding:8px;">Error loading contacts: ${esc(err.message)}</div>`;
+    }
+  }
+
+  // ── Activity tab ───────────────────────────────────────────
+  function loadActivityTab(name, branch, statusRecord) {
+    // Avg days to pay
+    document.getElementById('avg-pay-input').value = statusRecord?.avg_days_to_pay ?? '';
+    const dsoNote = document.getElementById('avg-pay-dso-note');
+    const dsoVals = drawerCurrent?.invoices?.map(i => parseFloat(i.dso)).filter(n => !isNaN(n) && n > 0) || [];
+    const avgDso  = dsoVals.length ? Math.round(dsoVals.reduce((a,b) => a+b,0) / dsoVals.length) : null;
+    dsoNote.textContent = avgDso != null ? `(Current open DSO: ${avgDso}d)` : '';
+
+    // Load history
+    loadActivityLog(name, branch);
+  }
+
+  async function loadActivityLog(name, branch) {
+    const el = document.getElementById('activity-log-list');
+    const { data, error } = await supabase
+      .from('ar_activity_log')
+      .select('*')
+      .eq('customer_name', name)
+      .eq('branch', branch)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error || !data?.length) {
+      el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:.82rem;">No activity logged yet.</div>';
+      return;
+    }
+
+    el.innerHTML = data.map(a => {
+      const ts = new Date(a.created_at).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      });
+      const typeLabel = a.type === 'letter' ? (a.letter_type ? `Letter: ${a.letter_type}` : 'Letter') : a.type;
+      return `<div class="act-entry">
+        <div class="act-entry-meta">
+          <span class="act-type-tag ${a.type}">${esc(typeLabel.toUpperCase())}</span>
+          <span>${esc(ts)}</span>
+        </div>
+        <div class="act-entry-body">${esc(a.body || '')}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function logActivity(type, body, letterType = null) {
+    if (!drawerCurrent) return;
+    const { error } = await supabase.from('ar_activity_log').insert({
+      customer_name: drawerCurrent.name,
+      branch:        drawerCurrent.branch,
+      type,
+      body,
+      letter_type:   letterType,
+    });
+    if (error) { toast('Error saving activity'); return; }
+
+    // Update count badge
+    const key = `${drawerCurrent.name}||${drawerCurrent.branch}`;
+    activityCounts[key] = (activityCounts[key] || 0) + 1;
+    document.getElementById('drawer-contact-badge').textContent =
+      `${activityCounts[key]} contact${activityCounts[key] !== 1 ? 's' : ''}`;
+
+    if (drawerTab === 'activity') loadActivityLog(drawerCurrent.name, drawerCurrent.branch);
+    toast('Activity logged ✓');
+  }
+
+  // ── Status save ────────────────────────────────────────────
+  async function saveStatus() {
+    if (!drawerCurrent) return;
+    const status   = document.getElementById('drawer-status-sel').value;
+    const agency   = document.getElementById('collection-agency').value.trim() || null;
+    const colDate  = document.getElementById('collection-date').value || null;
+
+    const { error } = await supabase.from('ar_customer_status').upsert({
+      customer_name:     drawerCurrent.name,
+      branch:            drawerCurrent.branch,
+      status,
+      collection_agency: agency,
+      collection_date:   colDate,
+      updated_at:        new Date().toISOString(),
+    }, { onConflict: 'customer_name,branch' });
+
+    if (error) { toast('Error saving status'); return; }
+
+    // Update local state
+    const key = `${drawerCurrent.name}||${drawerCurrent.branch}`;
+    if (!customerStatuses[key]) customerStatuses[key] = {};
+    customerStatuses[key].status            = status;
+    customerStatuses[key].collection_agency = agency;
+    customerStatuses[key].collection_date   = colDate;
+
+    toast('Status saved ✓');
+  }
+
+  // ── Avg days to pay save ───────────────────────────────────
+  async function saveAvgDays() {
+    if (!drawerCurrent) return;
+    const val = parseFloat(document.getElementById('avg-pay-input').value) || null;
+
+    const { error } = await supabase.from('ar_customer_status').upsert({
+      customer_name:    drawerCurrent.name,
+      branch:           drawerCurrent.branch,
+      avg_days_to_pay:  val,
+      updated_at:       new Date().toISOString(),
+    }, { onConflict: 'customer_name,branch' });
+
+    if (!error) toast('Avg days to pay saved ✓');
+    else        toast('Error saving');
+  }
+
+  // ── Form letter generation ─────────────────────────────────
+  const LETTER_NAMES = {
+    inquiry:   'Invoice Inquiry',
+    ach:       'ACH Payment Offer',
+    status:    'Payment Status Request',
+    demand_10: '10-Day Demand Letter',
+    final:     'Final Warning (Pre-Collection)',
+  };
+
+  function generateLetter(type) {
+    if (!drawerCurrent) return null;
+    const customer = drawerCurrent;
+    const today    = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    const bal      = fmt$(customer.invoices.reduce((s,i) => s + (i.balanceamount ?? 0), 0));
+    const invList  = customer.invoices.map(i =>
+      `  • Invoice #${i.invoicenumber || '—'} — ${fmt$(i.balanceamount ?? 0)} (Due ${fmtDate(i.duedate)})`
+    ).join('\n');
+
+    const greet = 'Valued Client'; // replaced by contact name if available
+
+    const letters = {
+      inquiry: {
+        subject: `Invoice Inquiry – ${customer.name}`,
+        body:
+`Dear ${greet},
+
+I hope this message finds you well. I'm reaching out regarding outstanding invoice(s) on your account with PlaceSmart Agency.
+
+${invList}
+
+Total Outstanding: ${bal}
+
+Could you please confirm receipt of the above invoice(s)? If you need us to resend any invoices, or if a different invoicing method (email, portal, EDI) would be more convenient, please let us know.
+
+Thank you for your continued partnership.
+
+Best regards,
+[Your Name]
+PlaceSmart Agency`,
+      },
+      ach: {
+        subject: `Payment Options – ACH Available | ${customer.name}`,
+        body:
+`Dear ${greet},
+
+We are reaching out regarding your outstanding balance of ${bal} with PlaceSmart Agency.
+
+We offer ACH (electronic funds transfer) as a fast and convenient payment option. If this would simplify your accounts payable process, please reply and we'll provide our banking details.
+
+Open invoices:
+${invList}
+
+We'd also welcome knowing your expected payment date. Please don't hesitate to reach out with any questions.
+
+Best regards,
+[Your Name]
+PlaceSmart Agency`,
+      },
+      status: {
+        subject: `Payment Status Request – ${customer.name}`,
+        body:
+`Dear ${greet},
+
+I'm following up on the following outstanding invoice(s) for ${customer.name}:
+
+${invList}
+
+Total Balance: ${bal}
+
+Could you please provide an update on the payment status or your anticipated payment date? Your prompt response is greatly appreciated.
+
+Thank you,
+[Your Name]
+PlaceSmart Agency`,
+      },
+      demand_10: {
+        subject: `URGENT: Payment Required Within 10 Days – ${customer.name}`,
+        body:
+`Dear ${greet},
+
+Date: ${today}
+
+This letter serves as formal notice that your account with PlaceSmart Agency carries a past-due balance requiring immediate attention.
+
+PAST DUE INVOICES:
+${invList}
+
+TOTAL AMOUNT DUE: ${bal}
+
+PAYMENT IN FULL IS REQUIRED WITHIN 10 DAYS of the date of this letter.
+
+Failure to remit payment within this timeframe may result in:
+  • Immediate suspension of staffing services
+  • Referral of your account to a collection agency
+  • Pursuit of legal action to recover the outstanding balance plus all associated costs
+
+Please contact us immediately to arrange payment or discuss payment arrangements.
+
+Sincerely,
+[Your Name]
+PlaceSmart Agency`,
+      },
+      final: {
+        subject: `FINAL NOTICE – Legal/Collection Action Pending | ${customer.name}`,
+        body:
+`Dear ${greet},
+
+Date: ${today}
+
+This is your FINAL NOTICE regarding the outstanding balance of ${bal} owed to PlaceSmart Agency.
+
+PAST DUE INVOICES:
+${invList}
+
+Despite previous communications, this account remains delinquent. Unless payment in full is received within 3 business days of this notice, we will proceed with the following:
+
+  1. Immediate and permanent suspension of all staffing services
+  2. Referral of your account to our collection agency
+  3. Legal action to recover the outstanding balance, plus all attorney fees and court costs
+
+This is your final opportunity to resolve this matter without further consequences.
+
+To make payment or discuss arrangements, contact us immediately.
+
+Sincerely,
+[Your Name]
+PlaceSmart Agency`,
+      },
+    };
+
+    return letters[type] || null;
+  }
+
+  // ── Sync ───────────────────────────────────────────────────
   window.syncNow = async function() {
     const startVal = document.getElementById('date-from').value;
     const endVal   = document.getElementById('date-to').value;
@@ -315,15 +1211,16 @@
       const raw = await res.json();
       if (!Array.isArray(raw)) throw new Error('Unexpected response format');
 
-      // Keep only invoices with an outstanding balance
       const open = raw.filter(r => (r.balanceamount ?? 0) > 0.005);
 
       await loadRegionMap();
+      await bulkLoadARData(open);
       render(open);
 
+      const lateFeeCount = open.filter(i => daysOverdue(i.duedate) >= 3).length;
       const ts = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
       document.getElementById('sync-meta').textContent =
-        `${open.length} open invoice${open.length !== 1 ? 's' : ''} of ${raw.length} total · synced at ${ts}`;
+        `${open.length} open invoice${open.length !== 1 ? 's' : ''} of ${raw.length} total · ${lateFeeCount} late fee eligible · synced at ${ts}`;
     } catch (err) {
       document.getElementById('report-content').innerHTML =
         `<div class="empty-state"><div class="icon">⚠️</div>
@@ -335,14 +1232,82 @@
     }
   };
 
-  // ── Utility ────────────────────────────────────────────────────
-  function esc(s) {
-    return String(s ?? '')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
+  // ── Event wiring ───────────────────────────────────────────
 
-  // ── Init ───────────────────────────────────────────────────────
+  // Drawer close
+  document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+  document.getElementById('ar-backdrop').addEventListener('click', closeDrawer);
+
+  // Tabs
+  document.querySelectorAll('.drawer-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Status select
+  document.getElementById('drawer-status-sel').addEventListener('change', e => {
+    toggleCollectionFields(e.target.value);
+  });
+
+  // Save status
+  document.getElementById('save-status-btn').addEventListener('click', saveStatus);
+
+  // Activity type buttons
+  document.querySelectorAll('.act-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      drawerActType = btn.dataset.type;
+      document.querySelectorAll('.act-type-btn').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // Log activity
+  document.getElementById('log-activity-btn').addEventListener('click', async () => {
+    const body = document.getElementById('activity-body').value.trim();
+    if (!body) { toast('Please add a note before logging.'); return; }
+    await logActivity(drawerActType, body);
+    document.getElementById('activity-body').value = '';
+  });
+
+  // Avg days to pay save
+  document.getElementById('avg-pay-save-btn').addEventListener('click', saveAvgDays);
+
+  // Form letter template select
+  document.getElementById('letter-template-sel').addEventListener('change', e => {
+    const type = e.target.value;
+    const wrap  = document.getElementById('letter-preview-wrap');
+    if (!type) { wrap.style.display = 'none'; return; }
+    const letter = generateLetter(type);
+    if (!letter) { wrap.style.display = 'none'; return; }
+    document.getElementById('letter-subject-line').textContent = `Subject: ${letter.subject}`;
+    document.getElementById('letter-preview-body').textContent = letter.body;
+    document.getElementById('copy-letter-btn').classList.remove('copied');
+    document.getElementById('copy-letter-btn').textContent = '📋 Copy Letter';
+    wrap.style.display = 'block';
+  });
+
+  // Copy letter
+  document.getElementById('copy-letter-btn').addEventListener('click', async () => {
+    const subj = document.getElementById('letter-subject-line').textContent;
+    const body = document.getElementById('letter-preview-body').textContent;
+    try {
+      await navigator.clipboard.writeText(`${subj}\n\n${body}`);
+      const btn = document.getElementById('copy-letter-btn');
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '📋 Copy Letter'; btn.classList.remove('copied'); }, 2000);
+    } catch { toast('Copy failed — please select and copy manually.'); }
+  });
+
+  // Log letter as sent
+  document.getElementById('log-letter-btn').addEventListener('click', async () => {
+    const type = document.getElementById('letter-template-sel').value;
+    if (!type) return;
+    const letter = generateLetter(type);
+    if (!letter) return;
+    await logActivity('letter', letter.body, LETTER_NAMES[type] || type);
+    toast('Letter logged as sent ✓');
+  });
+
+  // ── Init ───────────────────────────────────────────────────
   (function seedDates() {
     const today           = new Date();
     const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
