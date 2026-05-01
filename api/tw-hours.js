@@ -1,26 +1,34 @@
-// Vercel Serverless Function — TempWorks hours aggregator
-// Calls GET /TimeEntry/timecards once per week in the requested date range,
-// paginates until all records are fetched, then returns totals grouped by
-// customer + branch + weekend_date.
+// Vercel Serverless Function — TempWorks Employee Hours aggregator
 //
-// Auth: TW_BEARER env var (falls back to TW_INVOICE_BEARER).
-//       The account must have time-entry-read scope AND be assigned to
-//       the appropriate TempWorks branches in TempWorks admin.
+// Uses the "Employee Hours" data export (same mechanism as tw-invoice.js).
+// Requires TW_INVOICE_BEARER with report-read scope — no extra credentials needed.
 //
-// Response shape: { data: [...], totalCount: N }  (TW REST pagination envelope)
-// Timecard fields (camelCase): regularHours, overtimeHours, doubletimeHours,
-//   customerName, branchName, weekendDate, employeeName, payRate, billRate
+// Export:      9d512845-b636-4803-a8d7-ed0fe3f74987  ("Employee Hours")
+// StartDate:   4ed208df-7358-4112-a2f1-ef5c93a82f9d
+// EndDate:     ea279903-dc79-409d-941b-8a2883de5b54
+//
+// Export row fields (PascalCase):
+//   WeekendBill, BranchName, BranchID, CustomerId, CustomerName,
+//   RHours, OHours, DHours, THours, TotalBill, AIdent (assignment ID), EmpName, ...
+//
+// Response: JSON array of { customer_name, branch_name, weekend_date,
+//   regular_hours, overtime_hours, total_hours, headcount }
+//   aggregated by customer + branch + weekend_date.
 //
 // Usage: GET /api/tw-hours?start_date=2026-01-01&end_date=2026-03-31
+
+const EXPORT_ID   = '9d512845-b636-4803-a8d7-ed0fe3f74987';
+const START_PARAM = '4ed208df-7358-4112-a2f1-ef5c93a82f9d';
+const END_PARAM   = 'ea279903-dc79-409d-941b-8a2883de5b54';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const bearer = process.env.TW_BEARER || process.env.TW_INVOICE_BEARER;
+  const bearer = process.env.TW_INVOICE_BEARER;
   if (!bearer) {
-    return res.status(500).json({ error: 'TW_BEARER not configured' });
+    return res.status(500).json({ error: 'TW_INVOICE_BEARER not configured' });
   }
 
   const { start_date, end_date } = req.query;
@@ -28,81 +36,43 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'start_date and end_date are required' });
   }
 
-  // ── Build list of week-end Sundays in range ──────────────────────────────
-  function getSundays(start, end) {
-    const sundays = [];
-    const d = new Date(start + 'T12:00:00Z');
-    if (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + (7 - d.getUTCDay()));
-    const endDate = new Date(end + 'T12:00:00Z');
-    while (d <= endDate) {
-      sundays.push(d.toISOString().slice(0, 10));
-      d.setUTCDate(d.getUTCDate() + 7);
-    }
-    return sundays;
-  }
-
-  // ── Fetch all timecards for one week (handles TW pagination envelope) ─────
-  // TW returns { data: [...], totalCount: N } — not a raw array.
-  async function fetchWeek(weekendBill) {
-    const records = [];
-    let skip = 0;
-    const take = 1000;
-
-    while (true) {
-      const url = `https://api.ontempworks.com/TimeEntry/timecards?weekendBill=${weekendBill}&skip=${skip}&take=${take}`;
-      const twRes = await fetch(url, {
-        headers: { 'x-tw-token': bearer, 'Accept': 'application/json' },
-      });
-
-      if (!twRes.ok) {
-        const msg = await twRes.text().catch(() => '');
-        throw new Error(`TW timecards HTTP ${twRes.status} (week ${weekendBill}): ${msg}`);
-      }
-
-      const envelope = await twRes.json();
-
-      // Handle both raw array (legacy) and pagination envelope
-      const page = Array.isArray(envelope) ? envelope : (envelope.data || []);
-      if (page.length === 0) break;
-
-      records.push(...page);
-      if (page.length < take) break;
-      skip += take;
-    }
-
-    return records;
-  }
-
-  // ── Run week fetches with limited concurrency (5 at a time) ──────────────
-  async function fetchAll(sundays) {
-    const results = [];
-    const CONCURRENCY = 5;
-    for (let i = 0; i < sundays.length; i += CONCURRENCY) {
-      const batch = sundays.slice(i, i + CONCURRENCY);
-      const settled = await Promise.allSettled(batch.map(s => fetchWeek(s)));
-      for (const r of settled) {
-        if (r.status === 'fulfilled') results.push(...r.value);
-        // silently skip failed weeks — one bad week doesn't kill the whole range
-      }
-    }
-    return results;
-  }
-
   try {
-    const sundays = getSundays(start_date, end_date);
-    const timecards = await fetchAll(sundays);
+    const twRes = await fetch(
+      `https://api.ontempworks.com/utilities/dataExport/exports/${EXPORT_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          'accept':        'text/plain',
+          'x-tw-token':    bearer,
+          'Content-Type':  'application/vnd.textus+jsonld',
+        },
+        body: JSON.stringify({
+          parameters: [
+            { exportParameterId: START_PARAM, value: start_date },
+            { exportParameterId: END_PARAM,   value: end_date   },
+          ],
+        }),
+      }
+    );
 
-    // ── Aggregate by customer + branch + weekend_date ─────────────────────
-    // Field names from TW REST schema are camelCase.
+    if (!twRes.ok) {
+      const msg = await twRes.text().catch(() => '');
+      throw new Error(`TW Hours export HTTP ${twRes.status}: ${msg}`);
+    }
+
+    const rows = JSON.parse(await twRes.text());
+
+    // Aggregate by customer + branch + weekend date.
+    // Use a Set for AIdent (assignment ID) to count unique workers per group.
     const byKey = {};
-    for (const tc of timecards) {
-      const customer = tc.customerName || '';
-      const branch   = tc.branchName   || '';
-      // weekendDate comes back as a datetime string e.g. "2026-01-04T00:00:00"
-      const weekStr  = (tc.weekendDate || '').split('T')[0];
-      const regHrs   = Number(tc.regularHours    || 0);
-      const otHrs    = Number(tc.overtimeHours   || 0);
-      const dtHrs    = Number(tc.doubletimeHours || 0);
+    for (const r of rows) {
+      const customer = r.CustomerName || '';
+      const branch   = r.BranchName   || '';
+      // WeekendBill comes back as "2026-03-22T00:00:00"
+      const weekStr  = (r.WeekendBill || r.WeekendDate || '').split('T')[0];
+      const regHrs   = Number(r.RHours || 0);
+      const otHrs    = Number(r.OHours || 0);
+      const dtHrs    = Number(r.DHours || 0);
 
       const key = `${customer}||${branch}||${weekStr}`;
       if (!byKey[key]) {
@@ -113,16 +83,20 @@ export default async function handler(req, res) {
           regular_hours:  0,
           overtime_hours: 0,
           total_hours:    0,
-          headcount:      0,
+          _workers:       new Set(),
         };
       }
       byKey[key].regular_hours  += regHrs;
       byKey[key].overtime_hours += otHrs;
       byKey[key].total_hours    += regHrs + otHrs + dtHrs;
-      byKey[key].headcount      += 1;
+      if (r.AIdent) byKey[key]._workers.add(r.AIdent);
     }
 
-    const data = Object.values(byKey);
+    const data = Object.values(byKey).map(({ _workers, ...rest }) => ({
+      ...rest,
+      headcount: _workers.size,
+    }));
+
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
     return res.status(200).json(data);
   } catch (err) {

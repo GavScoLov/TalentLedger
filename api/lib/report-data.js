@@ -97,65 +97,61 @@ export async function fetchInvoiceRegister(start, end) {
   return getInvoices(start, end);
 }
 
-// ── Hours helpers: TW REST primary, Supabase fallback ─────────────────────
+// ── Hours helpers: TW "Employee Hours" data export (same as invoice approach) ──
+// Export ID 9d512845-b636-4803-a8d7-ed0fe3f74987, uses TW_INVOICE_BEARER (report-read).
+// Fields are PascalCase: CustomerName, BranchName, WeekendBill, RHours, OHours, DHours, AIdent.
+
+const HOURS_EXPORT_ID   = '9d512845-b636-4803-a8d7-ed0fe3f74987';
+const HOURS_START_PARAM = '4ed208df-7358-4112-a2f1-ef5c93a82f9d';
+const HOURS_END_PARAM   = 'ea279903-dc79-409d-941b-8a2883de5b54';
 
 async function getTWHours(start, end) {
-  const bearer = process.env.TW_BEARER || process.env.TW_INVOICE_BEARER;
-  function getSundays(s, e) {
-    const out = [];
-    const d = new Date(s + 'T12:00:00Z');
-    if (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + (7 - d.getUTCDay()));
-    const ed = new Date(e + 'T12:00:00Z');
-    while (d <= ed) { out.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 7); }
-    return out;
-  }
-  async function fetchWeek(weekendBill) {
-    const records = [];
-    let skip = 0;
-    while (true) {
-      const res = await fetch(
-        `https://api.ontempworks.com/TimeEntry/timecards?weekendBill=${weekendBill}&skip=${skip}&take=1000`,
-        { headers: { 'x-tw-token': bearer, 'Accept': 'application/json' } }
-      );
-      if (!res.ok) throw new Error(`TW timecards ${res.status}`);
-      const envelope = await res.json();
-      // TW REST returns {"data": [...], "totalCount": N} — not a raw array
-      const page = Array.isArray(envelope) ? envelope : (envelope.data || []);
-      if (page.length === 0) break;
-      records.push(...page);
-      if (page.length < 1000) break;
-      skip += 1000;
+  const bearer = process.env.TW_INVOICE_BEARER;
+  if (!bearer) throw new Error('TW_INVOICE_BEARER not configured');
+
+  const res = await fetch(
+    `https://api.ontempworks.com/utilities/dataExport/exports/${HOURS_EXPORT_ID}`,
+    {
+      method: 'POST',
+      headers: {
+        'accept':       'text/plain',
+        'x-tw-token':   bearer,
+        'Content-Type': 'application/vnd.textus+jsonld',
+      },
+      body: JSON.stringify({
+        parameters: [
+          { exportParameterId: HOURS_START_PARAM, value: start },
+          { exportParameterId: HOURS_END_PARAM,   value: end   },
+        ],
+      }),
     }
-    return records;
+  );
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`TW Hours export HTTP ${res.status}: ${msg}`);
   }
-  const sundays = getSundays(start, end);
-  const CONCURRENCY = 5;
-  const all = [];
-  for (let i = 0; i < sundays.length; i += CONCURRENCY) {
-    const settled = await Promise.allSettled(sundays.slice(i, i + CONCURRENCY).map(fetchWeek));
-    for (const r of settled) if (r.status === 'fulfilled') all.push(...r.value);
-  }
-  return all;
+  return JSON.parse(await res.text());
 }
 
 async function getHoursAggregated(start, end) {
-  let records;
   try {
-    records = await getTWHours(start, end);
-    // Aggregate to customer+branch+week
+    const rows = await getTWHours(start, end);
+    // Aggregate to customer+branch+week; count unique AIdent (assignment IDs) as headcount
     const byKey = {};
-    for (const tc of records) {
-      // TW REST returns camelCase field names per Swagger schema
-      const customer = tc.customerName || '';
-      const branch   = tc.branchName   || '';
-      const weekend  = (tc.weekendDate || '').split('T')[0];
-      const hrs = (Number(tc.regularHours || 0) + Number(tc.overtimeHours || 0) + Number(tc.doubletimeHours || 0));
-      const key = `${customer}||${branch}||${weekend}`;
-      if (!byKey[key]) byKey[key] = { customer, branch, weekend, hours: 0, headcount: 0 };
+    for (const r of rows) {
+      const customer = r.CustomerName || '';
+      const branch   = r.BranchName   || '';
+      const weekend  = (r.WeekendBill || r.WeekendDate || '').split('T')[0];
+      const hrs      = Number(r.RHours || 0) + Number(r.OHours || 0) + Number(r.DHours || 0);
+      const key      = `${customer}||${branch}||${weekend}`;
+      if (!byKey[key]) byKey[key] = { customer, branch, weekend, hours: 0, _workers: new Set() };
       byKey[key].hours += hrs;
-      byKey[key].headcount += 1;
+      if (r.AIdent) byKey[key]._workers.add(r.AIdent);
     }
-    return Object.values(byKey);
+    return Object.values(byKey).map(({ _workers, ...rest }) => ({
+      ...rest,
+      headcount: _workers.size,
+    }));
   } catch {
     // Supabase fallback
     const sb = makeSB();
