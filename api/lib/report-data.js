@@ -118,8 +118,10 @@ async function getTWHours(start, end) {
         { headers: { 'x-tw-token': bearer, 'Accept': 'application/json' } }
       );
       if (!res.ok) throw new Error(`TW timecards ${res.status}`);
-      const page = await res.json();
-      if (!Array.isArray(page) || page.length === 0) break;
+      const envelope = await res.json();
+      // TW REST returns {"data": [...], "totalCount": N} — not a raw array
+      const page = Array.isArray(envelope) ? envelope : (envelope.data || []);
+      if (page.length === 0) break;
       records.push(...page);
       if (page.length < 1000) break;
       skip += 1000;
@@ -143,10 +145,11 @@ async function getHoursAggregated(start, end) {
     // Aggregate to customer+branch+week
     const byKey = {};
     for (const tc of records) {
-      const customer = tc.CustomerName || '';
-      const branch   = tc.BranchName   || '';
-      const weekend  = (tc.WeekendBill || '').split('T')[0];
-      const hrs = (Number(tc.RegularHours || 0) + Number(tc.OvertimeHours || 0) + Number(tc.DoubletimeHours || 0));
+      // TW REST returns camelCase field names per Swagger schema
+      const customer = tc.customerName || '';
+      const branch   = tc.branchName   || '';
+      const weekend  = (tc.weekendDate || '').split('T')[0];
+      const hrs = (Number(tc.regularHours || 0) + Number(tc.overtimeHours || 0) + Number(tc.doubletimeHours || 0));
       const key = `${customer}||${branch}||${weekend}`;
       if (!byKey[key]) byKey[key] = { customer, branch, weekend, hours: 0, headcount: 0 };
       byKey[key].hours += hrs;

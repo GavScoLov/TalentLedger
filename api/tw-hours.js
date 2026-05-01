@@ -3,8 +3,13 @@
 // paginates until all records are fetched, then returns totals grouped by
 // customer + branch + weekend_date.
 //
-// Auth: requires TW_BEARER to have time-entry-read scope.
-//       Falls back to TW_INVOICE_BEARER if TW_BEARER is not set.
+// Auth: TW_BEARER env var (falls back to TW_INVOICE_BEARER).
+//       The account must have time-entry-read scope AND be assigned to
+//       the appropriate TempWorks branches in TempWorks admin.
+//
+// Response shape: { data: [...], totalCount: N }  (TW REST pagination envelope)
+// Timecard fields (camelCase): regularHours, overtimeHours, doubletimeHours,
+//   customerName, branchName, weekendDate, employeeName, payRate, billRate
 //
 // Usage: GET /api/tw-hours?start_date=2026-01-01&end_date=2026-03-31
 
@@ -27,7 +32,6 @@ export default async function handler(req, res) {
   function getSundays(start, end) {
     const sundays = [];
     const d = new Date(start + 'T12:00:00Z');
-    // Advance to first Sunday on or after start
     if (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + (7 - d.getUTCDay()));
     const endDate = new Date(end + 'T12:00:00Z');
     while (d <= endDate) {
@@ -37,7 +41,8 @@ export default async function handler(req, res) {
     return sundays;
   }
 
-  // ── Fetch all timecards for one week (handles pagination) ─────────────────
+  // ── Fetch all timecards for one week (handles TW pagination envelope) ─────
+  // TW returns { data: [...], totalCount: N } — not a raw array.
   async function fetchWeek(weekendBill) {
     const records = [];
     let skip = 0;
@@ -54,8 +59,12 @@ export default async function handler(req, res) {
         throw new Error(`TW timecards HTTP ${twRes.status} (week ${weekendBill}): ${msg}`);
       }
 
-      const page = await twRes.json();
-      if (!Array.isArray(page) || page.length === 0) break;
+      const envelope = await twRes.json();
+
+      // Handle both raw array (legacy) and pagination envelope
+      const page = Array.isArray(envelope) ? envelope : (envelope.data || []);
+      if (page.length === 0) break;
+
       records.push(...page);
       if (page.length < take) break;
       skip += take;
@@ -73,7 +82,7 @@ export default async function handler(req, res) {
       const settled = await Promise.allSettled(batch.map(s => fetchWeek(s)));
       for (const r of settled) {
         if (r.status === 'fulfilled') results.push(...r.value);
-        // silently skip failed weeks so one bad week doesn't kill the whole range
+        // silently skip failed weeks — one bad week doesn't kill the whole range
       }
     }
     return results;
@@ -83,33 +92,33 @@ export default async function handler(req, res) {
     const sundays = getSundays(start_date, end_date);
     const timecards = await fetchAll(sundays);
 
-    // ── Aggregate by customer + branch + weekend ──────────────────────────
+    // ── Aggregate by customer + branch + weekend_date ─────────────────────
+    // Field names from TW REST schema are camelCase.
     const byKey = {};
     for (const tc of timecards) {
-      const customer   = tc.CustomerName  || tc.customerName  || '';
-      const branch     = tc.BranchName    || tc.branchName    || '';
-      const weekend    = tc.WeekendBill   || tc.weekendBill   || '';
-      const weekStr    = weekend ? weekend.split('T')[0] : '';
-      const regHrs     = Number(tc.RegularHours    || tc.regularHours    || 0);
-      const otHrs      = Number(tc.OvertimeHours   || tc.overtimeHours   || 0);
-      const dtHrs      = Number(tc.DoubletimeHours || tc.doubletimeHours || 0);
-      const totalHrs   = regHrs + otHrs + dtHrs;
+      const customer = tc.customerName || '';
+      const branch   = tc.branchName   || '';
+      // weekendDate comes back as a datetime string e.g. "2026-01-04T00:00:00"
+      const weekStr  = (tc.weekendDate || '').split('T')[0];
+      const regHrs   = Number(tc.regularHours    || 0);
+      const otHrs    = Number(tc.overtimeHours   || 0);
+      const dtHrs    = Number(tc.doubletimeHours || 0);
 
       const key = `${customer}||${branch}||${weekStr}`;
       if (!byKey[key]) {
         byKey[key] = {
-          customer_name:   customer,
-          branch_name:     branch,
-          weekend_date:    weekStr,
-          regular_hours:   0,
-          overtime_hours:  0,
-          total_hours:     0,
-          headcount:       0,
+          customer_name:  customer,
+          branch_name:    branch,
+          weekend_date:   weekStr,
+          regular_hours:  0,
+          overtime_hours: 0,
+          total_hours:    0,
+          headcount:      0,
         };
       }
       byKey[key].regular_hours  += regHrs;
       byKey[key].overtime_hours += otHrs;
-      byKey[key].total_hours    += totalHrs;
+      byKey[key].total_hours    += regHrs + otHrs + dtHrs;
       byKey[key].headcount      += 1;
     }
 
