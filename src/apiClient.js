@@ -83,77 +83,100 @@ export async function fetchTotalBillingByCompany(startDate, endDate) {
   return Object.values(byKey);
 }
 
-// ── Hours Aggregations — from Supabase tw_ tables ─────────────────────────
-// tw_customer_weekly_summary has total_hours per customer per week, but no
-// branch field.  We infer branch by matching customer+week against the invoice
-// register (which does carry branchname).
+// ── Hours Aggregations ────────────────────────────────────────────────────
+// Primary:  /api/tw-hours  (TempWorks REST — needs TW_BEARER with time-entry-read)
+// Fallback: Supabase tw_customer_weekly_summary (n8n sync — may be incomplete)
+
+let _hoursCache    = null;
+let _hoursCacheKey = null;
+
+async function fetchTWHours(startDate, endDate) {
+  const cacheKey = `${startDate}_${endDate}`;
+  if (_hoursCacheKey === cacheKey && _hoursCache) return _hoursCache;
+  const res = await fetch(`/api/tw-hours?start_date=${startDate}&end_date=${endDate}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `TW Hours API error ${res.status}`);
+  }
+  _hoursCache    = await res.json();
+  _hoursCacheKey = cacheKey;
+  return _hoursCache;
+}
+
+async function getHoursWithBranch(startDate, endDate) {
+  // Try live TW REST endpoint first
+  try {
+    const twData = await fetchTWHours(startDate, endDate);
+    return twData.map(r => ({
+      customer_name: r.customer_name,
+      branch:        r.branch_name || '',
+      weekend_date:  r.weekend_date,
+      total_hours:   r.total_hours || 0,
+      headcount:     r.headcount   || 0,
+    }));
+  } catch {
+    // Fall back to Supabase (may be incomplete for older dates)
+    const { data: sbRows } = await supabase
+      .from('tw_customer_weekly_summary')
+      .select('customer_name, weekend_date, total_hours, headcount')
+      .gte('weekend_date', startDate)
+      .lte('weekend_date', endDate);
+    const invoices = await fetchTWInvoices(startDate, endDate);
+    const branchByWeek = {}, branchByCustomer = {};
+    for (const r of invoices) {
+      if (r.customername && r.branchname) {
+        branchByWeek[`${r.customername}||${r.weekendbill}`] = r.branchname;
+        if (!branchByCustomer[r.customername]) branchByCustomer[r.customername] = r.branchname;
+      }
+    }
+    return (sbRows || []).map(r => ({
+      customer_name: r.customer_name,
+      branch:        branchByWeek[`${r.customer_name}||${r.weekend_date}`]
+                     || branchByCustomer[r.customer_name] || '',
+      weekend_date:  r.weekend_date,
+      total_hours:   r.total_hours || 0,
+      headcount:     r.headcount   || 0,
+    }));
+  }
+}
 
 export async function fetchTotalHoursByCompany(startDate, endDate) {
-  const [{ data: hoursData }, invoices] = await Promise.all([
-    supabase
-      .from('tw_customer_weekly_summary')
-      .select('customer_name, weekend_date, total_hours, total_regular, total_overtime, headcount')
-      .gte('weekend_date', startDate)
-      .lte('weekend_date', endDate),
-    fetchTWInvoices(startDate, endDate),
-  ]);
-
-  // Build branch lookup: customer+week → branch (exact match)
-  // and customer → branch (fallback — most-recently-seen branch)
-  const branchByWeek     = {};
-  const branchByCustomer = {};
-  for (const r of invoices) {
-    if (r.customername && r.branchname) {
-      branchByWeek[`${r.customername}||${r.weekendbill}`] = r.branchname;
-      if (!branchByCustomer[r.customername]) branchByCustomer[r.customername] = r.branchname;
-    }
-  }
-
-  return (hoursData || []).map(r => ({
+  const rows = await getHoursWithBranch(startDate, endDate);
+  return rows.map(r => ({
     company_name: r.customer_name,
-    total_hours:  r.total_hours  || 0,
-    branch:       branchByWeek[`${r.customer_name}||${r.weekend_date}`]
-                  || branchByCustomer[r.customer_name]
-                  || '',
+    total_hours:  r.total_hours,
+    branch:       r.branch,
     weekend_bill: r.weekend_date,
   }));
 }
 
 export async function fetchTotalHoursByBranch(startDate, endDate) {
-  const { data } = await supabase
-    .from('tw_branch_weekly_summary')
-    .select('branch_name, weekend_date, total_hours, headcount')
-    .gte('weekend_date', startDate)
-    .lte('weekend_date', endDate);
-  return (data || []).map(r => ({
-    branch:       r.branch_name,
-    total_hours:  r.total_hours || 0,
-    weekend_bill: r.weekend_date,
-  }));
+  const rows = await getHoursWithBranch(startDate, endDate);
+  const byKey = {};
+  for (const r of rows) {
+    const key = `${r.branch}||${r.weekend_date}`;
+    if (!byKey[key]) byKey[key] = { branch: r.branch, weekend_bill: r.weekend_date, total_hours: 0 };
+    byKey[key].total_hours += r.total_hours;
+  }
+  return Object.values(byKey);
 }
 
 export async function fetchUniqueCountByBranch(startDate, endDate) {
-  const { data } = await supabase
-    .from('tw_branch_weekly_summary')
-    .select('branch_name, weekend_date, headcount')
-    .gte('weekend_date', startDate)
-    .lte('weekend_date', endDate);
-  return (data || []).map(r => ({
-    branch:       r.branch_name,
-    unique_count: r.headcount || 0,
-    weekend_bill: r.weekend_date,
-  }));
+  const rows = await getHoursWithBranch(startDate, endDate);
+  const byKey = {};
+  for (const r of rows) {
+    const key = `${r.branch}||${r.weekend_date}`;
+    if (!byKey[key]) byKey[key] = { branch: r.branch, weekend_bill: r.weekend_date, unique_count: 0 };
+    byKey[key].unique_count += r.headcount;
+  }
+  return Object.values(byKey);
 }
 
 export async function fetchUniqueCountByCompany(startDate, endDate) {
-  const { data } = await supabase
-    .from('tw_customer_weekly_summary')
-    .select('customer_name, weekend_date, headcount')
-    .gte('weekend_date', startDate)
-    .lte('weekend_date', endDate);
-  return (data || []).map(r => ({
+  const rows = await getHoursWithBranch(startDate, endDate);
+  return rows.map(r => ({
     company_name: r.customer_name,
-    unique_count: r.headcount || 0,
+    unique_count: r.headcount,
     weekend_bill: r.weekend_date,
   }));
 }
