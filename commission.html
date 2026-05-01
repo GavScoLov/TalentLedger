@@ -206,6 +206,7 @@
                             <option value="">-- Select Producer --</option>
                         </select>
                         <button type="button" class="btn btn-outlined btn-sm" id="new-producer-btn" title="Add new producer">+ New</button>
+                        <button type="button" class="btn btn-sm" id="delete-producer-btn" title="Delete selected producer" style="display:none;background:#DC2626;color:#fff;border:1px solid #DC2626;">Delete</button>
                     </div>
 
                     <!-- Show/hide old companies toggle -->
@@ -234,6 +235,18 @@
 
                     <button type="button" class="btn btn-primary" style="width:100%;margin-top:8px;" id="save-commissions-btn">Save Commissions</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Producer Confirmation Modal -->
+    <div class="modal-overlay" id="delete-producer-modal">
+        <div class="modal">
+            <h3 style="color:#DC2626;">Delete Producer</h3>
+            <p id="delete-producer-text" style="color:var(--text-secondary);font-size:14px;margin:0 0 20px;line-height:1.5;"></p>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" class="btn btn-outlined" id="cancel-delete-producer">Cancel</button>
+                <button type="button" class="btn" id="confirm-delete-producer" style="background:#DC2626;color:#fff;border:1px solid #DC2626;">Delete</button>
             </div>
         </div>
     </div>
@@ -344,6 +357,21 @@
             }));
             const { error } = await supabase.from('producer_commissions').insert(rows);
             if (error) throw error;
+        }
+
+        async function deleteProducer(producerId) {
+            const producer = producers.find(p => String(p.id) === String(producerId));
+            if (!producer) return;
+            // Delete commissions first, then the producer record
+            await supabase.from('producer_commissions').delete().eq('producer_id', producerId);
+            const { error } = await supabase.from('producers').delete().eq('id', producerId);
+            if (error) throw error;
+            showMessage(`Producer "${producer.name}" deleted.`, 'success');
+            selectedProducerId = '';
+            commissions = [];
+            document.getElementById('delete-producer-btn').style.display = 'none';
+            await loadProducers();
+            renderCompanyPanel();
         }
 
         // ── UI Helpers ───────────────────────────────────────────
@@ -928,6 +956,7 @@
         // Producer select
         document.getElementById('producer_select').addEventListener('change', async (e) => {
             selectedProducerId = e.target.value;
+            document.getElementById('delete-producer-btn').style.display = selectedProducerId ? '' : 'none';
             if (selectedProducerId) {
                 await loadCommissions(selectedProducerId);
             } else {
@@ -980,6 +1009,29 @@
             document.getElementById('producer-report-dropdown').classList.remove('open');
         });
         document.getElementById('producer-report-dropdown').addEventListener('click', (e) => { e.stopPropagation(); });
+
+        // Delete producer button — opens confirmation modal
+        document.getElementById('delete-producer-btn').addEventListener('click', () => {
+            const producer = producers.find(p => String(p.id) === String(selectedProducerId));
+            if (!producer) return;
+            document.getElementById('delete-producer-text').textContent =
+                `Are you sure you want to delete "${producer.name}"? All of their commission assignments will also be removed. This cannot be undone.`;
+            document.getElementById('delete-producer-modal').classList.add('open');
+        });
+        document.getElementById('cancel-delete-producer').addEventListener('click', () => {
+            document.getElementById('delete-producer-modal').classList.remove('open');
+        });
+        document.getElementById('delete-producer-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+        });
+        document.getElementById('confirm-delete-producer').addEventListener('click', async () => {
+            document.getElementById('delete-producer-modal').classList.remove('open');
+            try {
+                await deleteProducer(selectedProducerId);
+            } catch (err) {
+                showMessage(`Error deleting producer: ${err.message}`, 'error');
+            }
+        });
 
         // New producer modal
         document.getElementById('new-producer-btn').addEventListener('click', () => {
